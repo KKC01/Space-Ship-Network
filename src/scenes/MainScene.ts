@@ -576,8 +576,11 @@ export class MainScene extends Scene {
           }
 
           if (ship.assignedSlots.includes(currentSlot)) {
-            // It's our slot! Try to transmit
-            this.handleOpticalTransmission(ship);
+            if (ship.lastTransmittedSlot !== currentSlot) {
+              ship.lastTransmittedSlot = currentSlot;
+              // It's our slot! Try to transmit
+              this.handleOpticalTransmission(ship);
+            }
           }
         }
       }
@@ -1032,6 +1035,8 @@ export class MainScene extends Scene {
       });
 
       const waveSpeed = 750;
+      const drawnCircleHubs = new Set<string>();
+      
       this.activePolls.forEach(poll => {
         const hub = this.spaceships.get(poll.hubId);
         const target = this.spaceships.get(poll.targetId);
@@ -1059,25 +1064,30 @@ export class MainScene extends Scene {
             const motionColor = poll.rangeMode === 'optical' ? 0xa855f7 : 0x38bdf8; // Purple for Multiplex, Blue for Standard
             if (this.vizMode === 'circles') {
               // Circle Mode: Expanding Wave (Double circle)
-              const alpha = Math.max(0, 0.6 * (1 - resWaveDist / maxRange));
-              const centerX = poll.rangeMode === 'optical' ? hub.x : target.x;
-              const centerY = poll.rangeMode === 'optical' ? hub.y : target.y;
-              
-              this.linkGraphics.lineStyle(2, motionColor, alpha);
-              this.linkGraphics.strokeCircle(centerX, centerY, resWaveDist);
-              
-              if (resWaveDist > 30) {
-                this.linkGraphics.lineStyle(1, motionColor, alpha * 0.7);
-                this.linkGraphics.strokeCircle(centerX, centerY, resWaveDist - 30);
+              // Ensure only one double-circle is drawn per hub to prevent overlapping clutter
+              const hubId = poll.rangeMode === 'optical' ? hub.id : target.id;
+              if (!drawnCircleHubs.has(hubId)) {
+                drawnCircleHubs.add(hubId);
+                const alpha = Math.max(0, 0.6 * (1 - resWaveDist / maxRange));
+                const centerX = poll.rangeMode === 'optical' ? hub.x : target.x;
+                const centerY = poll.rangeMode === 'optical' ? hub.y : target.y;
+                
+                this.linkGraphics.lineStyle(2, motionColor, alpha);
+                this.linkGraphics.strokeCircle(centerX, centerY, resWaveDist);
+                
+                if (poll.rangeMode === 'optical' && resWaveDist > 30) {
+                  this.linkGraphics.lineStyle(1, motionColor, alpha * 0.7);
+                  this.linkGraphics.strokeCircle(centerX, centerY, resWaveDist - 30);
+                }
               }
             } else if (this.vizMode === 'dots') {
               // Dot Mode: Multiple Streamlines
               const activeNodes = Array.from(this.spaceships.values()).filter(s => s.isNodeActive);
               this.spaceships.forEach(nearbyShip => {
-                if (nearbyShip.id === hub.id) return; // Don't draw to self
-                
                 // For Multiplex (broadcast poll), sender is hub. For standard, sender is target.
                 const startNode = poll.rangeMode === 'optical' ? hub : target;
+                if (nearbyShip.id === startNode.id) return; // Don't draw to self
+                
                 const d = CommunicationSystem.getDistance(startNode.x, startNode.y, nearbyShip.x, nearbyShip.y);
                 
                 const canConnect = poll.rangeMode === 'optical' 
@@ -1086,7 +1096,13 @@ export class MainScene extends Scene {
 
                 if (canConnect && resWaveDist <= d + 100) {
                   const t = Math.min(1.0, resWaveDist / d);
-                  if (t > 0) this.drawStreamline(startNode.x, startNode.y, nearbyShip.x, nearbyShip.y, t, motionColor);
+                  if (t > 0) {
+                    if (poll.rangeMode === 'optical') {
+                      this.drawFourDots(startNode.x, startNode.y, nearbyShip.x, nearbyShip.y, t, motionColor);
+                    } else {
+                      this.drawStreamline(startNode.x, startNode.y, nearbyShip.x, nearbyShip.y, t, motionColor);
+                    }
+                  }
                 }
               });
             }
@@ -1178,7 +1194,7 @@ export class MainScene extends Scene {
 
   private drawStreamline(startX: number, startY: number, endX: number, endY: number, progress: number, color: number) {
     const totalDist = Math.sqrt(Math.pow(endX - startX, 2) + Math.pow(endY - startY, 2));
-    const segmentLen = 20; // Short lines
+    const segmentLen = 5; // Shorter lines
     
     const headT = progress;
     const tailT = Math.max(0, headT - (segmentLen / totalDist));
@@ -1188,10 +1204,24 @@ export class MainScene extends Scene {
     const tailX = startX + (endX - startX) * tailT;
     const tailY = startY + (endY - startY) * tailT;
 
-    this.linkGraphics.lineStyle(3, color, 0.8);
+    this.linkGraphics.lineStyle(2, color, 0.8);
     this.linkGraphics.lineBetween(tailX, tailY, headX, headY);
-    this.linkGraphics.fillStyle(color, 1.0);
-    this.linkGraphics.fillCircle(headX, headY, 3);
+    // Removed the head dot to avoid looking like a ping/poll
+  }
+
+  private drawFourDots(startX: number, startY: number, endX: number, endY: number, progress: number, color: number) {
+    const totalDist = Math.sqrt(Math.pow(endX - startX, 2) + Math.pow(endY - startY, 2));
+    
+    for (let i = 0; i < 4; i++) {
+      const offset = (i * 20) / totalDist;
+      const t = progress - offset;
+      if (t >= 0 && t <= 1) {
+        const x = startX + (endX - startX) * t;
+        const y = startY + (endY - startY) * t;
+        this.linkGraphics.fillStyle(color, 1.0 - (i * 0.2));
+        this.linkGraphics.fillCircle(x, y, 2.5);
+      }
+    }
   }
 
   private checkWinLoss() {
