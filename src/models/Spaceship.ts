@@ -37,6 +37,7 @@ export class Spaceship {
   public isOpticalRelayEnabled: boolean = false;
   public assignedSlots: number[] = [];
   public selectedMasterId: string | null = null;
+  public lastTransmittedSlot: number = -1;
   
   public hp: number = 100;
   public maxHp: number = 100;
@@ -48,7 +49,7 @@ export class Spaceship {
   public pollingList: string[] = [];
   public isWaitingForResponse: boolean = false;
   private pollingTimer: number = 0;
-  private static readonly POLLING_DELAY_MS = 100; 
+  private static readonly POLLING_DELAY_MS = 33; 
   public currentPollingIndex: number = 0;
 
   public freqChangeTimer: number = 0;

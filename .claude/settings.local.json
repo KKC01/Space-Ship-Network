@@ -1,5 +1,5 @@
 {
   "env": {
-    "HF_API_TOKEN": "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"
+      "GEMINI_API_KEY":"AIzaSyBX25_7FmgsRr1FD3ZmdJxlxFaKf27ZRHI"
   }
 }
