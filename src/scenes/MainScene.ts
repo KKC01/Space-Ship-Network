@@ -2,9 +2,11 @@ import { Scene } from 'phaser';
 import { Spaceship } from '../models/Spaceship';
 import { PacketType, FreqShort, FreqLong, SystemDisplayMode } from '../models/DataPacket';
 import { CommunicationSystem } from '../models/CommunicationSystem';
+import { OpticalMaster } from '../models/OpticalMaster';
 
 export class MainScene extends Scene {
   private spaceships: Map<string, Spaceship> = new Map();
+  private opticalMasters: OpticalMaster[] = [];
 
   private shipGraphics: Map<string, Phaser.GameObjects.Graphics> = new Map();
   private linkGraphics!: Phaser.GameObjects.Graphics;
@@ -14,8 +16,6 @@ export class MainScene extends Scene {
   private textLabels: Map<string, Phaser.GameObjects.Text> = new Map();
 
   // DOM Elements
-  private domTime!: HTMLElement | null;
-  private domCoverage!: HTMLElement | null;
   private domGameOver!: HTMLElement | null;
   private domGameTitle!: HTMLElement | null;
   private domGameDesc!: HTMLElement | null;
@@ -34,6 +34,12 @@ export class MainScene extends Scene {
   private domRgrContainer!: HTMLElement | null;
   private domRgrList!: HTMLElement | null;
   private domModalClose: HTMLElement | null = null;
+  private domMultiplexEnable!: HTMLInputElement | null;
+  private domMultiplexMaster!: HTMLSelectElement | null;
+  private domMultiplexSpeed!: HTMLSelectElement | null;
+  private domMultiplexCipher!: HTMLSelectElement | null;
+  private domMultiplexRelay!: HTMLInputElement | null;
+  private domToggleStatusBtn!: HTMLElement | null;
 
   private domScaleBarLine!: HTMLElement | null;
   private domScaleBarText!: HTMLElement | null;
@@ -44,12 +50,10 @@ export class MainScene extends Scene {
   private systemDisplayMode: SystemDisplayMode = SystemDisplayMode.CONTROL;
   private vizMode: 'dots' | 'circles' | 'quality' | 'range' = 'circles';
   
-  private detectionPacketId = 'detect-001';
+  
   private surveyPoint = { x: 3000, y: 3000, radius: 200 };
-  private missionStatus = { reach: false, link: false, data: false };
   
   private selectedUnitId: string | null = null;
-  private responsePulses: {x: number, y: number, r: number, alpha: number}[] = [];
   private activePolls: {
     hubId: string, 
     targetId: string, 
@@ -58,7 +62,7 @@ export class MainScene extends Scene {
     responseStarted: boolean,
     distance: number,
     isBroadcast?: boolean,
-    rangeMode?: 'short' | 'long'
+    rangeMode?: 'short' | 'long' | 'optical'
   }[] = [];
   
   // Link history: Key is "id1-id2", value is timestamp of last success
@@ -107,8 +111,6 @@ export class MainScene extends Scene {
   }
 
   private initDOM() {
-    this.domTime = document.getElementById('time-display');
-    this.domCoverage = document.getElementById('coverage-display');
     this.domGameOver = document.getElementById('game-over-panel');
     this.domGameTitle = document.getElementById('game-over-title');
     this.domGameDesc = document.getElementById('game-over-desc');
@@ -140,6 +142,65 @@ export class MainScene extends Scene {
     if (this.domShortFreq) this.domShortFreq.onchange = (e) => updateLocal(e);
     if (this.domLongEnable) this.domLongEnable.onchange = (e) => updateLocal(e);
     if (this.domLongFreq) this.domLongFreq.onchange = (e) => updateLocal(e);
+
+    this.domMultiplexEnable = document.getElementById('multiplex-enable') as HTMLInputElement;
+    this.domMultiplexMaster = document.getElementById('multiplex-master') as HTMLSelectElement;
+    this.domMultiplexSpeed = document.getElementById('multiplex-speed') as HTMLSelectElement;
+    this.domMultiplexCipher = document.getElementById('multiplex-cipher') as HTMLSelectElement;
+    this.domMultiplexRelay = document.getElementById('multiplex-relay') as HTMLInputElement;
+    this.domToggleStatusBtn = document.getElementById('toggle-status-btn');
+
+    const updateMultiplex = (e?: Event) => {
+      if (e && e.isTrusted && this.selectedUnitId) {
+        const ship = this.spaceships.get(this.selectedUnitId);
+        if (ship) {
+          if (this.domMultiplexEnable) ship.isMultiplexEnabled = this.domMultiplexEnable.checked;
+          if (this.domMultiplexMaster) ship.selectedMasterId = this.domMultiplexMaster.value || null;
+          if (this.domMultiplexSpeed) ship.multiplexSpeed = this.domMultiplexSpeed.value as any;
+          if (this.domMultiplexCipher) ship.multiplexCipher = this.domMultiplexCipher.value as any;
+          if (this.domMultiplexRelay) ship.isOpticalRelayEnabled = this.domMultiplexRelay.checked;
+          
+          if (e.target === this.domMultiplexMaster) {
+            ship.assignedSlots = [];
+          }
+        }
+      }
+    };
+
+    if (this.domMultiplexEnable) this.domMultiplexEnable.onchange = (e) => updateMultiplex(e);
+    if (this.domMultiplexMaster) this.domMultiplexMaster.onchange = (e) => updateMultiplex(e);
+    if (this.domMultiplexSpeed) this.domMultiplexSpeed.onchange = (e) => updateMultiplex(e);
+    if (this.domMultiplexCipher) this.domMultiplexCipher.onchange = (e) => updateMultiplex(e);
+    if (this.domMultiplexRelay) this.domMultiplexRelay.onchange = (e) => updateMultiplex(e);
+
+    if (this.domToggleStatusBtn) {
+      this.domToggleStatusBtn.onclick = () => {
+        if (this.domRgrContainer) {
+          const isHidden = this.domRgrContainer.classList.contains('hidden');
+          if (isHidden) {
+            this.domRgrContainer.classList.remove('hidden');
+            this.domToggleStatusBtn!.textContent = 'COMMUNICATION STATUS 非表示';
+          } else {
+            this.domRgrContainer.classList.add('hidden');
+            this.domToggleStatusBtn!.textContent = 'COMMUNICATION STATUS 表示';
+          }
+        }
+      };
+    }
+
+    // Accordion Logic
+    const setupAccordion = (btnId: string, contentId: string) => {
+      const btn = document.getElementById(btnId);
+      const content = document.getElementById(contentId);
+      if (btn && content) {
+        btn.onclick = () => {
+          btn.classList.toggle('open');
+          content.classList.toggle('open');
+        };
+      }
+    };
+    setupAccordion('multiplex-group-btn', 'multiplex-group-content');
+    setupAccordion('optical-group-btn', 'optical-group-content');
 
     this.domSendCmdBtn = document.getElementById('send-cmd-btn');
     this.domRgrContainer = document.getElementById('rgr-container');
@@ -236,8 +297,13 @@ export class MainScene extends Scene {
     if (domStartMissionBtn && domBriefingOverlay) {
       domStartMissionBtn.onclick = () => {
         this.isBriefingActive = false;
-        domBriefingOverlay.style.display = 'none';
+        domBriefingOverlay.classList.add('hidden');
+        console.log("Mission Started");
       };
+    } else {
+      console.warn("Briefing overlay or start button not found!");
+      // Fallback: start game anyway if button missing
+      this.isBriefingActive = false;
     }
 
     if (this.domModalClose) {
@@ -269,6 +335,10 @@ export class MainScene extends Scene {
       }
       this.spaceships.set(id, ship);
     }
+
+    // Initialize Optical Masters
+    this.opticalMasters.push(new OpticalMaster('Master-Alpha', cx - 1000, cy - 1000));
+    this.opticalMasters.push(new OpticalMaster('Master-Beta', cx + 1000, cy + 1000));
 
     for (const id of this.spaceships.keys()) {
       const g = this.add.graphics().setDepth(5);
@@ -353,7 +423,7 @@ export class MainScene extends Scene {
 
   private openUnitModal() {
     if (!this.selectedUnitId || !this.domUnitModal) return;
-    this.domUnitModal.classList.remove('hidden');
+    if (this.domUnitModal) this.domUnitModal.classList.remove('hidden');
     this.updateModalData();
   }
 
@@ -363,9 +433,22 @@ export class MainScene extends Scene {
     const unit = this.spaceships.get(this.selectedUnitId);
     if (!unit) return;
 
+    // Update Master List dynamically
+    if (this.domMultiplexMaster) {
+      const currentMasterId = unit.selectedMasterId;
+      this.domMultiplexMaster.innerHTML = '<option value="">-- 連接マスターを選択 --</option>';
+      this.spaceships.forEach(s => {
+        const opt = document.createElement('option');
+        opt.value = s.id;
+        opt.textContent = `連接マスター: ${s.id}`;
+        this.domMultiplexMaster!.appendChild(opt);
+      });
+      this.domMultiplexMaster.value = currentMasterId || '';
+    }
+
     if (this.domUnitTitle) this.domUnitTitle.textContent = unit.id;
-    if (this.domUnitType) this.domUnitType.textContent = 'Space Legacy Destroyer';
-    if (this.domUnitLevel) this.domUnitLevel.textContent = `LV ${unit.level}${unit.isNodeActive ? ' (NODE)' : ''}`;
+    if (this.domUnitType) this.domUnitType.textContent = 'Destroyer';
+    if (this.domUnitLevel) this.domUnitLevel.textContent = `LV ${unit.level}`;
 
     let targets = 0;
     this.clutters.forEach(c => {
@@ -378,6 +461,12 @@ export class MainScene extends Scene {
     if (this.domLongEnable) this.domLongEnable.checked = unit.isLongEnabled;
     if (this.domLongFreq) this.domLongFreq.value = unit.longFreq;
 
+    if (this.domMultiplexEnable) this.domMultiplexEnable.checked = unit.isMultiplexEnabled;
+    if (this.domMultiplexMaster) this.domMultiplexMaster.value = unit.selectedMasterId || '';
+    if (this.domMultiplexSpeed) this.domMultiplexSpeed.value = unit.multiplexSpeed;
+    if (this.domMultiplexCipher) this.domMultiplexCipher.value = unit.multiplexCipher;
+    if (this.domMultiplexRelay) this.domMultiplexRelay.checked = unit.isOpticalRelayEnabled;
+
     // Authority check: Show "Send Command" only if HQ is selected AND active
     if (unit.id === 'HQ Ship' && unit.isNodeActive) {
         this.domSendCmdBtn?.classList.remove('hidden');
@@ -387,7 +476,7 @@ export class MainScene extends Scene {
 
     const domToggleRoleBtn = document.getElementById('toggle-role-btn');
     if (domToggleRoleBtn) {
-      domToggleRoleBtn.textContent = unit.isNodeActive ? 'ノード選択解除' : 'ノードに設定';
+      domToggleRoleBtn.textContent = unit.isNodeActive ? 'ノード設定解除' : 'ノードに設定';
     }
 
     this.domShortEnable?.removeAttribute('disabled');
@@ -395,40 +484,37 @@ export class MainScene extends Scene {
     this.domLongEnable?.removeAttribute('disabled');
     this.domLongFreq?.removeAttribute('disabled');
     
-    // Communication Status Table (Color-based)
-    this.domRgrContainer?.classList.remove('hidden');
+    // Communication Status Table (Keep visibility state)
     if (this.domRgrList) {
       this.domRgrList.innerHTML = '';
       const activeNodes = Array.from(this.spaceships.values()).filter(s => s.isNodeActive);
       
       this.spaceships.forEach(s => {
         if (s.id === unit.id) return;
-        const { canConnect, dropRate } = CommunicationSystem.getLinkQuality(unit, s, activeNodes);
+        const { canConnect: canRadio, dropRate: radioRate } = CommunicationSystem.getLinkQuality(unit, s, activeNodes);
+        const { canConnect: canOpt, dropRate: optRate } = CommunicationSystem.getOpticalMultiplexQuality(unit, s, activeNodes);
         
-        let statusColor = '#ef4444'; // Red (Default/Offline)
-        let statusText = 'OFFLINE';
-        let statusIcon = '×';
+        let radioColor = '#ef4444'; 
+        let radioText = 'OFFLINE';
+        if (canRadio) {
+          radioColor = radioRate < 0.2 ? '#4ade80' : '#facc15';
+          radioText = radioRate < 0.2 ? 'STABLE' : 'WEAK';
+        }
 
-        if (canConnect) {
-          if (dropRate < 0.2) {
-            statusColor = '#4ade80'; // Green (Stable)
-            statusText = 'STABLE';
-            statusIcon = '●';
-          } else if (dropRate < 0.8) {
-            statusColor = '#facc15'; // Yellow (Warning/Interference)
-            statusText = 'UNSTABLE';
-            statusIcon = '▲';
-          } else {
-            statusColor = '#ef4444'; // Red (High Error)
-            statusText = 'POOR';
-            statusIcon = '×';
-          }
+        let optColor = '#ef4444';
+        let optText = 'OFFLINE';
+        if (canOpt) {
+          optColor = optRate < 0.2 ? '#a855f7' : '#d8b4fe'; // Purple
+          optText = optRate < 0.2 ? 'STABLE' : 'WEAK';
         }
         
         this.domRgrList!.innerHTML += `
-          <div style="display: flex; justify-content: space-between; padding: 4px 0; border-bottom: 1px solid rgba(255,255,255,0.05); font-size: 12px;">
-            <span style="color: #94a3b8;">${s.id}</span>
-            <span style="color: ${statusColor}; font-weight: bold;">${statusIcon} ${statusText}</span>
+          <div style="padding: 6px 0; border-bottom: 1px solid rgba(255,255,255,0.05); font-size: 10px;">
+            <div style="color: #94a3b8; margin-bottom: 2px;">${s.id}</div>
+            <div style="display: flex; justify-content: space-between;">
+              <span>光通信: <span style="color: ${radioColor};">${radioText}</span></span>
+              <span>多重通信: <span style="color: ${optColor};">${optText}</span></span>
+            </div>
           </div>`;
       });
     }
@@ -458,11 +544,43 @@ export class MainScene extends Scene {
     if (this.isGameOver || this.isBriefingActive) return;
 
     this.timeElapsedMs += delta;
-    const deltaSeconds = delta / 1000;
-    const activeNodes = Array.from(this.spaceships.values()).filter(s => s.isNodeActive);
 
     for (const ship of this.spaceships.values()) {
       ship.update(delta, this.spaceships, (node, target) => this.handlePolling(node, target));
+
+      // TDMA Logic
+      if (ship.isMultiplexEnabled && ship.selectedMasterId) {
+        let m = this.opticalMasters.find(om => om.id === ship.selectedMasterId);
+        
+        // Dynamically create master logic if it doesn't exist
+        if (!m) {
+          m = new OpticalMaster(ship.selectedMasterId, 0, 0); // Position doesn't matter
+          this.opticalMasters.push(m);
+        }
+
+        if (m) {
+          const currentSlot = m.getCurrentSlotIndex(this.timeElapsedMs / 1000);
+          
+          // Auto-assign multiple slots to fill the frame if not assigned
+          if (ship.assignedSlots.length === 0) {
+            const shipIndex = Array.from(this.spaceships.keys()).indexOf(ship.id);
+            const totalShips = this.spaceships.size;
+            if (totalShips > 0) {
+              const slotsPerShip = Math.floor(OpticalMaster.MAX_SLOTS / totalShips);
+              const mySlots: number[] = [];
+              for (let i = 0; i < slotsPerShip; i++) {
+                mySlots.push(shipIndex + (i * totalShips));
+              }
+              ship.assignedSlots = mySlots;
+            }
+          }
+
+          if (ship.assignedSlots.includes(currentSlot)) {
+            // It's our slot! Try to transmit
+            this.handleOpticalTransmission(ship);
+          }
+        }
+      }
     }
 
     if (this.domUnitModal && !this.domUnitModal.classList.contains('hidden')) {
@@ -629,6 +747,49 @@ export class MainScene extends Scene {
     }
   }
 
+  private handleOpticalTransmission(ship: Spaceship) {
+    let transmissionOccurred = false;
+
+    // Find targets within 750km (Optical range)
+    this.spaceships.forEach(target => {
+      if (target.id === ship.id) return;
+      
+      const { canConnect, dropRate } = CommunicationSystem.getOpticalMultiplexQuality(ship, target, Array.from(this.spaceships.values()).filter(s => s.isNodeActive));
+      
+      if (canConnect && Math.random() >= dropRate) {
+        transmissionOccurred = true;
+        // Even if queue is empty, we send a heartbeat for visual connection
+        const packetsToTransmit = ship.getPacketsToTransmit();
+        const packets = packetsToTransmit.length > 0 ? packetsToTransmit.map(p => ({
+          ...p,
+          payload: { ...p.payload, isOptical: true, cipher: ship.multiplexCipher }
+        })) : [{
+          id: `heartbeat-${Date.now()}-${ship.id}`,
+          type: PacketType.NORMAL,
+          createdAt: Date.now(),
+          originShipId: ship.id,
+          payload: { isOptical: true, isHeartbeat: true }
+        }];
+        
+        packets.forEach(p => target.receivePacket(p as any));
+        this.recordLinkSuccess(ship.id, target.id);
+      }
+    });
+
+    if (transmissionOccurred) {
+      // Trigger visual effect (Single broadcast poll for the sender)
+      this.activePolls.push({
+        hubId: ship.id,
+        targetId: ship.id, // Use sender as target for broadcast center
+        startTime: this.timeElapsedMs,
+        callReached: true, 
+        responseStarted: true,
+        distance: 0,
+        rangeMode: 'optical'
+      });
+    }
+  }
+
   private draw(time: number) {
     this.linkGraphics.clear();
     this.linkGraphics.setBlendMode(Phaser.BlendModes.ADD);
@@ -650,6 +811,8 @@ export class MainScene extends Scene {
       this.clutterGraphics.fillStyle(0x94a3b8, alpha);
       this.clutterGraphics.fillCircle(c.x, c.y, size);
     });
+
+    // 0c. Optical Masters (Hidden from map as per request)
 
     // 1. Draw Survey Point (Yellow Circle) with expanding pulse motion
     const pulseRate = (time % 2000) / 2000;
@@ -798,30 +961,60 @@ export class MainScene extends Scene {
       } else {
         this.textLabels.get(warningLabelId)?.setVisible(false);
       }
+    });
 
-      // Coverage Circles for Selected Unit (Control Mode Only)
-      if (isSelected && isControl) {
-        // Short Range (750km)
-        g.lineStyle(1, 0x38bdf8, 0.3);
+    // 1. Draw Individual Ship Range Circles
+    this.spaceships.forEach(ship => {
+      const g = this.shipGraphics.get(ship.id);
+      if (g && ship.isNodeActive) {
+        g.lineStyle(1, 0x38bdf8, 0.4);
         g.strokeCircle(ship.x, ship.y, 750);
-        
-        // Long Range (2500km)
         g.lineStyle(1, 0x38bdf8, 0.15);
         g.strokeCircle(ship.x, ship.y, 2500);
-
-        // Labels for ranges
-        if (!this.textLabels.has(`range-label-s-${ship.id}`)) {
-          this.textLabels.set(`range-label-s-${ship.id}`, this.add.text(ship.x, ship.y - 755, '近距離限界 (750km)', { fontSize: '10px', color: '#38bdf8', alpha: 0.6 }).setOrigin(0.5));
-          this.textLabels.set(`range-label-l-${ship.id}`, this.add.text(ship.x, ship.y - 2505, '遠距離限界 (2500km)', { fontSize: '10px', color: '#38bdf8', alpha: 0.4 }).setOrigin(0.5));
-        } else {
-          this.textLabels.get(`range-label-s-${ship.id}`)?.setPosition(ship.x, ship.y - 755).setVisible(true);
-          this.textLabels.get(`range-label-l-${ship.id}`)?.setPosition(ship.x, ship.y - 2505).setVisible(true);
-        }
-      } else {
-        // Hide range labels if not selected
-        this.textLabels.get(`range-label-s-${ship.id}`)?.setVisible(false);
-        this.textLabels.get(`range-label-l-${ship.id}`)?.setVisible(false);
       }
+    });
+
+    // 2. Draw Links (Background connections)
+    this.spaceships.forEach(source => {
+      this.spaceships.forEach(target => {
+        if (source.id < target.id) {
+          const { canConnect: canStandard, dropRate: standardRate } = CommunicationSystem.getLinkQuality(source, target, activeNodes);
+          const { canConnect: canOpt, dropRate: optDrop } = CommunicationSystem.getOpticalMultiplexQuality(source, target, activeNodes);
+          
+          // Calculate perpendicular vector for offset
+          const dx = target.x - source.x;
+          const dy = target.y - source.y;
+          const len = Math.sqrt(dx*dx + dy*dy);
+          const nx = -dy / len;
+          const ny = dx / len;
+          const offset = 1.2; // Narrower gap for background lines
+
+          // Standard Radio/Optical Link (Yellow/Red in all modes, Blue in Quality)
+          if (canStandard) {
+            let color = 0x4ade80; 
+            let alpha = 0.15;
+            if (this.vizMode === 'quality') {
+              color = 0x38bdf8; // Blue
+              alpha = 0.3;
+            } else {
+              if (standardRate > 0.8) color = 0xef4444;
+              else if (standardRate > 0.4) color = 0xfacc15;
+            }
+            this.linkGraphics.lineStyle(1, color, alpha);
+            const ox = this.vizMode === 'quality' ? nx * -offset : 0;
+            const oy = this.vizMode === 'quality' ? ny * -offset : 0;
+            this.linkGraphics.lineBetween(source.x + ox, source.y + oy, target.x + ox, target.y + oy);
+          }
+
+          // Multiplex Link (Purple) - ONLY in quality mode for background
+          if (this.vizMode === 'quality' && canOpt) {
+            this.linkGraphics.lineStyle(1, 0xa855f7, 0.4);
+            const ox = nx * offset;
+            const oy = ny * offset;
+            this.linkGraphics.lineBetween(source.x + ox, source.y + oy, target.x + ox, target.y + oy);
+          }
+        }
+      });
     });
 
     // 3. Draw Communication (Control mode only)
@@ -857,26 +1050,43 @@ export class MainScene extends Scene {
         if (poll.responseStarted) {
           const resElapsed = elapsed - (poll.distance / (waveSpeed / 1000));
           const resWaveDist = resElapsed * (waveSpeed / 1000);
-          const maxRange = poll.rangeMode === 'long' ? 2500 : 750;
           
+          let maxRange = 750;
+          if (poll.rangeMode === 'long') maxRange = 2500;
+          if (poll.rangeMode === 'optical') maxRange = 750;
+
           if (resWaveDist > 0 && resWaveDist <= maxRange) {
+            const motionColor = poll.rangeMode === 'optical' ? 0xa855f7 : 0x38bdf8; // Purple for Multiplex, Blue for Standard
             if (this.vizMode === 'circles') {
-              // Circle Mode: Expanding Wave
+              // Circle Mode: Expanding Wave (Double circle)
               const alpha = Math.max(0, 0.6 * (1 - resWaveDist / maxRange));
-              this.linkGraphics.lineStyle(2, 0xfacc15, alpha);
-              this.linkGraphics.strokeCircle(target.x, target.y, resWaveDist);
-              this.linkGraphics.lineStyle(4, 0xfacc15, alpha * 0.3);
-              this.linkGraphics.strokeCircle(target.x, target.y, resWaveDist);
+              const centerX = poll.rangeMode === 'optical' ? hub.x : target.x;
+              const centerY = poll.rangeMode === 'optical' ? hub.y : target.y;
+              
+              this.linkGraphics.lineStyle(2, motionColor, alpha);
+              this.linkGraphics.strokeCircle(centerX, centerY, resWaveDist);
+              
+              if (resWaveDist > 30) {
+                this.linkGraphics.lineStyle(1, motionColor, alpha * 0.7);
+                this.linkGraphics.strokeCircle(centerX, centerY, resWaveDist - 30);
+              }
             } else if (this.vizMode === 'dots') {
-              // Dot Mode: Multiple Streamlines to all nearby ships within range
+              // Dot Mode: Multiple Streamlines
+              const activeNodes = Array.from(this.spaceships.values()).filter(s => s.isNodeActive);
               this.spaceships.forEach(nearbyShip => {
-                if (nearbyShip.id === target.id) return;
-                const d = CommunicationSystem.getDistance(target.x, target.y, nearbyShip.x, nearbyShip.y);
-                const { canConnect } = CommunicationSystem.getLinkQuality(target, nearbyShip, activeNodes);
+                if (nearbyShip.id === hub.id) return; // Don't draw to self
                 
+                // For Multiplex (broadcast poll), sender is hub. For standard, sender is target.
+                const startNode = poll.rangeMode === 'optical' ? hub : target;
+                const d = CommunicationSystem.getDistance(startNode.x, startNode.y, nearbyShip.x, nearbyShip.y);
+                
+                const canConnect = poll.rangeMode === 'optical' 
+                  ? CommunicationSystem.getOpticalMultiplexQuality(startNode, nearbyShip, activeNodes).canConnect
+                  : (nearbyShip.id !== target.id && CommunicationSystem.getLinkQuality(target, nearbyShip, activeNodes).canConnect);
+
                 if (canConnect && resWaveDist <= d + 100) {
                   const t = Math.min(1.0, resWaveDist / d);
-                  if (t > 0) this.drawStreamline(target.x, target.y, nearbyShip.x, nearbyShip.y, t, 0x38bdf8);
+                  if (t > 0) this.drawStreamline(startNode.x, startNode.y, nearbyShip.x, nearbyShip.y, t, motionColor);
                 }
               });
             }
@@ -902,30 +1112,37 @@ export class MainScene extends Scene {
           const isCommandPath = lastTime && (this.timeElapsedMs - lastTime) < 5000;
           
           if (canConnect || isCommandPath) {
-            let color = 0x4ade80; // Green (Excellent)
-            if (isCommandPath && !canConnect) color = 0xfbbf24; // Amber (CMD Path but Frequency mismatch)
+            let color = 0x38bdf8; // Blue (Standard Optical)
+            if (isCommandPath && !canConnect) color = 0xfbbf24; // Amber (CMD Path)
             else if (dropRate > 0.5) color = 0xef4444; // Red (Poor)
             else if (dropRate > 0.2) color = 0xfacc15; // Yellow (Good)
             
-            this.linkGraphics.lineStyle(2, color, 0.4);
-            this.linkGraphics.lineBetween(source.x, source.y, target.x, target.y);
-            
-            // Draw quality percentage
-            const midX = (source.x + target.x) / 2;
-            const midY = (source.y + target.y) / 2;
-            const qualityTextId = `quality-txt-${source.id}-${target.id}`;
-            const qualityStr = isCommandPath && !canConnect ? 'CMD LINK' : `${Math.round((1 - dropRate) * 100)}%`;
-            
-            if (!this.textLabels.has(qualityTextId)) {
-              this.textLabels.set(qualityTextId, this.add.text(midX, midY, qualityStr, { fontSize: '10px', color: '#fff', backgroundColor: 'rgba(0,0,0,0.5)' }).setOrigin(0.5).setDepth(20));
-            } else {
-              this.textLabels.get(qualityTextId)?.setPosition(midX, midY).setText(qualityStr).setVisible(true);
+            // Calculate perpendicular vector for offset
+            const dx = target.x - source.x;
+            const dy = target.y - source.y;
+            const len = Math.sqrt(dx*dx + dy*dy);
+            const nx = -dy / len;
+            const ny = dx / len;
+            const offset = 2.5; // Narrower gap
+
+            // Quality lines for selected unit (Radio already handled, highlighting optical)
+            const { canConnect: canOpt, dropRate: optDrop } = CommunicationSystem.getOpticalMultiplexQuality(source, target, activeNodes);
+            if (canOpt) {
+              this.linkGraphics.lineStyle(1, 0xa855f7, (1 - optDrop) * 0.8); // Thinner Purple (Multiplex)
+              this.linkGraphics.lineBetween(source.x + nx * offset, source.y + ny * offset, target.x + nx * offset, target.y + ny * offset);
             }
+
+            if (canConnect) {
+              this.linkGraphics.lineStyle(1.5, color, 0.4); // Standard Optical
+              this.linkGraphics.lineBetween(source.x - nx * offset, source.y - ny * offset, target.x - nx * offset, target.y - ny * offset);
+            }
+            
+            // Text labels removed as per request
           }
         });
       }
     } else {
-      // Hide all quality texts if not in mode or no selection
+      // Hide all quality texts
       this.textLabels.forEach((txt, key) => {
         if (key.startsWith('quality-txt-')) txt.setVisible(false);
       });
@@ -961,7 +1178,7 @@ export class MainScene extends Scene {
 
   private drawStreamline(startX: number, startY: number, endX: number, endY: number, progress: number, color: number) {
     const totalDist = Math.sqrt(Math.pow(endX - startX, 2) + Math.pow(endY - startY, 2));
-    const segmentLen = 60;
+    const segmentLen = 20; // Short lines
     
     const headT = progress;
     const tailT = Math.max(0, headT - (segmentLen / totalDist));
@@ -1038,15 +1255,6 @@ export class MainScene extends Scene {
       this.domGameOver.classList.remove('hidden');
       if (this.domGameTitle) this.domGameTitle.textContent = 'MISSION SUCCESS';
       if (this.domGameDesc) this.domGameDesc.textContent = '調査データをHQに回収し、全部隊の安全を確保しました。';
-    }
-  }
-
-  private lose() {
-    this.isGameOver = true;
-    if (this.domGameOver) {
-      this.domGameOver.classList.remove('hidden');
-      if (this.domGameTitle) this.domGameTitle.textContent = 'MISSION FAILURE';
-      if (this.domGameDesc) this.domGameDesc.textContent = '制限時間内に調査を完了できませんでした。';
     }
   }
 

@@ -9,6 +9,45 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@400;600;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="/src/style.css" />
+  <style>
+    .accordion-content {
+      max-height: 0;
+      overflow: hidden;
+      transition: max-height 0.3s ease-out;
+      background: rgba(0,0,0,0.2);
+      border-radius: 0 0 8px 8px;
+    }
+    .accordion-content.open {
+      max-height: 500px;
+      padding: 10px;
+      margin-bottom: 10px;
+    }
+    .accordion-btn {
+      width: 100%;
+      text-align: left;
+      padding: 10px;
+      background: rgba(255,255,255,0.05);
+      border: 1px solid rgba(255,255,255,0.1);
+      color: #fff;
+      cursor: pointer;
+      font-family: inherit;
+      font-weight: 600;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .accordion-btn:hover {
+      background: rgba(255,255,255,0.1);
+    }
+    .accordion-btn::after {
+      content: '▼';
+      font-size: 10px;
+      transition: transform 0.3s;
+    }
+    .accordion-btn.open::after {
+      transform: rotate(180deg);
+    }
+  </style>
 </head>
 
 <body>
@@ -31,7 +70,9 @@
       <button id="toggle-mode-btn" class="mode-toggle-btn">モード：通信管制</button>
       <button id="viz-cycle-btn" class="viz-cycle-btn">サークル表示</button>
     </div>
-    <div id="briefing-overlay" class="glass-panel" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 100; display: flex; flex-direction: column; justify-content: center; align-items: center; background: rgba(2, 6, 23, 0.95); backdrop-filter: blur(10px); pointer-events: auto;">
+
+    <!-- ブリーフィング画面 (復元) -->
+    <div id="briefing-overlay" class="glass-panel" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 1000; display: flex; flex-direction: column; justify-content: center; align-items: center; background: rgba(2, 6, 23, 0.95); backdrop-filter: blur(10px); pointer-events: auto;">
       <div style="max-width: 600px; padding: 40px; border: 1px solid rgba(245, 158, 11, 0.3); border-radius: 8px;">
         <div style="color: #f59e0b; font-size: 12px; letter-spacing: 2px; margin-bottom: 20px;">[ INCOMING TRANSMISSION FROM HQ ]</div>
         <div style="color: #fff; font-size: 20px; line-height: 1.6; margin-bottom: 30px; font-weight: 300;">
@@ -51,55 +92,84 @@
     </div>
 
     <div id="unit-modal" class="glass-panel hidden"
-      style="position: absolute; top: 20px; right: 20px; width: 300px; padding: 20px; pointer-events: auto;">
+      style="position: absolute; top: 20px; right: 20px; width: 320px; padding: 20px; pointer-events: auto; max-height: 90vh; overflow-y: auto;">
       <div id="unit-modal-close" style="position: absolute; top: 10px; right: 15px; cursor: pointer; font-size: 24px;">
         &times;</div>
       <h2 id="unit-title"
         style="margin-bottom: 15px; border-bottom: 1px solid rgba(255,255,255,0.2); padding-bottom: 5px;">UNIT ID</h2>
-      <div class="unit-stat">
-        <span class="hud-label">TYPE</span> <span id="unit-type" class="hud-value" style="font-size: 16px;">Node</span>
-      </div>
-      <div class="unit-stat">
-        <span class="hud-label">LEVEL</span> <span id="unit-level" class="hud-value" style="font-size: 16px;">MAX</span>
-      </div>
-      <div class="unit-stat">
-        <span class="hud-label">Target Detected</span> <span id="unit-targets" class="hud-value"
-          style="font-size: 16px;">0</span>
+      
+      <div style="display: flex; gap: 10px; margin-bottom: 15px;">
+        <div class="unit-stat"><span class="hud-label">TYPE</span><span id="unit-type" style="font-size: 14px; color: #fff;">Destroyer</span></div>
+        <div class="unit-stat"><span class="hud-label">LV</span><span id="unit-level" style="font-size: 14px; color: #fff;">1</span></div>
+        <div class="unit-stat"><span class="hud-label">TARGETS</span><span id="unit-targets" style="font-size: 14px; color: #fff;">0</span></div>
       </div>
 
-      <h3 style="margin-top: 15px; font-size: 14px; color: #9ca3af; margin-bottom: 5px;">COMMUNICATION</h3>
-      <div class="comm-group">
-        <label><input type="checkbox" id="short-enable"> 短距離光通信 (Max 300km)</label>
-        <select id="short-freq" class="custom-select">
-          <option value="A">周波数 A</option>
-          <option value="B">周波数 B</option>
-          <option value="C">周波数 C</option>
-        </select>
-      </div>
-
-      <div class="comm-group" style="margin-top: 10px;">
-        <label><input type="checkbox" id="long-enable"> 長距離光通信 (Max 1000km)</label>
-        <select id="long-freq" class="custom-select">
-          <option value="D">周波数 D</option>
-          <option value="E">周波数 E</option>
-          <option value="F">周波数 F</option>
-        </select>
-      </div>
-
-        <button id="send-cmd-btn" style="margin-top: 20px; width: 100%;" class="action-btn hidden">周波数変更指示</button>
-        <button id="toggle-role-btn" style="margin-top: 10px; width: 100%;" class="action-btn">ノード選択</button>
-        
-        <div id="unit-hp-container" style="margin-top: 15px;">
-           <div class="hud-label">HP</div>
-           <div style="width: 100%; height: 8px; background: rgba(0,0,0,0.5); border-radius: 4px; margin-top: 5px; overflow: hidden;">
-              <div id="unit-hp-bar" style="width: 100%; height: 100%; background: #4ade80; transition: width 0.3s;"></div>
-           </div>
+      <!-- 光多重通信グループ -->
+      <button id="multiplex-group-btn" class="accordion-btn">光多重通信設定</button>
+      <div id="multiplex-group-content" class="accordion-content">
+        <div class="comm-group">
+          <label><input type="checkbox" id="multiplex-enable"> 光多重通信 (200km) 有効</label>
+          <div style="margin-top: 8px;">
+            <div class="hud-label" style="font-size: 10px; margin-bottom: 2px;">連接マスター</div>
+            <select id="multiplex-master" class="custom-select">
+              <option value="">-- 連接マスターを選択 --</option>
+            </select>
+          </div>
+          <div style="display: flex; gap: 5px; margin-top: 8px;">
+            <div style="flex: 1;">
+              <div class="hud-label" style="font-size: 10px; margin-bottom: 2px;">速度</div>
+              <select id="multiplex-speed" class="custom-select">
+                <option value="low">Low</option>
+                <option value="medium">Medium</option>
+                <option value="high">High</option>
+              </select>
+            </div>
+            <div style="flex: 1;">
+              <div class="hud-label" style="font-size: 10px; margin-bottom: 2px;">暗号</div>
+              <select id="multiplex-cipher" class="custom-select">
+                <option value="AA">暗号 AA</option>
+                <option value="BB">暗号 BB</option>
+              </select>
+            </div>
+          </div>
+          <label style="margin-top: 8px; display: block; font-size: 11px;"><input type="checkbox" id="multiplex-relay"> 中継 (Multi-hop) ON</label>
         </div>
+      </div>
 
-        <div id="rgr-container" style="margin-top: 15px;">
-          <h3 style="font-size: 12px; color: #9ca3af; margin-bottom: 8px; border-top: 1px solid rgba(255,255,255,0.1); padding-top: 8px;">COMMUNICATION STATUS</h3>
-          <div id="rgr-list" style="font-size: 12px; max-height: 120px; overflow-y: auto;"></div>
+      <!-- 光通信グループ -->
+      <button id="optical-group-btn" class="accordion-btn">光通信設定</button>
+      <div id="optical-group-content" class="accordion-content">
+        <div class="comm-group">
+          <label><input type="checkbox" id="short-enable"> 短距離光通信 (750km)</label>
+          <select id="short-freq" class="custom-select">
+            <option value="A">周波数 A</option>
+            <option value="B">周波数 B</option>
+            <option value="C">周波数 C</option>
+          </select>
+          
+          <label style="margin-top: 10px;"><input type="checkbox" id="long-enable"> 長距離光通信 (2500km)</label>
+          <select id="long-freq" class="custom-select">
+            <option value="D">周波数 D</option>
+            <option value="E">周波数 E</option>
+            <option value="F">周波数 F</option>
+          </select>
+
+          <button id="toggle-role-btn" style="margin-top: 15px; width: 100%;" class="action-btn">ノード設定</button>
+          <button id="send-cmd-btn" style="margin-top: 10px; width: 100%;" class="action-btn hidden">全般宛 周波数変更</button>
         </div>
+      </div>
+
+      <div id="unit-hp-container" style="margin-top: 15px;">
+        <div class="hud-label">UNIT CONDITION (HP)</div>
+        <div style="width: 100%; height: 6px; background: rgba(0,0,0,0.5); border-radius: 3px; margin-top: 5px; overflow: hidden;">
+          <div id="unit-hp-bar" style="width: 100%; height: 100%; background: #4ade80; transition: width 0.3s;"></div>
+        </div>
+      </div>
+
+      <button id="toggle-status-btn" style="margin-top: 15px; width: 100%; font-size: 11px; padding: 5px; background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); color: #94a3b8; cursor: pointer;">COMMUNICATION STATUS 表示</button>
+      <div id="rgr-container" style="margin-top: 10px;" class="hidden">
+        <div id="rgr-list" style="font-size: 11px; max-height: 150px; overflow-y: auto;"></div>
+      </div>
     </div>
 
     <div id="scale-bar-container" class="glass-panel"

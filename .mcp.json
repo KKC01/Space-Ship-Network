@@ -3,6 +3,13 @@
     "playwright": {
       "command": "npx",
       "args": ["-y", "@playwright/mcp@latest"]
+    },
+    "huggingface": {
+      "command": "node",
+      "args": ["hf-image-mcp.js"],
+      "env": {
+        "HF_API_TOKEN": "${HF_API_TOKEN}"
+      }
     }
   }
 }

@@ -9,7 +9,9 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.29.0",
     "@playwright/mcp": "^0.0.73",
+    "canvas": "^3.2.3",
     "phaser": "^3.80.1"
   },
   "devDependencies": {

@@ -29,6 +29,14 @@ export class Spaceship {
     processor: 'green' as 'green' | 'yellow' | 'red',
     display: 'green' as 'green' | 'yellow' | 'red'
   };
+
+  // Optical Multiplex (TDMA) Settings
+  public isMultiplexEnabled: boolean = false;
+  public multiplexSpeed: 'low' | 'medium' | 'high' = 'low';
+  public multiplexCipher: 'AA' | 'BB' = 'AA';
+  public isOpticalRelayEnabled: boolean = false;
+  public assignedSlots: number[] = [];
+  public selectedMasterId: string | null = null;
   
   public hp: number = 100;
   public maxHp: number = 100;
@@ -180,6 +188,17 @@ export class Spaceship {
 
     // 2. Relay logic: Always queue for relay if not seen before
     if (!this.queue.some(p => p.id === packet.id)) {
+      // If it's an optical packet, check encryption
+      if (packet.payload?.isOptical) {
+        if (packet.payload.cipher !== this.multiplexCipher) {
+          // Encryption mismatch, discard
+          return;
+        }
+        // If relay is OFF, only keep if it's for us
+        if (!this.isOpticalRelayEnabled && packet.targetShipId && packet.targetShipId !== this.id) {
+          return;
+        }
+      }
       this.queue.push(packet);
     }
   }
