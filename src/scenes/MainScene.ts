@@ -3,6 +3,7 @@ import { Spaceship } from '../models/Spaceship';
 import { PacketType, FreqShort, FreqLong, SystemDisplayMode } from '../models/DataPacket';
 import { CommunicationSystem } from '../models/CommunicationSystem';
 import { OpticalMaster } from '../models/OpticalMaster';
+import legacyDestroyerImg from '../assets/Legacy_Destroyer.png';
 
 export class MainScene extends Scene {
   private spaceships: Map<string, Spaceship> = new Map();
@@ -25,7 +26,6 @@ export class MainScene extends Scene {
   private domUnitTitle!: HTMLElement | null;
   private domUnitType!: HTMLElement | null;
   private domUnitLevel!: HTMLElement | null;
-  private domUnitTargets!: HTMLElement | null;
   private domShortEnable!: HTMLInputElement | null;
   private domShortFreq!: HTMLSelectElement | null;
   private domLongEnable!: HTMLInputElement | null;
@@ -119,7 +119,6 @@ export class MainScene extends Scene {
     this.domUnitTitle = document.getElementById('unit-title');
     this.domUnitType = document.getElementById('unit-type');
     this.domUnitLevel = document.getElementById('unit-level');
-    this.domUnitTargets = document.getElementById('unit-targets');
     this.domShortEnable = document.getElementById('short-enable') as HTMLInputElement;
     this.domShortFreq = document.getElementById('short-freq') as HTMLSelectElement;
     this.domLongEnable = document.getElementById('long-enable') as HTMLInputElement;
@@ -327,7 +326,7 @@ export class MainScene extends Scene {
       // Specific initial formation around HQ
       const x = i === 0 ? cx : cx + (i === 1 ? -400 : (i === 2 ? 400 : 0));
       const y = i === 0 ? cy : cy + (i === 3 ? 500 : 200);
-      const ship = new Spaceship(id, x, y, 5);
+      const ship = new Spaceship(id, x, y, 1);
       
       if (i === 0) {
         ship.isNodeActive = true;
@@ -446,15 +445,11 @@ export class MainScene extends Scene {
       this.domMultiplexMaster.value = currentMasterId || '';
     }
 
+    const shipImg = document.getElementById('unit-ship-image') as HTMLImageElement | null;
+    if (shipImg) shipImg.src = legacyDestroyerImg;
     if (this.domUnitTitle) this.domUnitTitle.textContent = unit.id;
-    if (this.domUnitType) this.domUnitType.textContent = 'Destroyer';
+    if (this.domUnitType) this.domUnitType.textContent = 'Legacy Destroyer';
     if (this.domUnitLevel) this.domUnitLevel.textContent = `LV ${unit.level}`;
-
-    let targets = 0;
-    this.clutters.forEach(c => {
-      if (CommunicationSystem.getDistance(unit.x, unit.y, c.x, c.y) < 150) targets++;
-    });
-    if (this.domUnitTargets) this.domUnitTargets.textContent = targets.toString();
 
     if (this.domShortEnable) this.domShortEnable.checked = unit.isShortEnabled;
     if (this.domShortFreq) this.domShortFreq.value = unit.shortFreq;
@@ -592,19 +587,20 @@ export class MainScene extends Scene {
 
     // Old hub labels removed as we use spaceships now
 
+    const isCombat = this.systemDisplayMode === SystemDisplayMode.COMBAT;
     for (const [id, s] of this.spaceships.entries()) {
       const text = this.textLabels.get(id);
       const isHQ = (id === 'HQ Ship');
       if (text) {
-        const sStr = s.isShortEnabled ? `近:${s.shortFreq}` : '近:OFF';
-        const lStr = s.isLongEnabled ? `遠:${s.longFreq}` : '遠:OFF';
-        
-        // Show pending status if processing HQ command
-        const statusStr = s.pendingFreqChange ? ' [SETTING...]' : '';
-        text.setText(`${id}${statusStr}\n[${sStr} ${lStr}]`);
+        if (isCombat) {
+          text.setText(id);
+        } else {
+          const sStr = s.isShortEnabled ? `近:${s.shortFreq}` : '近:OFF';
+          const lStr = s.isLongEnabled ? `遠:${s.longFreq}` : '遠:OFF';
+          const statusStr = s.pendingFreqChange ? ' [SETTING...]' : '';
+          text.setText(`${id}${statusStr}\n[${sStr} ${lStr}]`);
+        }
         text.setPosition(s.x, s.y + (isHQ ? 55 : 40));
-        
-        // HQ Ship tag is always WHITE. Others are state-dependent.
         if (isHQ) {
           text.setColor('#ffffff');
         } else {
@@ -966,10 +962,17 @@ export class MainScene extends Scene {
       }
     });
 
-    // 1. Draw Individual Ship Range Circles
+    // 1. Draw Individual Ship Range Circles (control mode only)
     this.spaceships.forEach(ship => {
       const g = this.shipGraphics.get(ship.id);
-      if (g && ship.isNodeActive) {
+      if (!g) return;
+      if (!isControl) return;
+
+      const isSelected = ship.id === this.selectedUnitId;
+      // サークル/ライン表示: 選択ユニットのみ表示
+      // 通信品質: 全ユニット表示
+      const showCircle = this.vizMode === 'quality' || isSelected;
+      if (showCircle) {
         g.lineStyle(1, 0x38bdf8, 0.4);
         g.strokeCircle(ship.x, ship.y, 750);
         g.lineStyle(1, 0x38bdf8, 0.15);
@@ -977,13 +980,13 @@ export class MainScene extends Scene {
       }
     });
 
-    // 2. Draw Links (Background connections)
-    this.spaceships.forEach(source => {
+    // 2. Draw Links (Background connections) — control mode only
+    if (isControl) this.spaceships.forEach(source => {
       this.spaceships.forEach(target => {
         if (source.id < target.id) {
           const { canConnect: canStandard, dropRate: standardRate } = CommunicationSystem.getLinkQuality(source, target, activeNodes);
-          const { canConnect: canOpt, dropRate: optDrop } = CommunicationSystem.getOpticalMultiplexQuality(source, target, activeNodes);
-          
+          const { canConnect: canOpt } = CommunicationSystem.getOpticalMultiplexQuality(source, target, activeNodes);
+
           // Calculate perpendicular vector for offset
           const dx = target.x - source.x;
           const dy = target.y - source.y;
@@ -1164,30 +1167,11 @@ export class MainScene extends Scene {
       });
     }
 
-    // 5. Draw Range Overlay (Combat/射程 mode)
+    // 5. Draw Range Overlay (Combat/射程 mode: 100km circle only)
     if (this.vizMode === 'range') {
       this.spaceships.forEach(ship => {
-        // Short range circle (red)
-        if (ship.isShortEnabled) {
-          this.linkGraphics.lineStyle(1, 0xf87171, 0.25);
-          this.linkGraphics.strokeCircle(ship.x, ship.y, 750);
-        }
-        // Long range circle (darker red)
-        if (ship.isLongEnabled) {
-          this.linkGraphics.lineStyle(1, 0xf87171, 0.12);
-          this.linkGraphics.strokeCircle(ship.x, ship.y, 2500);
-        }
-
-        // Targeting lines to nearby clutters (threats)
-        let threatCount = 0;
-        this.clutters.forEach(c => {
-          const d = CommunicationSystem.getDistance(ship.x, ship.y, c.x, c.y);
-          if (d < 300 && threatCount < 5) {
-            this.linkGraphics.lineStyle(1, 0xef4444, 0.15);
-            this.linkGraphics.lineBetween(ship.x, ship.y, c.x, c.y);
-            threatCount++;
-          }
-        });
+        this.linkGraphics.lineStyle(1, 0xef4444, 0.6);
+        this.linkGraphics.strokeCircle(ship.x, ship.y, 100);
       });
     }
   }

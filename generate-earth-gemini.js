@@ -18,9 +18,12 @@ async function generateViaGeminiMCP() {
 
   let responses = {};
   let messageId = 1;
+  let stdoutBuffer = '';
 
   mcpProcess.stdout.on('data', (data) => {
-    const lines = data.toString().split('\n');
+    stdoutBuffer += data.toString();
+    const lines = stdoutBuffer.split('\n');
+    stdoutBuffer = lines.pop() || '';
     for (const line of lines) {
       if (line.trim()) {
         try {

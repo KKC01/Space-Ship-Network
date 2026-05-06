@@ -95,13 +95,14 @@
       style="position: absolute; top: 20px; right: 20px; width: 320px; padding: 20px; pointer-events: auto; max-height: 90vh; overflow-y: auto;">
       <div id="unit-modal-close" style="position: absolute; top: 10px; right: 15px; cursor: pointer; font-size: 24px;">
         &times;</div>
-      <h2 id="unit-title"
-        style="margin-bottom: 15px; border-bottom: 1px solid rgba(255,255,255,0.2); padding-bottom: 5px;">UNIT ID</h2>
-      
+      <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 15px; border-bottom: 1px solid rgba(255,255,255,0.2); padding-bottom: 5px;">
+        <img id="unit-ship-image" style="width: 58px; height: 58px; object-fit: contain;">
+        <h2 id="unit-title" style="margin: 0;">UNIT ID</h2>
+      </div>
+
       <div style="display: flex; gap: 10px; margin-bottom: 15px;">
-        <div class="unit-stat"><span class="hud-label">TYPE</span><span id="unit-type" style="font-size: 14px; color: #fff;">Destroyer</span></div>
+        <div class="unit-stat"><span class="hud-label">TYPE</span><span id="unit-type" style="font-size: 14px; color: #fff;">Legacy Destroyer</span></div>
         <div class="unit-stat"><span class="hud-label">LV</span><span id="unit-level" style="font-size: 14px; color: #fff;">1</span></div>
-        <div class="unit-stat"><span class="hud-label">TARGETS</span><span id="unit-targets" style="font-size: 14px; color: #fff;">0</span></div>
       </div>
 
       <!-- 光多重通信グループ -->
@@ -160,13 +161,13 @@
       </div>
 
       <div id="unit-hp-container" style="margin-top: 15px;">
-        <div class="hud-label">UNIT CONDITION (HP)</div>
+        <div class="hud-label">Unit Condition (HP)</div>
         <div style="width: 100%; height: 6px; background: rgba(0,0,0,0.5); border-radius: 3px; margin-top: 5px; overflow: hidden;">
           <div id="unit-hp-bar" style="width: 100%; height: 100%; background: #4ade80; transition: width 0.3s;"></div>
         </div>
       </div>
 
-      <button id="toggle-status-btn" style="margin-top: 15px; width: 100%; font-size: 11px; padding: 5px; background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); color: #94a3b8; cursor: pointer;">COMMUNICATION STATUS 表示</button>
+      <button id="toggle-status-btn" style="margin-top: 15px; width: 100%; font-size: 11px; padding: 5px; background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); color: #94a3b8; cursor: pointer;">Communication Status 表示</button>
       <div id="rgr-container" style="margin-top: 10px;" class="hidden">
         <div id="rgr-list" style="font-size: 11px; max-height: 150px; overflow-y: auto;"></div>
       </div>
