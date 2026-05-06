@@ -96,6 +96,8 @@ export class Hub {
         this.y = this.targetY;
         this.targetX = null;
         this.targetY = null;
+        this.targetX = null;
+        this.targetY = null;
       }
     }
     
@@ -126,7 +128,7 @@ export class Hub {
         }
         
         this.currentPollingIndex = (this.currentPollingIndex + 1) % this.pollingList.length;
-        this.pollingTimer = this.POLLING_DELAY_MS;
+        this.pollingTimer = Hub.POLLING_DELAY_MS;
       }
     }
   }
