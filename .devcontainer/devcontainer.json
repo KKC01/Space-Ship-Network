@@ -12,6 +12,10 @@
     }
   },
 
+  "mounts": [
+    "source=${localEnv:USERPROFILE}\\.claude,target=/home/node/.claude,type=bind,consistency=cached"
+  ],
+
   "postCreateCommand": "npm install",
 
   "remoteUser": "node",
@@ -21,7 +25,8 @@
       "extensions": [
         "dbaeumer.vscode-eslint",
         "esbenp.prettier-vscode",
-        "ms-vscode.vscode-typescript-next"
+        "ms-vscode.vscode-typescript-next",
+        "anthropic.claude-code"
       ],
       "settings": {
         "typescript.tsdk": "node_modules/typescript/lib",

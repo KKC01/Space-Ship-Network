@@ -1,5 +1,6 @@
 {
   "env": {
-    "GEMINI_API_KEY": "AIzaSyBX25_7FmgsRr1FD3ZmdJxlxFaKf27ZRHI"
+    "GEMINI_API_KEY": "AIzaSyBX25_7FmgsRr1FD3ZmdJxlxFaKf27ZRHI",
+    "TWENTY_FIRST_API_KEY": "7a3d2576d8eb53e2cca7f905d49e989a9cd2807f02b4c284d6b2eba6451b4810"
   }
 }

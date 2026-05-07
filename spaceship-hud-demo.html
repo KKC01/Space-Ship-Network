@@ -1,0 +1,357 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <title>Spaceship HUD - Magic MCP Demo</title>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&display=swap');
+
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    body {
+      background: #020a14;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      font-family: 'Orbitron', monospace;
+      overflow: hidden;
+    }
+
+    /* 星背景 */
+    body::before {
+      content: '';
+      position: fixed;
+      inset: 0;
+      background-image:
+        radial-gradient(1px 1px at 10% 20%, rgba(255,255,255,0.8) 0%, transparent 100%),
+        radial-gradient(1px 1px at 30% 60%, rgba(255,255,255,0.6) 0%, transparent 100%),
+        radial-gradient(1px 1px at 50% 10%, rgba(255,255,255,0.9) 0%, transparent 100%),
+        radial-gradient(1px 1px at 70% 80%, rgba(255,255,255,0.7) 0%, transparent 100%),
+        radial-gradient(1px 1px at 90% 40%, rgba(255,255,255,0.8) 0%, transparent 100%),
+        radial-gradient(1px 1px at 20% 90%, rgba(255,255,255,0.5) 0%, transparent 100%),
+        radial-gradient(1px 1px at 80% 15%, rgba(255,255,255,0.7) 0%, transparent 100%),
+        radial-gradient(1px 1px at 45% 50%, rgba(255,255,255,0.4) 0%, transparent 100%);
+      pointer-events: none;
+      z-index: 0;
+    }
+
+    .hud-container {
+      position: relative;
+      z-index: 1;
+      width: 720px;
+      padding: 40px;
+    }
+
+    /* タイトル */
+    .hud-title {
+      text-align: center;
+      color: #4ade80;
+      font-size: 11px;
+      letter-spacing: 6px;
+      margin-bottom: 32px;
+      text-shadow: 0 0 10px rgba(74,222,128,0.6);
+      animation: flicker 4s infinite;
+    }
+
+    /* メインパネル */
+    .hud-panel {
+      background: rgba(4, 20, 36, 0.9);
+      border: 1px solid rgba(74,222,128,0.3);
+      clip-path: polygon(16px 0%, 100% 0%, 100% calc(100% - 16px), calc(100% - 16px) 100%, 0% 100%, 0% 16px);
+      padding: 28px;
+      position: relative;
+    }
+
+    .hud-panel::before {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background: linear-gradient(135deg, rgba(74,222,128,0.04) 0%, transparent 50%);
+      clip-path: polygon(16px 0%, 100% 0%, 100% calc(100% - 16px), calc(100% - 16px) 100%, 0% 100%, 0% 16px);
+      pointer-events: none;
+    }
+
+    /* コーナードット */
+    .corner-dot {
+      position: absolute;
+      width: 4px;
+      height: 4px;
+      background: #4ade80;
+      border-radius: 50%;
+      box-shadow: 0 0 6px #4ade80;
+    }
+    .corner-dot.tr { top: 8px; right: 8px; }
+    .corner-dot.tr2 { top: 8px; right: 16px; }
+    .corner-dot.bl { bottom: 8px; left: 8px; }
+    .corner-dot.bl2 { bottom: 8px; left: 16px; }
+
+    /* ステータスグリッド */
+    .status-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 16px;
+      margin-bottom: 24px;
+    }
+
+    .status-card {
+      background: rgba(0,0,0,0.4);
+      border: 1px solid rgba(74,222,128,0.2);
+      clip-path: polygon(8px 0%, 100% 0%, 100% calc(100% - 8px), calc(100% - 8px) 100%, 0% 100%, 0% 8px);
+      padding: 14px;
+      position: relative;
+    }
+
+    .status-label {
+      color: rgba(74,222,128,0.6);
+      font-size: 8px;
+      letter-spacing: 3px;
+      margin-bottom: 6px;
+    }
+
+    .status-value {
+      color: #4ade80;
+      font-size: 22px;
+      font-weight: 700;
+      text-shadow: 0 0 12px rgba(74,222,128,0.5);
+    }
+
+    .status-unit {
+      color: rgba(74,222,128,0.5);
+      font-size: 9px;
+      letter-spacing: 2px;
+      margin-top: 2px;
+    }
+
+    /* バーゲージ */
+    .gauge-section {
+      margin-bottom: 24px;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    .gauge-row {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .gauge-label {
+      color: rgba(74,222,128,0.6);
+      font-size: 8px;
+      letter-spacing: 2px;
+      width: 80px;
+      flex-shrink: 0;
+    }
+
+    .gauge-bar {
+      flex: 1;
+      height: 4px;
+      background: rgba(74,222,128,0.1);
+      border: 1px solid rgba(74,222,128,0.2);
+      position: relative;
+      overflow: hidden;
+    }
+
+    .gauge-fill {
+      height: 100%;
+      background: linear-gradient(90deg, #166534, #4ade80);
+      box-shadow: 0 0 8px rgba(74,222,128,0.6);
+      position: relative;
+      animation: pulse-bar 3s ease-in-out infinite;
+    }
+
+    .gauge-value {
+      color: #4ade80;
+      font-size: 9px;
+      width: 36px;
+      text-align: right;
+      flex-shrink: 0;
+    }
+
+    /* HUDボタン（Magic MCPデザイン準拠） */
+    .hud-buttons {
+      display: flex;
+      gap: 16px;
+      justify-content: center;
+    }
+
+    .hud-btn {
+      position: relative;
+      cursor: pointer;
+      background: none;
+      border: none;
+      padding: 0;
+      width: 182px;
+      height: 44px;
+      transition: transform 0.2s;
+    }
+
+    .hud-btn:hover { transform: translateY(-2px) scale(1.02); }
+    .hud-btn:active { transform: scale(0.98); }
+
+    .hud-btn svg { width: 100%; height: 100%; }
+
+    .hud-btn-text {
+      position: absolute;
+      inset: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: #4ade80;
+      font-size: 10px;
+      letter-spacing: 3px;
+      text-shadow: 0 0 8px rgba(74,222,128,0.6);
+      pointer-events: none;
+    }
+
+    .hud-btn.secondary .hud-btn-text { color: #94a3b8; text-shadow: none; }
+
+    /* スキャンライン演出 */
+    .scanline {
+      position: fixed;
+      top: -100%;
+      left: 0;
+      width: 100%;
+      height: 2px;
+      background: rgba(74,222,128,0.15);
+      animation: scan 6s linear infinite;
+      pointer-events: none;
+      z-index: 0;
+    }
+
+    /* セパレーター */
+    .hud-sep {
+      height: 1px;
+      background: linear-gradient(90deg, transparent, rgba(74,222,128,0.4), transparent);
+      margin: 20px 0;
+    }
+
+    @keyframes flicker {
+      0%, 95%, 100% { opacity: 1; }
+      96% { opacity: 0.7; }
+      97% { opacity: 1; }
+      98% { opacity: 0.8; }
+    }
+
+    @keyframes pulse-bar {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.7; }
+    }
+
+    @keyframes scan {
+      from { top: -2px; }
+      to { top: 100vh; }
+    }
+
+    .blink {
+      animation: blink 1.5s step-end infinite;
+    }
+    @keyframes blink {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0; }
+    }
+  </style>
+</head>
+<body>
+  <div class="scanline"></div>
+
+  <div class="hud-container">
+    <div class="hud-title">◈ SPACE SHIP NETWORK — NAVIGATION CONSOLE ◈</div>
+
+    <div class="hud-panel">
+      <div class="corner-dot tr"></div>
+      <div class="corner-dot tr2"></div>
+      <div class="corner-dot bl"></div>
+      <div class="corner-dot bl2"></div>
+
+      <!-- ステータスカード -->
+      <div class="status-grid">
+        <div class="status-card">
+          <div class="status-label">VELOCITY</div>
+          <div class="status-value">24.7</div>
+          <div class="status-unit">AU / DAY</div>
+        </div>
+        <div class="status-card">
+          <div class="status-label">ALTITUDE</div>
+          <div class="status-value">384<span class="blink">_</span></div>
+          <div class="status-unit">× 10³ KM</div>
+        </div>
+        <div class="status-card">
+          <div class="status-label">HULL TEMP</div>
+          <div class="status-value">1,842</div>
+          <div class="status-unit">KELVIN</div>
+        </div>
+      </div>
+
+      <div class="hud-sep"></div>
+
+      <!-- ゲージ -->
+      <div class="gauge-section">
+        <div class="gauge-row">
+          <div class="gauge-label">SHIELD</div>
+          <div class="gauge-bar"><div class="gauge-fill" style="width:87%"></div></div>
+          <div class="gauge-value">87%</div>
+        </div>
+        <div class="gauge-row">
+          <div class="gauge-label">FUEL</div>
+          <div class="gauge-bar"><div class="gauge-fill" style="width:62%"></div></div>
+          <div class="gauge-value">62%</div>
+        </div>
+        <div class="gauge-row">
+          <div class="gauge-label">POWER</div>
+          <div class="gauge-bar"><div class="gauge-fill" style="width:95%"></div></div>
+          <div class="gauge-value">95%</div>
+        </div>
+      </div>
+
+      <div class="hud-sep"></div>
+
+      <!-- HUDボタン（Magic MCPデザイン準拠） -->
+      <div class="hud-buttons">
+        <button class="hud-btn">
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 182.288 43.721">
+            <defs>
+              <linearGradient id="g1" x1="93" y1="-53" x2="93" y2="69" gradientUnits="userSpaceOnUse">
+                <stop offset="0" stop-color="#4ade80" stop-opacity="0.3"/>
+                <stop offset="1" stop-color="#4ade80" stop-opacity="0"/>
+              </linearGradient>
+            </defs>
+            <path d="M181.788.5H13.7L4.609,9.593V43.221H170.048l11.74-11.74Z" fill="url(#g1)"/>
+            <path d="M170.256,43.721H4.108V9.386L13.494,0H182.288V31.688Zm-165.148-1H169.842l11.446-11.447V1H13.908l-8.8,8.8Z" fill="#4ade80"/>
+            <circle cx="169.908" cy="7.326" r="1.161" fill="#4ade80"/>
+            <circle cx="174.373" cy="7.326" r="1.161" fill="#4ade80"/>
+            <circle cx="169.908" cy="11.908" r="1.161" fill="#4ade80"/>
+            <circle cx="174.373" cy="11.908" r="1.161" fill="#4ade80"/>
+            <circle cx="0.621" cy="19.214" r="0.621" fill="#4ade80"/>
+            <circle cx="0.621" cy="24.506" r="0.621" fill="#4ade80"/>
+          </svg>
+          <span class="hud-btn-text">ENGAGE</span>
+        </button>
+
+        <button class="hud-btn secondary">
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 182.288 43.721">
+            <defs>
+              <linearGradient id="g2" x1="93" y1="-53" x2="93" y2="69" gradientUnits="userSpaceOnUse">
+                <stop offset="0" stop-color="#64748b" stop-opacity="0.3"/>
+                <stop offset="1" stop-color="#64748b" stop-opacity="0"/>
+              </linearGradient>
+            </defs>
+            <path d="M181.788.5H13.7L4.609,9.593V43.221H170.048l11.74-11.74Z" fill="url(#g2)"/>
+            <path d="M170.256,43.721H4.108V9.386L13.494,0H182.288V31.688Zm-165.148-1H169.842l11.446-11.447V1H13.908l-8.8,8.8Z" fill="#64748b"/>
+            <circle cx="169.908" cy="7.326" r="1.161" fill="#64748b"/>
+            <circle cx="174.373" cy="7.326" r="1.161" fill="#64748b"/>
+            <circle cx="169.908" cy="11.908" r="1.161" fill="#64748b"/>
+            <circle cx="174.373" cy="11.908" r="1.161" fill="#64748b"/>
+            <circle cx="0.621" cy="19.214" r="0.621" fill="#64748b"/>
+            <circle cx="0.621" cy="24.506" r="0.621" fill="#64748b"/>
+          </svg>
+          <span class="hud-btn-text">STANDBY</span>
+        </button>
+      </div>
+    </div>
+  </div>
+</body>
+</html>
