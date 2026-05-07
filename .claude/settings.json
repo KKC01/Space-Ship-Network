@@ -1,0 +1,16 @@
+{
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Read|Edit|Write|Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash /workspaces/Space-Ship-Network/.claude/hooks/block-sensitive-files.sh",
+            "statusMessage": "機密ファイルチェック中..."
+          }
+        ]
+      }
+    ]
+  }
+}
