@@ -1,0 +1,38 @@
+- generic [active]:
+  - generic:
+    - generic [ref=e1]:
+      - button "COMMANDER'S ORDER SURVEY MISSION ▼" [ref=e2] [cursor=pointer]:
+        - generic [ref=e3]:
+          - generic [ref=e4]: COMMANDER'S ORDER
+          - generic [ref=e5]: SURVEY MISSION
+        - generic [ref=e6]: ▼
+      - list [ref=e7]:
+        - listitem [ref=e8]: "[ ] 調査対象ポイントへの到達"
+        - listitem [ref=e9]: "[x] 全ユニットの通信確保"
+        - listitem [ref=e10]: "[ ] 調査データの転送・回収"
+    - generic [ref=e11]:
+      - generic [ref=e12]:
+        - generic [ref=e13]: 経過時間
+        - generic [ref=e14]: "0.1"
+      - generic [ref=e15]:
+        - button "モード：通信管制" [ref=e16] [cursor=pointer]
+        - button "サークル表示" [ref=e17] [cursor=pointer]
+    - text: ▼ ▼
+    - generic:
+      - button "チャットを開く" [ref=e25] [cursor=pointer]:
+        - img [ref=e26]
+        - generic [ref=e28]: OPERATOR
+      - dialog "オペレーターチャット":
+        - generic:
+          - img "Operator AI"
+          - generic:
+            - generic: Operator AI
+            - generic: STANDBY
+          - button "閉じる": ×
+        - generic:
+          - textbox "メッセージ入力":
+            - /placeholder: メッセージを入力... (Enter で送信)
+          - button "送信":
+            - img
+    - generic:
+      - generic: 500 km
