@@ -52,14 +52,21 @@
 
 <body>
   <div id="ui-layer">
-      <div id="mission-panel" class="glass-panel">
-        <div class="hud-label" style="color: #f59e0b; margin-bottom: 5px; font-weight: 700;">COMMANDER'S ORDER</div>
-        <div id="mission-title" style="font-size: 16px; font-weight: 700; margin-bottom: 10px; color: #fff;">SURVEY MISSION</div>
-        <ul id="mission-list" style="list-style: none; padding: 0; font-size: 13px; color: #9ca3af;">
-          <li id="m-reach"><span class="check">[ ]</span> 調査対象ポイントへの到達</li>
-          <li id="m-all-link"><span class="check">[ ]</span> 全ユニットの通信確保</li>
-          <li id="m-data"><span class="check">[ ]</span> 調査データの転送・回収</li>
-        </ul>
+      <div id="mission-panel" class="glass-panel collapsed">
+        <button id="mission-toggle" class="mission-toggle-btn" type="button" aria-expanded="false">
+          <div class="mission-header-text">
+            <span class="hud-label" style="color: #f59e0b; font-weight: 700;">COMMANDER'S ORDER</span>
+            <span id="mission-title">SURVEY MISSION</span>
+          </div>
+          <span class="mission-chevron">▼</span>
+        </button>
+        <div id="mission-body" class="mission-body">
+          <ul id="mission-list">
+            <li id="m-reach"><span class="check">[ ]</span> 調査対象ポイントへの到達</li>
+            <li id="m-all-link"><span class="check">[ ]</span> 全ユニットの通信確保</li>
+            <li id="m-data"><span class="check">[ ]</span> 調査データの転送・回収</li>
+          </ul>
+        </div>
       </div>
 
     <div class="hud-panel glass-panel">
@@ -67,8 +74,10 @@
         <span class="hud-label">経過時間</span>
         <span class="hud-value" id="time-display">0.0</span>
       </div>
-      <button id="toggle-mode-btn" class="mode-toggle-btn">モード：通信管制</button>
-      <button id="viz-cycle-btn" class="viz-cycle-btn">サークル表示</button>
+      <div class="mode-viz-stack">
+        <button id="toggle-mode-btn" class="mode-toggle-btn">モード：通信管制</button>
+        <button id="viz-cycle-btn" class="viz-cycle-btn">サークル表示</button>
+      </div>
     </div>
 
     <!-- ブリーフィング画面 (復元) -->
@@ -97,12 +106,15 @@
         &times;</div>
       <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 15px; border-bottom: 1px solid rgba(255,255,255,0.2); padding-bottom: 5px;">
         <img id="unit-ship-image" style="width: 58px; height: 58px; object-fit: contain;">
-        <h2 id="unit-title" style="margin: 0;">UNIT ID</h2>
+        <h2 id="unit-title" style="margin: 0; flex: 1;">UNIT ID</h2>
+        <span class="hud-label">LV</span>
+        <span id="unit-level" style="font-size: 14px; color: #fff;">1</span>
       </div>
 
-      <div style="display: flex; gap: 10px; margin-bottom: 15px;">
-        <div class="unit-stat"><span class="hud-label">TYPE</span><span id="unit-type" style="font-size: 14px; color: #fff;">Legacy Destroyer</span></div>
-        <div class="unit-stat"><span class="hud-label">LV</span><span id="unit-level" style="font-size: 14px; color: #fff;">1</span></div>
+      <div style="margin-bottom: 15px;">
+        <span class="hud-label">Type</span>
+        <span style="margin: 0 6px; color: #9ca3af;">:</span>
+        <span id="unit-type" style="font-size: 14px; color: #fff;">Legacy Destroyer</span>
       </div>
 
       <!-- 光多重通信グループ -->
@@ -172,6 +184,9 @@
         <div id="rgr-list" style="font-size: 11px; max-height: 150px; overflow-y: auto;"></div>
       </div>
     </div>
+
+    <!-- チャットウィジェット マウントポイント -->
+    <div id="chat-widget-root"></div>
 
     <div id="scale-bar-container" class="glass-panel"
       style="position: absolute; bottom: 20px; right: 20px; pointer-events: none; padding: 10px 15px;">

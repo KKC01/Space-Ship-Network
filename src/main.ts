@@ -1,5 +1,6 @@
 import 'phaser';
 import { MainScene } from './scenes/MainScene';
+import { ChatWidget } from './components/ChatWidget';
 
 const config: Phaser.Types.Core.GameConfig = {
   type: Phaser.AUTO,
@@ -23,4 +24,9 @@ const config: Phaser.Types.Core.GameConfig = {
 
 window.addEventListener('load', () => {
   new Phaser.Game(config);
+
+  const chatRoot = document.getElementById('chat-widget-root');
+  if (chatRoot) {
+    new ChatWidget(chatRoot);
+  }
 });

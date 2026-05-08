@@ -3,3 +3,8 @@ dist/
 .vite/
 .claude/settings.local.json
 
+# 環境変数（APIキー等のシークレット）
+.env
+.env.local
+.env.*.local
+

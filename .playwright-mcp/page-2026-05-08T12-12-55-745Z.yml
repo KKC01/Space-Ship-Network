@@ -1,0 +1,44 @@
+- generic [active]:
+  - generic:
+    - generic [ref=e1]:
+      - button "COMMANDER'S ORDER SURVEY MISSION ▼" [ref=e2]:
+        - generic [ref=e3]: COMMANDER'S ORDER SURVEY MISSION
+        - text: ▼
+      - list [ref=e5]:
+        - listitem [ref=e6]: "[ ] 調査対象ポイントへの到達"
+        - listitem [ref=e7]: "[ ] 全ユニットの通信確保"
+        - listitem [ref=e8]: "[ ] 調査データの転送・回収"
+    - generic [ref=e9]:
+      - generic [ref=e10]:
+        - generic [ref=e11]: 経過時間
+        - generic [ref=e12]: "0.0"
+      - generic [ref=e13]:
+        - button "モード：通信管制" [ref=e14] [cursor=pointer]
+        - button "サークル表示" [ref=e15] [cursor=pointer]
+    - generic [ref=e17]:
+      - generic [ref=e18]: "[ INCOMING TRANSMISSION FROM HQ ]"
+      - generic [ref=e19]: 「情報によると、特定ポイントにおいて敵の活動が活発化している。各ユニットは通信連絡を密とし、調査に向かえ。正当防衛、緊急避難以外の武器使用は禁止する」
+      - generic [ref=e20]: オペレーター：「指示ポイントを黄サークルで表示しました」
+      - button "了解" [ref=e21] [cursor=pointer]
+    - text: ▼ ▼
+    - generic:
+      - button "チャットを開く" [ref=e22] [cursor=pointer]:
+        - img [ref=e23]
+        - generic [ref=e25]: OPERATOR
+      - dialog "オペレーターチャット":
+        - generic:
+          - generic:
+            - generic: OPERATOR CHANNEL
+          - button "閉じる": ×
+        - generic:
+          - img "オペレーター AI"
+          - generic:
+            - generic: OPERATOR AI
+            - generic: STANDBY
+        - generic:
+          - textbox "メッセージ入力":
+            - /placeholder: メッセージを入力... (Enter で送信)
+          - button "送信":
+            - img
+    - generic:
+      - generic: 100 km

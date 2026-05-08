@@ -4,6 +4,7 @@ import { PacketType, FreqShort, FreqLong, SystemDisplayMode } from '../models/Da
 import { CommunicationSystem } from '../models/CommunicationSystem';
 import { OpticalMaster } from '../models/OpticalMaster';
 import legacyDestroyerImg from '../assets/Legacy_Destroyer.png';
+import planetImg from '../assets/Planet_01.png';
 
 export class MainScene extends Scene {
   private spaceships: Map<string, Spaceship> = new Map();
@@ -40,6 +41,7 @@ export class MainScene extends Scene {
   private domMultiplexCipher!: HTMLSelectElement | null;
   private domMultiplexRelay!: HTMLInputElement | null;
   private domToggleStatusBtn!: HTMLElement | null;
+  private domTimeDisplay!: HTMLElement | null;
 
   private domScaleBarLine!: HTMLElement | null;
   private domScaleBarText!: HTMLElement | null;
@@ -52,8 +54,18 @@ export class MainScene extends Scene {
   
   
   private surveyPoint = { x: 3000, y: 3000, radius: 200 };
+
+  // 惑星（環境ハザード）：通信干渉ゾーン
+  private planets: { x: number; y: number }[] = [];
+  private planetSprites: Phaser.GameObjects.Image[] = [];
   
   private selectedUnitId: string | null = null;
+
+  // チャットウィジェット連携用：ミッション達成状況のキャッシュ
+  private _missionReach: boolean = false;
+  private _missionAllLinked: boolean = false;
+  private _missionData: boolean = false;
+  private _gameStateTickCounter: number = 0;
   private activePolls: {
     hubId: string, 
     targetId: string, 
@@ -81,6 +93,11 @@ export class MainScene extends Scene {
 
   constructor() {
     super('MainScene');
+  }
+
+  preload() {
+    // 惑星画像を Phaser テクスチャとして読み込み
+    this.load.image('planet', planetImg);
   }
 
   create() {
@@ -148,6 +165,7 @@ export class MainScene extends Scene {
     this.domMultiplexCipher = document.getElementById('multiplex-cipher') as HTMLSelectElement;
     this.domMultiplexRelay = document.getElementById('multiplex-relay') as HTMLInputElement;
     this.domToggleStatusBtn = document.getElementById('toggle-status-btn');
+    this.domTimeDisplay = document.getElementById('time-display');
 
     const updateMultiplex = (e?: Event) => {
       if (e && e.isTrusted && this.selectedUnitId) {
@@ -178,10 +196,10 @@ export class MainScene extends Scene {
           const isHidden = this.domRgrContainer.classList.contains('hidden');
           if (isHidden) {
             this.domRgrContainer.classList.remove('hidden');
-            this.domToggleStatusBtn!.textContent = 'COMMUNICATION STATUS 非表示';
+            this.domToggleStatusBtn!.textContent = 'Communication Status 非表示';
           } else {
             this.domRgrContainer.classList.add('hidden');
-            this.domToggleStatusBtn!.textContent = 'COMMUNICATION STATUS 表示';
+            this.domToggleStatusBtn!.textContent = 'Communication Status 表示';
           }
         }
       };
@@ -200,6 +218,16 @@ export class MainScene extends Scene {
     };
     setupAccordion('multiplex-group-btn', 'multiplex-group-content');
     setupAccordion('optical-group-btn', 'optical-group-content');
+
+    // ミッションパネルの折りたたみトグル（経過時間との重なり回避用）
+    const missionToggle = document.getElementById('mission-toggle');
+    const missionPanel = document.getElementById('mission-panel');
+    if (missionToggle && missionPanel) {
+      missionToggle.onclick = () => {
+        const isCollapsed = missionPanel.classList.toggle('collapsed');
+        missionToggle.setAttribute('aria-expanded', String(!isCollapsed));
+      };
+    }
 
     this.domSendCmdBtn = document.getElementById('send-cmd-btn');
     this.domRgrContainer = document.getElementById('rgr-container');
@@ -366,6 +394,62 @@ export class MainScene extends Scene {
       // Use interferenceZones as "haze" markers for drawing
       this.interferenceZones.push({ x: cX, y: cY, radius: spread * 1.1 });
     }
+
+    // 惑星をランダムに2つ配置（環境ハザード：通信干渉源）
+    this.placePlanets(cx, cy);
+  }
+
+  // 惑星をランダム配置：他の重要地点から一定以上離す制約付き
+  private placePlanets(cx: number, cy: number) {
+    const PLANET_COUNT = 2;
+    const RANGE = 7000;             // 配置範囲: cx/cy ± RANGE/2
+    const MIN_DIST_BETWEEN = 1500;  // 惑星同士の最小距離
+    const MIN_DIST_SURVEY = 1000;   // 調査ポイントから最小距離
+    const MIN_DIST_SPAWN = 800;     // ユニットスポーン地点から最小距離
+    const MAX_RETRIES = 10;
+
+    const spawnX = cx;
+    const spawnY = cy;
+
+    for (let i = 0; i < PLANET_COUNT; i++) {
+      let candidate: { x: number; y: number } | null = null;
+      for (let attempt = 0; attempt < MAX_RETRIES; attempt++) {
+        const x = cx + (Math.random() - 0.5) * RANGE;
+        const y = cy + (Math.random() - 0.5) * RANGE;
+
+        // 制約チェック
+        const distFromSurvey = CommunicationSystem.getDistance(x, y, this.surveyPoint.x, this.surveyPoint.y);
+        const distFromSpawn = CommunicationSystem.getDistance(x, y, spawnX, spawnY);
+        if (distFromSurvey < MIN_DIST_SURVEY) continue;
+        if (distFromSpawn < MIN_DIST_SPAWN) continue;
+
+        let tooCloseToOther = false;
+        for (const p of this.planets) {
+          if (CommunicationSystem.getDistance(x, y, p.x, p.y) < MIN_DIST_BETWEEN) {
+            tooCloseToOther = true;
+            break;
+          }
+        }
+        if (tooCloseToOther) continue;
+
+        candidate = { x, y };
+        break;
+      }
+      // フェイルオープン：制約を満たせなかったら最後の候補を使用
+      if (!candidate) {
+        candidate = {
+          x: cx + (Math.random() - 0.5) * RANGE,
+          y: cy + (Math.random() - 0.5) * RANGE,
+        };
+      }
+      this.planets.push(candidate);
+
+      // Phaser スプライトとして配置
+      const sprite = this.add.image(candidate.x, candidate.y, 'planet');
+      sprite.setScale(0.5);
+      sprite.setDepth(2);
+      this.planetSprites.push(sprite);
+    }
   }
 
   private onPointerDown(pointer: Phaser.Input.Pointer) {
@@ -486,7 +570,7 @@ export class MainScene extends Scene {
       
       this.spaceships.forEach(s => {
         if (s.id === unit.id) return;
-        const { canConnect: canRadio, dropRate: radioRate } = CommunicationSystem.getLinkQuality(unit, s, activeNodes);
+        const { canConnect: canRadio, dropRate: radioRate } = CommunicationSystem.getLinkQuality(unit, s, activeNodes, this.planets);
         const { canConnect: canOpt, dropRate: optRate } = CommunicationSystem.getOpticalMultiplexQuality(unit, s, activeNodes);
         
         let radioColor = '#ef4444'; 
@@ -657,14 +741,14 @@ export class MainScene extends Scene {
         // Data exchange logic
         const activeNodes = Array.from(this.spaceships.values()).filter(s => s.isNodeActive);
         const packetsToTx = target.getPacketsToTransmit();
-        const successfulPackets = CommunicationSystem.transferData(target, node, packetsToTx, activeNodes);
+        const successfulPackets = CommunicationSystem.transferData(target, node, packetsToTx, activeNodes, this.planets);
         if (successfulPackets.length > 0) {
           successfulPackets.forEach(p => node.receivePacket(p));
           this.showFloatingText(node.x, node.y, 'データ受信', '#4ade80');
           this.recordLinkSuccess(node.id, target.id);
         }
         const nodePackets = node.queue;
-        const successfulNodePackets = CommunicationSystem.transferData(node, target, nodePackets, activeNodes);
+        const successfulNodePackets = CommunicationSystem.transferData(node, target, nodePackets, activeNodes, this.planets);
         if (successfulNodePackets.length > 0) {
           successfulNodePackets.forEach(p => {
             target.receivePacket(p);
@@ -686,7 +770,7 @@ export class MainScene extends Scene {
            // Check if wave just hit this ship
            if (Math.abs(resWaveDist - d) < (waveSpeed * delta / 1000) * 1.5) {
              const packets = target.getPacketsToTransmit();
-             const successful = CommunicationSystem.transferData(target, nearbyShip, packets, activeNodes);
+             const successful = CommunicationSystem.transferData(target, nearbyShip, packets, activeNodes, this.planets);
              if (successful.length > 0) {
                successful.forEach(p => nearbyShip.receivePacket(p));
                this.recordLinkSuccess(target.id, nearbyShip.id);
@@ -705,6 +789,17 @@ export class MainScene extends Scene {
     }
 
     this.checkWinLoss();
+
+    // 経過時間表示の更新（整数秒）
+    if (this.domTimeDisplay) {
+      this.domTimeDisplay.textContent = Math.floor(this.timeElapsedMs / 1000).toString();
+    }
+
+    // 60フレームに1回（≒1秒）ゲーム状態を window.__gameState に書き出し（チャット用）
+    this._gameStateTickCounter++;
+    if (this._gameStateTickCounter % 60 === 0) {
+      this.exposeGameState();
+    }
   }
 
   private handlePolling(node: Spaceship, target: Spaceship) {
@@ -727,7 +822,7 @@ export class MainScene extends Scene {
     }
 
     // 2. Normal communication requires matching frequencies
-    const { canConnect } = CommunicationSystem.getLinkQuality(node, target, activeNodes);
+    const { canConnect } = CommunicationSystem.getLinkQuality(node, target, activeNodes, this.planets);
     
     if (canConnect) {
       const rangeMode = (node.isLongEnabled && target.isLongEnabled && node.longFreq === target.longFreq) ? 'long' : 'short';
@@ -828,6 +923,19 @@ export class MainScene extends Scene {
     this.textLabels.set('survey-point-label', surveyText);
     surveyText.setPosition(this.surveyPoint.x, this.surveyPoint.y - this.surveyPoint.radius - 30);
 
+    // 1b. 惑星の干渉ゾーン（通信品質モード時のみ表示・薄ピンクFill）
+    if (this.vizMode === 'quality') {
+      const PINK = 0xfb7185;
+      for (const planet of this.planets) {
+        // 長距離干渉ゾーン (2500km) - 外側、薄め
+        this.clutterGraphics.fillStyle(PINK, 0.04);
+        this.clutterGraphics.fillCircle(planet.x, planet.y, CommunicationSystem.PLANET_LONG_RANGE_INTERFERENCE);
+        // 短距離干渉ゾーン (700km) - 内側、濃いめ
+        this.clutterGraphics.fillStyle(PINK, 0.08);
+        this.clutterGraphics.fillCircle(planet.x, planet.y, CommunicationSystem.PLANET_SHORT_RANGE_INTERFERENCE);
+      }
+    }
+
     const isControl = this.systemDisplayMode === SystemDisplayMode.CONTROL;
     const activeNodes = Array.from(this.spaceships.values()).filter(s => s.isNodeActive);
 
@@ -849,8 +957,8 @@ export class MainScene extends Scene {
         angle = Math.atan2(ship.targetY - ship.y, ship.targetX - ship.x);
       }
 
-      // Node Pulse: Only in CONTROL mode
-      if (isControl && ship.isNodeActive) {
+      // Selection Pulse: 選択中ユニットを CONTROL モードでパルス表示
+      if (isControl && isSelected) {
         const pulse = (Math.sin(time / 500) + 1) / 2;
         g.lineStyle(2, primaryColor, 0.4 + pulse * 0.4);
         g.strokeCircle(ship.x, ship.y, 25 + pulse * 10);
@@ -984,7 +1092,7 @@ export class MainScene extends Scene {
     if (isControl) this.spaceships.forEach(source => {
       this.spaceships.forEach(target => {
         if (source.id < target.id) {
-          const { canConnect: canStandard, dropRate: standardRate } = CommunicationSystem.getLinkQuality(source, target, activeNodes);
+          const { canConnect: canStandard, dropRate: standardRate } = CommunicationSystem.getLinkQuality(source, target, activeNodes, this.planets);
           const { canConnect: canOpt } = CommunicationSystem.getOpticalMultiplexQuality(source, target, activeNodes);
 
           // Calculate perpendicular vector for offset
@@ -1028,7 +1136,7 @@ export class MainScene extends Scene {
       activeNodes.forEach(node => {
         this.spaceships.forEach(target => {
           if (node.id === target.id) return;
-          const { canConnect, dropRate } = CommunicationSystem.getLinkQuality(node, target, activeNodes);
+          const { canConnect, dropRate } = CommunicationSystem.getLinkQuality(node, target, activeNodes, this.planets);
           if (canConnect) {
             // Background thin link
             this.linkGraphics.lineStyle(1, 0x4ade80, (1 - dropRate) * 0.05);
@@ -1095,7 +1203,7 @@ export class MainScene extends Scene {
                 
                 const canConnect = poll.rangeMode === 'optical' 
                   ? CommunicationSystem.getOpticalMultiplexQuality(startNode, nearbyShip, activeNodes).canConnect
-                  : (nearbyShip.id !== target.id && CommunicationSystem.getLinkQuality(target, nearbyShip, activeNodes).canConnect);
+                  : (nearbyShip.id !== target.id && CommunicationSystem.getLinkQuality(target, nearbyShip, activeNodes, this.planets).canConnect);
 
                 if (canConnect && resWaveDist <= d + 100) {
                   const t = Math.min(1.0, resWaveDist / d);
@@ -1122,8 +1230,8 @@ export class MainScene extends Scene {
       if (source) {
         this.spaceships.forEach(target => {
           if (source.id === target.id) return;
-          
-          const { canConnect, dropRate } = CommunicationSystem.getLinkQuality(source, target, activeNodes);
+
+          const { canConnect, dropRate } = CommunicationSystem.getLinkQuality(source, target, activeNodes, this.planets);
           
           // Check if there's a recent CMD success (Emergency path)
           const key = [source.id, target.id].sort().join('-');
@@ -1238,7 +1346,7 @@ export class MainScene extends Scene {
 
       // 2. All Linked Success (Must have connection to HQ)
       if (hqNode) {
-        const { canConnect } = CommunicationSystem.getLinkQuality(ship, hqNode, nodes);
+        const { canConnect } = CommunicationSystem.getLinkQuality(ship, hqNode, nodes, this.planets);
         if (!canConnect && ship.id !== hqNode.id) {
           allLinkedSuccess = false;
         }
@@ -1258,9 +1366,32 @@ export class MainScene extends Scene {
     if (mAllLink) mAllLink.innerHTML = `<span class="check">${allLinkedSuccess ? '[x]' : '[ ]'}</span> 全ユニットの通信確保`;
     if (mData) mData.innerHTML = `<span class="check">${dataSuccess ? '[x]' : '[ ]'}</span> 調査データの転送・回収`;
 
+    // チャットウィジェット用キャッシュ
+    this._missionReach = reachSuccess;
+    this._missionAllLinked = allLinkedSuccess;
+    this._missionData = dataSuccess;
+
     if (reachSuccess && allLinkedSuccess && dataSuccess) {
       this.win();
     }
+  }
+
+  // window.__gameState にゲーム状態を公開（チャットウィジェットがDifyへのコンテキストとして利用）
+  private exposeGameState() {
+    const selectedHp = this.selectedUnitId
+      ? (this.spaceships.get(this.selectedUnitId)?.hp ?? null)
+      : null;
+    window.__gameState = {
+      shipCount: this.spaceships.size,
+      selectedUnitId: this.selectedUnitId,
+      selectedUnitHp: selectedHp,
+      missionReach: this._missionReach,
+      missionAllLinked: this._missionAllLinked,
+      missionData: this._missionData,
+      elapsedSeconds: Math.floor(this.timeElapsedMs / 1000),
+      gameMode: this.systemDisplayMode === SystemDisplayMode.CONTROL ? 'control' : 'combat',
+      gameStatus: this.isBriefingActive ? 'briefing' : this.isGameOver ? 'won' : 'active',
+    };
   }
 
   private win() {
