@@ -27,4 +27,5 @@ interface GameStateSnapshot {
 
 interface Window {
   __gameState?: GameStateSnapshot;
+  __chatWidget?: import('./components/ChatWidget').ChatWidget;
 }
