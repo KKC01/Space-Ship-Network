@@ -3,6 +3,7 @@ import { Spaceship } from '../models/Spaceship';
 import { PacketType, FreqShort, FreqLong, SystemDisplayMode } from '../models/DataPacket';
 import { CommunicationSystem } from '../models/CommunicationSystem';
 import { OpticalMaster } from '../models/OpticalMaster';
+import { Planet, PLANET_SPECS } from '../models/Planet';
 import legacyDestroyerImg from '../assets/Legacy_Destroyer.png';
 import planetImg from '../assets/Planet_01.png';
 
@@ -35,6 +36,13 @@ export class MainScene extends Scene {
   private domRgrContainer!: HTMLElement | null;
   private domRgrList!: HTMLElement | null;
   private domModalClose: HTMLElement | null = null;
+
+  // Planet Modal DOM Elements
+  private domPlanetModal: HTMLElement | null = null;
+  private domPlanetModalClose: HTMLElement | null = null;
+  private domPlanetId: HTMLElement | null = null;
+  private domPlanetCommStation: HTMLElement | null = null;
+  private domPlanetDesc: HTMLElement | null = null;
   private domMultiplexEnable!: HTMLInputElement | null;
   private domMultiplexMaster!: HTMLSelectElement | null;
   private domMultiplexSpeed!: HTMLSelectElement | null;
@@ -56,7 +64,7 @@ export class MainScene extends Scene {
   private surveyPoint = { x: 3000, y: 3000, radius: 200 };
 
   // 惑星（環境ハザード）：通信干渉ゾーン
-  private planets: { x: number; y: number }[] = [];
+  private planets: Planet[] = [];
   private planetSprites: Phaser.GameObjects.Image[] = [];
   
   private selectedUnitId: string | null = null;
@@ -233,6 +241,11 @@ export class MainScene extends Scene {
     this.domRgrContainer = document.getElementById('rgr-container');
     this.domRgrList = document.getElementById('rgr-list');
     this.domModalClose = document.getElementById('unit-modal-close');
+    this.domPlanetModal = document.getElementById('planet-modal');
+    this.domPlanetModalClose = document.getElementById('planet-modal-close');
+    this.domPlanetId = document.getElementById('planet-id');
+    this.domPlanetCommStation = document.getElementById('planet-comm-station');
+    this.domPlanetDesc = document.getElementById('planet-desc');
     this.domScaleBarLine = document.getElementById('scale-bar-line');
     this.domScaleBarText = document.getElementById('scale-bar-text');
 
@@ -340,6 +353,12 @@ export class MainScene extends Scene {
       };
     }
 
+    if (this.domPlanetModalClose) {
+      this.domPlanetModalClose.onclick = () => {
+        this.domPlanetModal?.classList.add('hidden');
+      };
+    }
+
     // NOTE: send-cmd-btn handler is already set above (broadcast CMD via HQ queue).
     // Do NOT add a second handler here — it would overwrite the broadcast behavior.
   }
@@ -411,7 +430,17 @@ export class MainScene extends Scene {
     const spawnX = cx;
     const spawnY = cy;
 
+    // 配置に使う仕様を選定：PLN_05 を必ず含み、残りはその他からランダム
+    const pln05 = PLANET_SPECS.find(s => s.id === 'PLN_05');
+    const others = PLANET_SPECS.filter(s => s.id !== 'PLN_05');
+    const selectedSpecs = pln05 ? [pln05] : [];
+    while (selectedSpecs.length < PLANET_COUNT && others.length > 0) {
+      const idx = Math.floor(Math.random() * others.length);
+      selectedSpecs.push(others.splice(idx, 1)[0]);
+    }
+
     for (let i = 0; i < PLANET_COUNT; i++) {
+      const spec = selectedSpecs[i] || PLANET_SPECS[0];
       let candidate: { x: number; y: number } | null = null;
       for (let attempt = 0; attempt < MAX_RETRIES; attempt++) {
         const x = cx + (Math.random() - 0.5) * RANGE;
@@ -442,12 +471,14 @@ export class MainScene extends Scene {
           y: cy + (Math.random() - 0.5) * RANGE,
         };
       }
-      this.planets.push(candidate);
+      const planet = new Planet(spec.id, candidate.x, candidate.y, spec.hasCommStation, spec.description ?? '');
+      this.planets.push(planet);
 
-      // Phaser スプライトとして配置
+      // Phaser スプライトとして配置（クリック検出用に planetId を保存）
       const sprite = this.add.image(candidate.x, candidate.y, 'planet');
       sprite.setScale(0.5);
       sprite.setDepth(2);
+      sprite.setData('planetId', spec.id);
       this.planetSprites.push(sprite);
     }
   }
@@ -482,6 +513,17 @@ export class MainScene extends Scene {
       const worldX = pointer.worldX;
       const worldY = pointer.worldY;
 
+      // 惑星クリック判定（船舶と同じ距離ベース、半径は表示サイズ 75×0.5 より十分大きめ）
+      const PLANET_HIT_RADIUS = 100;
+      for (let i = 0; i < this.planetSprites.length; i++) {
+        const s = this.planetSprites[i];
+        const dp = CommunicationSystem.getDistance(worldX, worldY, s.x, s.y);
+        if (dp < PLANET_HIT_RADIUS) {
+          this.openPlanetModal(this.planets[i].id);
+          return;
+        }
+      }
+
       let clickedId: string | null = null;
       let minDist = 30;
 
@@ -506,8 +548,30 @@ export class MainScene extends Scene {
 
   private openUnitModal() {
     if (!this.selectedUnitId || !this.domUnitModal) return;
+    // 排他：惑星モーダルが開いていれば閉じる
+    this.domPlanetModal?.classList.add('hidden');
     if (this.domUnitModal) this.domUnitModal.classList.remove('hidden');
     this.updateModalData();
+  }
+
+  // 惑星情報モーダルを開く（ユニットモーダルとは排他）
+  private openPlanetModal(planetId: string) {
+    const planet = this.planets.find(p => p.id === planetId);
+    if (!planet || !this.domPlanetModal) return;
+
+    // 排他：ユニットモーダルが開いていれば閉じる
+    this.selectedUnitId = null;
+    this.domUnitModal?.classList.add('hidden');
+
+    if (this.domPlanetId) this.domPlanetId.textContent = planet.id;
+    if (this.domPlanetCommStation) {
+      this.domPlanetCommStation.textContent = planet.hasCommStation ? 'あり' : 'なし';
+      this.domPlanetCommStation.style.color = planet.hasCommStation ? '#4ade80' : '#9ca3af';
+    }
+    if (this.domPlanetDesc) {
+      this.domPlanetDesc.textContent = planet.description || '電波到達圏内では干渉が発生します。';
+    }
+    this.domPlanetModal.classList.remove('hidden');
   }
 
   private updateModalData() {
