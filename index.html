@@ -185,6 +185,28 @@
       </div>
     </div>
 
+    <!-- 惑星情報モーダル（ユニットモーダルと同じ右側、排他制御） -->
+    <div id="planet-modal" class="glass-panel hidden"
+      style="position: absolute; top: 20px; right: 20px; width: 320px; padding: 20px; pointer-events: auto; max-height: 90vh; overflow-y: auto;">
+      <div id="planet-modal-close" style="position: absolute; top: 10px; right: 15px; cursor: pointer; font-size: 24px;">
+        &times;</div>
+      <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 15px; border-bottom: 1px solid rgba(255,255,255,0.2); padding-bottom: 5px;">
+        <h2 style="margin: 0; flex: 1;">PLANET</h2>
+        <span id="planet-id" style="font-size: 16px; color: #38bdf8;">PLN_05</span>
+      </div>
+      <div style="margin-bottom: 10px;">
+        <span class="hud-label">通信局</span>
+        <span style="margin: 0 6px; color: #9ca3af;">:</span>
+        <span id="planet-comm-station" style="color: #4ade80;">あり</span>
+      </div>
+      <div style="margin-bottom: 10px;">
+        <span class="hud-label">干渉</span>
+        <div id="planet-desc" style="margin-top: 4px; font-size: 12px; color: #cbd5e1; line-height: 1.5;">
+          電波到達圏内では干渉が発生します。
+        </div>
+      </div>
+    </div>
+
     <!-- チャットウィジェット マウントポイント -->
     <div id="chat-widget-root"></div>
 

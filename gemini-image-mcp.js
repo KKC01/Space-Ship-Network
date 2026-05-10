@@ -60,6 +60,9 @@ async function generateImageWithGemini(prompt, width = 100, height = 100) {
 async function handleRequest(request) {
   const { id, method, params } = request;
 
+  // id なし = notification（応答不要）
+  if (id === undefined) return;
+
   try {
     if (method === 'initialize') {
       sendResponse(id, {
