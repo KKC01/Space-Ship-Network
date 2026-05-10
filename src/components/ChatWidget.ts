@@ -49,6 +49,9 @@ export class ChatWidget {
 
     this.render();
     this.bindEvents();
+
+    // MainScene からアクセス可能にする
+    window.__chatWidget = this;
   }
 
   private render(): void {
@@ -65,7 +68,7 @@ export class ChatWidget {
           <img class="operator-portrait" src="${operatorImg}" alt="Operator AI" />
           <div class="operator-info">
             <div class="operator-name">Operator AI</div>
-            <div class="operator-status" id="operator-status">STANDBY</div>
+            <div class="operator-status" id="operator-status"></div>
           </div>
           <div class="operator-speech-indicator" id="speech-indicator">
             <span></span><span></span><span></span>
@@ -252,7 +255,7 @@ export class ChatWidget {
       speechEl.classList.add('active');
     } else {
       this.portrait.classList.remove('speaking');
-      statusEl.textContent = 'STANDBY';
+      statusEl.textContent = '';
       statusEl.style.color = '';
       speechEl.classList.remove('active');
     }
@@ -271,6 +274,26 @@ export class ChatWidget {
     requestAnimationFrame(() => {
       this.messageList.scrollTop = this.messageList.scrollHeight;
     });
+  }
+
+  /**
+   * Operator AI からのシステムメッセージをチャットバブルに追加する。
+   * MainScene などの外部モジュールから呼び出し可能。
+   */
+  public pushSystemMessage(content: string): void {
+    const msg: ChatMessage = {
+      id: crypto.randomUUID(),
+      role: 'assistant',
+      content,
+    };
+    this.state.messages.push(msg);
+    this.appendMessageBubble(msg);
+
+    // パネルが閉じていれば自動で開く
+    if (!this.state.isOpen) {
+      this.open();
+    }
+    this.scrollToBottom();
   }
 
   destroy(): void {

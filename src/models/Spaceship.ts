@@ -39,10 +39,17 @@ export class Spaceship {
   public selectedMasterId: string | null = null;
   public lastTransmittedSlot: number = -1;
   
-  public hp: number = 100;
-  public maxHp: number = 100;
+  public hp: number = 300;
+  public maxHp: number = 300;
   public lastReceivedSourceId: string | null = null;
   public lastReceivedAt: number = 0;
+
+  // 攻撃関連（隕石戦闘用）
+  public attackTargetMeteorId: string | null = null;
+  public attackCooldown: number = 0;
+  public readonly ATTACK_RANGE: number = 400;
+  public readonly ATTACK_DAMAGE: number = 25;
+  public readonly ATTACK_COOLDOWN_MS: number = 1000;
 
   // Node Functionality
   public isNodeActive: boolean = false;
