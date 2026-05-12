@@ -6,6 +6,9 @@ export interface PlanetSpec {
 }
 
 export class Planet {
+  public vx: number = 0;
+  public vy: number = 0;
+
   constructor(
     public readonly id: string,
     public x: number,
@@ -13,6 +16,12 @@ export class Planet {
     public readonly hasCommStation: boolean,
     public readonly description: string = ''
   ) {}
+
+  public update(dt: number): void {
+    const dtSeconds = dt / 1000;
+    this.x += this.vx * dtSeconds;
+    this.y += this.vy * dtSeconds;
+  }
 }
 
 // 配置に使う ID プール（PLN_05 を必ず含む）

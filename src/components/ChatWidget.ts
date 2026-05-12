@@ -15,6 +15,8 @@ interface ChatWidgetState {
 }
 
 export class ChatWidget {
+  public disabled: boolean = false;
+
   private state: ChatWidgetState = {
     isOpen: false,
     messages: [],
@@ -281,6 +283,7 @@ export class ChatWidget {
    * MainScene などの外部モジュールから呼び出し可能。
    */
   public pushSystemMessage(content: string): void {
+    if (this.disabled) return;
     const msg: ChatMessage = {
       id: crypto.randomUUID(),
       role: 'assistant',

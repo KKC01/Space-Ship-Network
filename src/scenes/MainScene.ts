@@ -8,6 +8,7 @@ import { Meteor } from '../models/Meteor';
 import legacyDestroyerImg from '../assets/Legacy_Destroyer.png';
 import planetImg from '../assets/Planet_01.png';
 import meteorImg from '../assets/meteor/meteor_01.png';
+import monitorVideoSrc from '../assets/monitor_01.mp4';
 
 export class MainScene extends Scene {
   private spaceships: Map<string, Spaceship> = new Map();
@@ -69,6 +70,7 @@ export class MainScene extends Scene {
   private isGameOver: boolean = false;
   private isBriefingActive: boolean = true;
   private systemDisplayMode: SystemDisplayMode = SystemDisplayMode.CONTROL;
+  private selectedAction: 'attack' | 'jamming' | 'warning' = 'attack';
   private vizMode: 'dots' | 'circles' | 'quality' | 'range' = 'circles';
   
   
@@ -143,9 +145,11 @@ export class MainScene extends Scene {
     // Camera Setup - Unified
     const cx = this.sys.game.canvas.width / 2;
     const cy = this.sys.game.canvas.height / 2;
-    this.cameras.main.setBounds(-4000, -4000, 8000, 8000);
+    // ユニット初期位置のオフセットに合わせて bounds を拡張（クランプ回避）
+    this.cameras.main.setBounds(-6000, -6000, 12000, 12000);
     this.cameras.main.setZoom(0.4); // Doubled from 0.2 for better initial detail
-    this.cameras.main.centerOn(cx, cy);
+    // ユニット群を画面右側に表示してミッションパネル（左上）との重なりを回避
+    this.cameras.main.centerOn(cx - 3200 - 250, cy - 3200);
 
     this.input.on('pointerdown', this.onPointerDown, this);
     this.input.on('pointermove', this.onPointerMove, this);
@@ -341,6 +345,11 @@ export class MainScene extends Scene {
         domToggleModeBtn.textContent = isControl ? 'モード：通信管制' : 'モード：戦闘指揮';
         domToggleModeBtn.className = isControl ? 'mode-toggle-btn' : 'mode-toggle-btn combat';
 
+        // モーダルが開いていればUI表示を切り替える
+        if (this.selectedUnitId && this.domUnitModal && !this.domUnitModal.classList.contains('hidden')) {
+          this.applyModeToUnitModal();
+        }
+
         if (domVizCycleBtn) {
           if (isControl) {
             controlVizIndex = 0;
@@ -400,6 +409,39 @@ export class MainScene extends Scene {
 
     // NOTE: send-cmd-btn handler is already set above (broadcast CMD via HQ queue).
     // Do NOT add a second handler here — it would overwrite the broadcast behavior.
+
+    // 戦闘アクションボタン：クリックで 攻撃→妨害→警告 を循環
+    const actionCycleBtn = document.getElementById('action-cycle-btn');
+    if (actionCycleBtn) {
+      actionCycleBtn.onclick = () => {
+        const cycle: Array<'attack' | 'jamming' | 'warning'> = ['attack', 'jamming', 'warning'];
+        const labels: Record<string, string> = { attack: '攻撃', jamming: '妨害', warning: '警告' };
+        const next = cycle[(cycle.indexOf(this.selectedAction) + 1) % cycle.length];
+        this.selectedAction = next;
+        actionCycleBtn.textContent = labels[next];
+      };
+    }
+
+    // 背景雑音監視：動画ソースとメッセージのマッピング（将来は干渉レベルで切替）
+    const NOISE_MONITOR_CONFIG: Record<string, { src: string; message: string }> = {
+      none: { src: monitorVideoSrc, message: '干渉はありません' },
+    };
+    const noiseBtnEl   = document.getElementById('noise-monitor-btn');
+    const noiseContEl  = document.getElementById('noise-monitor-video-container') as HTMLElement | null;
+    const noiseVideoEl = document.getElementById('noise-monitor-video') as HTMLVideoElement | null;
+    if (noiseBtnEl && noiseContEl && noiseVideoEl) {
+      noiseBtnEl.onclick = () => {
+        const cfg = NOISE_MONITOR_CONFIG['none'];
+        noiseVideoEl.src = cfg.src;
+        noiseContEl.style.display = 'block';
+        window.__chatWidget?.pushSystemMessage(cfg.message);
+      };
+      noiseVideoEl.onclick = () => {
+        noiseContEl.style.display = 'none';
+        noiseVideoEl.pause();
+        noiseVideoEl.src = '';
+      };
+    }
   }
 
   private initGameData() {
@@ -407,11 +449,13 @@ export class MainScene extends Scene {
     const cy = this.sys.game.canvas.height / 2;
 
     const shipCount = 4;
+    const SPAWN_OFFSET_X = -3200;
+    const SPAWN_OFFSET_Y = -3200;
     for (let i = 0; i < shipCount; i++) {
       const id = i === 0 ? 'HQ Ship' : `Ship-${i}`;
       // Specific initial formation around HQ
-      const x = i === 0 ? cx : cx + (i === 1 ? -400 : (i === 2 ? 400 : 0));
-      const y = i === 0 ? cy : cy + (i === 3 ? 500 : 200);
+      const x = (i === 0 ? cx : cx + (i === 1 ? -400 : (i === 2 ? 400 : 0))) + SPAWN_OFFSET_X;
+      const y = (i === 0 ? cy : cy + (i === 3 ? 500 : 200)) + SPAWN_OFFSET_Y;
       const ship = new Spaceship(id, x, y, 1);
       
       if (i === 0) {
@@ -511,6 +555,11 @@ export class MainScene extends Scene {
         };
       }
       const planet = new Planet(spec.id, candidate.x, candidate.y, spec.hasCommStation, spec.description ?? '');
+      // 隕石速度(30)の1/5でランダムな一定方向に移動
+      const PLANET_SPEED = 30 / 5;
+      const angle = Math.random() * Math.PI * 2;
+      planet.vx = Math.cos(angle) * PLANET_SPEED;
+      planet.vy = Math.sin(angle) * PLANET_SPEED;
       this.planets.push(planet);
 
       // Phaser スプライトとして配置（クリック検出用に planetId を保存）
@@ -570,8 +619,8 @@ export class MainScene extends Scene {
         const dm = CommunicationSystem.getDistance(worldX, worldY, meteor.x, meteor.y);
         if (dm < METEOR_HIT_RADIUS) {
           const isCombatMode = this.systemDisplayMode === SystemDisplayMode.COMBAT;
-          if (isCombatMode && this.selectedUnitId) {
-            // 戦闘指揮モード + ユニット選択済み → 攻撃指示
+          if (isCombatMode && this.selectedUnitId && this.selectedAction === 'attack') {
+            // 戦闘指揮モード + ユニット選択済み + 攻撃アクション → 攻撃指示
             const ship = this.spaceships.get(this.selectedUnitId);
             if (ship) {
               ship.attackTargetMeteorId = mId;
@@ -608,11 +657,26 @@ export class MainScene extends Scene {
     }
   }
 
+  private applyModeToUnitModal() {
+    const isCombat = this.systemDisplayMode === SystemDisplayMode.COMBAT;
+    // hidden クラス（display: none !important）で制御し CSS との競合を防ぐ
+    ['multiplex-group-btn', 'multiplex-group-content',
+     'optical-group-btn',  'optical-group-content',
+     'toggle-status-btn',  'rgr-container'
+    ].forEach(id => {
+      const el = document.getElementById(id);
+      if (el) el.classList.toggle('hidden', isCombat);
+    });
+    const actionContainer = document.getElementById('action-btn-container');
+    if (actionContainer) actionContainer.classList.toggle('hidden', !isCombat);
+  }
+
   private openUnitModal() {
     if (!this.selectedUnitId || !this.domUnitModal) return;
     // 排他：惑星モーダルが開いていれば閉じる
     this.domPlanetModal?.classList.add('hidden');
     if (this.domUnitModal) this.domUnitModal.classList.remove('hidden');
+    this.applyModeToUnitModal();
     this.updateModalData();
   }
 
@@ -762,6 +826,14 @@ export class MainScene extends Scene {
     if (this.meteorSpawnTimer <= 0) {
       this.spawnMeteor();
     }
+    // 惑星の移動更新
+    for (let i = 0; i < this.planets.length; i++) {
+      this.planets[i].update(delta);
+      const ps = this.planetSprites[i];
+      if (ps) {
+        ps.setPosition(this.planets[i].x, this.planets[i].y);
+      }
+    }
     // 隕石の更新・探知・衝突
     this.updateMeteors(delta);
     // 隕石への攻撃処理
@@ -809,7 +881,10 @@ export class MainScene extends Scene {
     }
 
     if (this.domUnitModal && !this.domUnitModal.classList.contains('hidden')) {
-      if (Math.floor(time) % 10 === 0) this.updateModalData();
+      if (Math.floor(time) % 10 === 0) {
+        this.updateModalData();
+        this.applyModeToUnitModal();
+      }
     }
 
     // Old hub labels removed as we use spaceships now
@@ -822,10 +897,8 @@ export class MainScene extends Scene {
         if (isCombat) {
           text.setText(id);
         } else {
-          const sStr = s.isShortEnabled ? `近:${s.shortFreq}` : '近:OFF';
-          const lStr = s.isLongEnabled ? `遠:${s.longFreq}` : '遠:OFF';
           const statusStr = s.pendingFreqChange ? ' [SETTING...]' : '';
-          text.setText(`${id}${statusStr}\n[${sStr} ${lStr}]`);
+          text.setText(`${id}${statusStr}`);
         }
         text.setPosition(s.x, s.y + (isHQ ? 55 : 40));
         if (isHQ) {
@@ -1548,6 +1621,16 @@ export class MainScene extends Scene {
     };
   }
 
+  private lose() {
+    this.isGameOver = true;
+    if (window.__chatWidget) window.__chatWidget.disabled = true;
+    if (this.domGameOver) {
+      this.domGameOver.classList.remove('hidden');
+      if (this.domGameTitle) this.domGameTitle.textContent = 'MISSION FAILED';
+      if (this.domGameDesc) this.domGameDesc.textContent = '全部隊が消滅しました。';
+    }
+  }
+
   private win() {
     this.isGameOver = true;
     if (this.domGameOver) {
@@ -1627,7 +1710,9 @@ export class MainScene extends Scene {
     else if (r < 0.7) size = 'SMALL';
     else size = 'TINY';
 
-    const meteor = new Meteor(meteorId, mx, my, targetId, targetShip.x, targetShip.y, size);
+    const baseSpeed = 30;
+    const speed = baseSpeed * (0.7 + Math.random() * 0.6); // ±30%: 21〜39
+    const meteor = new Meteor(meteorId, mx, my, targetId, targetShip.x, targetShip.y, size, speed);
     this.meteors.set(meteorId, meteor);
 
     // Phaserスプライトを作成（探知前は非表示）
@@ -1715,6 +1800,14 @@ export class MainScene extends Scene {
             sg.clear();
             this.shipGraphics.delete(hitShip.id);
           }
+          // IDラベルを破棄
+          const label = this.textLabels.get(hitShip.id);
+          if (label) { label.destroy(); this.textLabels.delete(hitShip.id); }
+          // METEOR WARNING ラベルを破棄
+          const warnLabel = this.textLabels.get(`meteor-warning-${hitShip.id}`);
+          if (warnLabel) { warnLabel.destroy(); this.textLabels.delete(`meteor-warning-${hitShip.id}`); }
+          // 全ユニット消滅チェック
+          if (this.spaceships.size === 0) this.lose();
         } else {
           let colMsg = '';
           if (meteor.sizeType === 'LARGE') colMsg = `大型隕石、迎撃失敗。${hitShip.id}に衝突！被害確認中…`;

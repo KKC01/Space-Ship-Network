@@ -1,0 +1,2 @@
+[    2587ms] [LOG] %c %c %c %c %c Phaser v3.90.0 (WebGL | Web Audio) %c https://phaser.io/v390 background: #ff0000 background: #ffff00 background: #00ff00 background: #00ffff color: #ffffff; background: #000000 background: transparent @ http://localhost:3002/node_modules/.vite/deps/phaser.js?v=7c2a77cc:8456
+[    8860ms] [LOG] Mission Started @ http://localhost:3002/src/scenes/MainScene.ts:300
