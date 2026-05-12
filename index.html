@@ -179,9 +179,20 @@
         </div>
       </div>
 
+      <!-- 戦闘アクションボタン（戦闘指揮モードのみ表示） -->
+      <div id="action-btn-container" style="display: none; margin-top: 15px;">
+        <button id="action-cycle-btn" style="width: 100%; font-size: 13px; padding: 7px; background: rgba(239,68,68,0.2); border: 1px solid rgba(239,68,68,0.5); color: #f87171; cursor: pointer; font-family: Rajdhani, sans-serif; font-weight: bold; letter-spacing: 1px;">攻撃</button>
+      </div>
+
       <button id="toggle-status-btn" style="margin-top: 15px; width: 100%; font-size: 11px; padding: 5px; background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); color: #94a3b8; cursor: pointer;">Communication Status 表示</button>
       <div id="rgr-container" style="margin-top: 10px;" class="hidden">
         <div id="rgr-list" style="font-size: 11px; max-height: 150px; overflow-y: auto;"></div>
+        <button id="noise-monitor-btn" style="margin-top: 8px; width: 100%; font-size: 11px; padding: 5px; background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); color: #94a3b8; cursor: pointer;">背景雑音 監視</button>
+        <div id="noise-monitor-video-container" style="margin-top: 8px; display: none;">
+          <video id="noise-monitor-video" loop autoplay muted
+            style="width: 100%; border: 1px solid rgba(255,255,255,0.1); cursor: pointer;">
+          </video>
+        </div>
       </div>
     </div>
 

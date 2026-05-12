@@ -48,14 +48,17 @@ export class Meteor {
     }
     this.maxHp = this.hp;
 
-    // ターゲット方向の固定ベクトルを計算
-    const dx = targetX - this.x;
-    const dy = targetY - this.y;
-    const dist = Math.sqrt(dx * dx + dy * dy);
-    if (dist > 0) {
-      this.vx = (dx / dist) * this.speed;
-      this.vy = (dy / dist) * this.speed;
+    // 25%の確率でランダム方向、75%でターゲット直行
+    let angle: number;
+    if (Math.random() < 0.25) {
+      angle = Math.random() * Math.PI * 2;
+    } else {
+      const dx = targetX - this.x;
+      const dy = targetY - this.y;
+      angle = Math.atan2(dy, dx);
     }
+    this.vx = Math.cos(angle) * this.speed;
+    this.vy = Math.sin(angle) * this.speed;
 
     // ランダムな回転速度
     this.rotationSpeed = (Math.random() - 0.5) * 1.5;

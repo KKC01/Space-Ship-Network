@@ -1,0 +1,7 @@
+[    7815ms] [LOG] %c %c %c %c %c Phaser v3.90.0 (WebGL | Web Audio) %c https://phaser.io/v390 background: #ff0000 background: #ffff00 background: #00ff00 background: #00ffff color: #ffffff; background: #000000 background: transparent @ http://localhost:3001/node_modules/.vite/deps/phaser.js?v=7c2a77cc:8456
+[    8932ms] [WARNING] [.WebGL-0x1b2c000f0e00]GL Driver Message (OpenGL, Performance, GL_CLOSE_PATH_NV, High): GPU stall due to ReadPixels @ http://localhost:3001/:0
+[    8978ms] [WARNING] [.WebGL-0x1b2c000f0e00]GL Driver Message (OpenGL, Performance, GL_CLOSE_PATH_NV, High): GPU stall due to ReadPixels @ http://localhost:3001/:0
+[    9038ms] [WARNING] [.WebGL-0x1b2c000f0e00]GL Driver Message (OpenGL, Performance, GL_CLOSE_PATH_NV, High): GPU stall due to ReadPixels @ http://localhost:3001/:0
+[    9186ms] [ERROR] Failed to load resource: the server responded with a status of 404 (Not Found) @ http://localhost:3001/favicon.ico:0
+[    9191ms] [WARNING] [.WebGL-0x1b2c000f0e00]GL Driver Message (OpenGL, Performance, GL_CLOSE_PATH_NV, High): GPU stall due to ReadPixels (this message will no longer repeat) @ http://localhost:3001/:0
+[   29283ms] [LOG] Mission Started @ http://localhost:3001/src/scenes/MainScene.ts:300
