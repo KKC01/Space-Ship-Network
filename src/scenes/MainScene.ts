@@ -3,8 +3,8 @@ import { Spaceship } from '../models/Spaceship';
 import { PacketType, FreqShort, FreqLong, SystemDisplayMode } from '../models/DataPacket';
 import { CommunicationSystem } from '../models/CommunicationSystem';
 import { OpticalMaster } from '../models/OpticalMaster';
-import { Planet, PLANET_SPECS } from '../models/Planet';
 import { MeteorSystem } from '../systems/MeteorSystem';
+import { PlanetSystem } from '../systems/PlanetSystem';
 import legacyDestroyerImg from '../assets/Legacy_Destroyer.png';
 import planetImg from '../assets/Planet_01.png';
 import meteorImg from '../assets/meteor/meteor_01.png';
@@ -24,6 +24,7 @@ export class MainScene extends Scene {
 
   // サブシステム
   private meteorSystem!: MeteorSystem;
+  private planetSystem!: PlanetSystem;
 
   // DOM Elements
   private domGameOver!: HTMLElement | null;
@@ -44,12 +45,7 @@ export class MainScene extends Scene {
   private domRgrList!: HTMLElement | null;
   private domModalClose: HTMLElement | null = null;
 
-  // Planet Modal DOM Elements
-  private domPlanetModal: HTMLElement | null = null;
-  private domPlanetModalClose: HTMLElement | null = null;
-  private domPlanetId: HTMLElement | null = null;
-  private domPlanetCommStation: HTMLElement | null = null;
-  private domPlanetDesc: HTMLElement | null = null;
+  // 惑星モーダル DOM は PlanetSystem 内で管理
   private domMultiplexEnable!: HTMLInputElement | null;
   private domMultiplexMaster!: HTMLSelectElement | null;
   private domMultiplexSpeed!: HTMLSelectElement | null;
@@ -73,9 +69,7 @@ export class MainScene extends Scene {
   
   private surveyPoint = { x: 3000, y: 3000, radius: 200 };
 
-  // 惑星（環境ハザード）：通信干渉ゾーン
-  private planets: Planet[] = [];
-  private planetSprites: Phaser.GameObjects.Image[] = [];
+  // 惑星（環境ハザード）状態は PlanetSystem 内で管理
 
   // 隕石（メテオ）状態は MeteorSystem 内で管理
 
@@ -131,6 +125,8 @@ export class MainScene extends Scene {
     // サブシステム初期化（DOM・Graphics は各システム内で生成）
     this.meteorSystem = new MeteorSystem(this);
     this.meteorSystem.init();
+    this.planetSystem = new PlanetSystem(this);
+    // 惑星配置は cx/cy が必要なので initGameData() 内で init() を呼ぶ
 
     this.initDOM();
     this.initGameData();
@@ -261,11 +257,7 @@ export class MainScene extends Scene {
     this.domRgrContainer = document.getElementById('rgr-container');
     this.domRgrList = document.getElementById('rgr-list');
     this.domModalClose = document.getElementById('unit-modal-close');
-    this.domPlanetModal = document.getElementById('planet-modal');
-    this.domPlanetModalClose = document.getElementById('planet-modal-close');
-    this.domPlanetId = document.getElementById('planet-id');
-    this.domPlanetCommStation = document.getElementById('planet-comm-station');
-    this.domPlanetDesc = document.getElementById('planet-desc');
+    // 惑星モーダル DOM は PlanetSystem.init() 内で初期化済み
     this.domScaleBarLine = document.getElementById('scale-bar-line');
     this.domScaleBarText = document.getElementById('scale-bar-text');
 
@@ -378,11 +370,7 @@ export class MainScene extends Scene {
       };
     }
 
-    if (this.domPlanetModalClose) {
-      this.domPlanetModalClose.onclick = () => {
-        this.domPlanetModal?.classList.add('hidden');
-      };
-    }
+    // 惑星モーダルの close ハンドラは PlanetSystem.init() 内で登録済み
 
     // 隕石モーダル DOM は MeteorSystem.init() 内で初期化済み
 
@@ -477,77 +465,7 @@ export class MainScene extends Scene {
     }
 
     // 惑星をランダムに2つ配置（環境ハザード：通信干渉源）
-    this.placePlanets(cx, cy);
-  }
-
-  // 惑星をランダム配置：他の重要地点から一定以上離す制約付き
-  private placePlanets(cx: number, cy: number) {
-    const PLANET_COUNT = 2;
-    const RANGE = 7000;             // 配置範囲: cx/cy ± RANGE/2
-    const MIN_DIST_BETWEEN = 1500;  // 惑星同士の最小距離
-    const MIN_DIST_SURVEY = 1000;   // 調査ポイントから最小距離
-    const MIN_DIST_SPAWN = 800;     // ユニットスポーン地点から最小距離
-    const MAX_RETRIES = 10;
-
-    const spawnX = cx;
-    const spawnY = cy;
-
-    // 配置に使う仕様を選定：PLN_05 を必ず含み、残りはその他からランダム
-    const pln05 = PLANET_SPECS.find(s => s.id === 'PLN_05');
-    const others = PLANET_SPECS.filter(s => s.id !== 'PLN_05');
-    const selectedSpecs = pln05 ? [pln05] : [];
-    while (selectedSpecs.length < PLANET_COUNT && others.length > 0) {
-      const idx = Math.floor(Math.random() * others.length);
-      selectedSpecs.push(others.splice(idx, 1)[0]);
-    }
-
-    for (let i = 0; i < PLANET_COUNT; i++) {
-      const spec = selectedSpecs[i] || PLANET_SPECS[0];
-      let candidate: { x: number; y: number } | null = null;
-      for (let attempt = 0; attempt < MAX_RETRIES; attempt++) {
-        const x = cx + (Math.random() - 0.5) * RANGE;
-        const y = cy + (Math.random() - 0.5) * RANGE;
-
-        // 制約チェック
-        const distFromSurvey = CommunicationSystem.getDistance(x, y, this.surveyPoint.x, this.surveyPoint.y);
-        const distFromSpawn = CommunicationSystem.getDistance(x, y, spawnX, spawnY);
-        if (distFromSurvey < MIN_DIST_SURVEY) continue;
-        if (distFromSpawn < MIN_DIST_SPAWN) continue;
-
-        let tooCloseToOther = false;
-        for (const p of this.planets) {
-          if (CommunicationSystem.getDistance(x, y, p.x, p.y) < MIN_DIST_BETWEEN) {
-            tooCloseToOther = true;
-            break;
-          }
-        }
-        if (tooCloseToOther) continue;
-
-        candidate = { x, y };
-        break;
-      }
-      // フェイルオープン：制約を満たせなかったら最後の候補を使用
-      if (!candidate) {
-        candidate = {
-          x: cx + (Math.random() - 0.5) * RANGE,
-          y: cy + (Math.random() - 0.5) * RANGE,
-        };
-      }
-      const planet = new Planet(spec.id, candidate.x, candidate.y, spec.hasCommStation, spec.description ?? '');
-      // 隕石速度(30)の1/5でランダムな一定方向に移動
-      const PLANET_SPEED = 30 / 5;
-      const angle = Math.random() * Math.PI * 2;
-      planet.vx = Math.cos(angle) * PLANET_SPEED;
-      planet.vy = Math.sin(angle) * PLANET_SPEED;
-      this.planets.push(planet);
-
-      // Phaser スプライトとして配置（クリック検出用に planetId を保存）
-      const sprite = this.add.image(candidate.x, candidate.y, 'planet');
-      sprite.setScale(0.5);
-      sprite.setDepth(2);
-      sprite.setData('planetId', spec.id);
-      this.planetSprites.push(sprite);
-    }
+    this.planetSystem.init(cx, cy, this.surveyPoint);
   }
 
   private onPointerDown(pointer: Phaser.Input.Pointer) {
@@ -580,15 +498,9 @@ export class MainScene extends Scene {
       const worldX = pointer.worldX;
       const worldY = pointer.worldY;
 
-      // 惑星クリック判定（船舶と同じ距離ベース、半径は表示サイズ 75×0.5 より十分大きめ）
-      const PLANET_HIT_RADIUS = 100;
-      for (let i = 0; i < this.planetSprites.length; i++) {
-        const s = this.planetSprites[i];
-        const dp = CommunicationSystem.getDistance(worldX, worldY, s.x, s.y);
-        if (dp < PLANET_HIT_RADIUS) {
-          this.openPlanetModal(this.planets[i].id);
-          return;
-        }
+      // 惑星クリック判定（PlanetSystem に委譲）
+      if (this.planetSystem.handleClick(worldX, worldY)) {
+        return;
       }
 
       // 隕石クリック判定（MeteorSystem に委譲）
@@ -635,30 +547,10 @@ export class MainScene extends Scene {
   private openUnitModal() {
     if (!this.selectedUnitId || !this.domUnitModal) return;
     // 排他：惑星モーダルが開いていれば閉じる
-    this.domPlanetModal?.classList.add('hidden');
+    this.planetSystem.closeModal();
     if (this.domUnitModal) this.domUnitModal.classList.remove('hidden');
     this.applyModeToUnitModal();
     this.updateModalData();
-  }
-
-  // 惑星情報モーダルを開く（ユニットモーダルとは排他）
-  private openPlanetModal(planetId: string) {
-    const planet = this.planets.find(p => p.id === planetId);
-    if (!planet || !this.domPlanetModal) return;
-
-    // 排他：ユニットモーダルが開いていれば閉じる
-    this.selectedUnitId = null;
-    this.domUnitModal?.classList.add('hidden');
-
-    if (this.domPlanetId) this.domPlanetId.textContent = planet.id;
-    if (this.domPlanetCommStation) {
-      this.domPlanetCommStation.textContent = planet.hasCommStation ? 'あり' : 'なし';
-      this.domPlanetCommStation.style.color = planet.hasCommStation ? '#4ade80' : '#9ca3af';
-    }
-    if (this.domPlanetDesc) {
-      this.domPlanetDesc.textContent = planet.description || '電波到達圏内では干渉が発生します。';
-    }
-    this.domPlanetModal.classList.remove('hidden');
   }
 
   private updateModalData() {
@@ -728,7 +620,7 @@ export class MainScene extends Scene {
       
       this.spaceships.forEach(s => {
         if (s.id === unit.id) return;
-        const { canConnect: canRadio, dropRate: radioRate } = CommunicationSystem.getLinkQuality(unit, s, activeNodes, this.planets);
+        const { canConnect: canRadio, dropRate: radioRate } = CommunicationSystem.getLinkQuality(unit, s, activeNodes, this.planetSystem.getPlanets());
         const { canConnect: canOpt, dropRate: optRate } = CommunicationSystem.getOpticalMultiplexQuality(unit, s, activeNodes);
         
         let radioColor = '#ef4444'; 
@@ -785,14 +677,8 @@ export class MainScene extends Scene {
     // 隕石の更新（spawn / 探知 / 衝突 / 戦闘）は MeteorSystem に委譲
     this.meteorSystem.update(delta, time);
 
-    // 惑星の移動更新
-    for (let i = 0; i < this.planets.length; i++) {
-      this.planets[i].update(delta);
-      const ps = this.planetSprites[i];
-      if (ps) {
-        ps.setPosition(this.planets[i].x, this.planets[i].y);
-      }
-    }
+    // 惑星の移動更新は PlanetSystem に委譲
+    this.planetSystem.update(delta);
 
     for (const ship of this.spaceships.values()) {
       ship.update(delta, this.spaceships, (node, target) => this.handlePolling(node, target));
@@ -916,14 +802,14 @@ export class MainScene extends Scene {
         // Data exchange logic
         const activeNodes = Array.from(this.spaceships.values()).filter(s => s.isNodeActive);
         const packetsToTx = target.getPacketsToTransmit();
-        const successfulPackets = CommunicationSystem.transferData(target, node, packetsToTx, activeNodes, this.planets);
+        const successfulPackets = CommunicationSystem.transferData(target, node, packetsToTx, activeNodes, this.planetSystem.getPlanets());
         if (successfulPackets.length > 0) {
           successfulPackets.forEach(p => node.receivePacket(p));
           this.showFloatingText(node.x, node.y, 'データ受信', '#4ade80');
           this.recordLinkSuccess(node.id, target.id);
         }
         const nodePackets = node.queue;
-        const successfulNodePackets = CommunicationSystem.transferData(node, target, nodePackets, activeNodes, this.planets);
+        const successfulNodePackets = CommunicationSystem.transferData(node, target, nodePackets, activeNodes, this.planetSystem.getPlanets());
         if (successfulNodePackets.length > 0) {
           successfulNodePackets.forEach(p => {
             target.receivePacket(p);
@@ -945,7 +831,7 @@ export class MainScene extends Scene {
            // Check if wave just hit this ship
            if (Math.abs(resWaveDist - d) < (waveSpeed * delta / 1000) * 1.5) {
              const packets = target.getPacketsToTransmit();
-             const successful = CommunicationSystem.transferData(target, nearbyShip, packets, activeNodes, this.planets);
+             const successful = CommunicationSystem.transferData(target, nearbyShip, packets, activeNodes, this.planetSystem.getPlanets());
              if (successful.length > 0) {
                successful.forEach(p => nearbyShip.receivePacket(p));
                this.recordLinkSuccess(target.id, nearbyShip.id);
@@ -997,7 +883,7 @@ export class MainScene extends Scene {
     }
 
     // 2. Normal communication requires matching frequencies
-    const { canConnect } = CommunicationSystem.getLinkQuality(node, target, activeNodes, this.planets);
+    const { canConnect } = CommunicationSystem.getLinkQuality(node, target, activeNodes, this.planetSystem.getPlanets());
     
     if (canConnect) {
       const rangeMode = (node.isLongEnabled && target.isLongEnabled && node.longFreq === target.longFreq) ? 'long' : 'short';
@@ -1099,17 +985,9 @@ export class MainScene extends Scene {
     this.textLabels.set('survey-point-label', surveyText);
     surveyText.setPosition(this.surveyPoint.x, this.surveyPoint.y - this.surveyPoint.radius - 30);
 
-    // 1b. 惑星の干渉ゾーン（通信品質モード時のみ表示・薄ピンクFill）
+    // 1b. 惑星の干渉ゾーン（通信品質モード時のみ表示）→ PlanetSystem に委譲
     if (this.vizMode === 'quality') {
-      const PINK = 0xfb7185;
-      for (const planet of this.planets) {
-        // 長距離干渉ゾーン (2500km) - 外側、薄め
-        this.clutterGraphics.fillStyle(PINK, 0.04);
-        this.clutterGraphics.fillCircle(planet.x, planet.y, CommunicationSystem.PLANET_LONG_RANGE_INTERFERENCE);
-        // 短距離干渉ゾーン (700km) - 内側、濃いめ
-        this.clutterGraphics.fillStyle(PINK, 0.08);
-        this.clutterGraphics.fillCircle(planet.x, planet.y, CommunicationSystem.PLANET_SHORT_RANGE_INTERFERENCE);
-      }
+      this.planetSystem.drawInterferenceZones(this.clutterGraphics);
     }
 
     const isControl = this.systemDisplayMode === SystemDisplayMode.CONTROL;
@@ -1268,7 +1146,7 @@ export class MainScene extends Scene {
     if (isControl) this.spaceships.forEach(source => {
       this.spaceships.forEach(target => {
         if (source.id < target.id) {
-          const { canConnect: canStandard, dropRate: standardRate } = CommunicationSystem.getLinkQuality(source, target, activeNodes, this.planets);
+          const { canConnect: canStandard, dropRate: standardRate } = CommunicationSystem.getLinkQuality(source, target, activeNodes, this.planetSystem.getPlanets());
           const { canConnect: canOpt } = CommunicationSystem.getOpticalMultiplexQuality(source, target, activeNodes);
 
           // Calculate perpendicular vector for offset
@@ -1312,7 +1190,7 @@ export class MainScene extends Scene {
       activeNodes.forEach(node => {
         this.spaceships.forEach(target => {
           if (node.id === target.id) return;
-          const { canConnect, dropRate } = CommunicationSystem.getLinkQuality(node, target, activeNodes, this.planets);
+          const { canConnect, dropRate } = CommunicationSystem.getLinkQuality(node, target, activeNodes, this.planetSystem.getPlanets());
           if (canConnect) {
             // Background thin link
             this.linkGraphics.lineStyle(1, 0x4ade80, (1 - dropRate) * 0.05);
@@ -1379,7 +1257,7 @@ export class MainScene extends Scene {
                 
                 const canConnect = poll.rangeMode === 'optical' 
                   ? CommunicationSystem.getOpticalMultiplexQuality(startNode, nearbyShip, activeNodes).canConnect
-                  : (nearbyShip.id !== target.id && CommunicationSystem.getLinkQuality(target, nearbyShip, activeNodes, this.planets).canConnect);
+                  : (nearbyShip.id !== target.id && CommunicationSystem.getLinkQuality(target, nearbyShip, activeNodes, this.planetSystem.getPlanets()).canConnect);
 
                 if (canConnect && resWaveDist <= d + 100) {
                   const t = Math.min(1.0, resWaveDist / d);
@@ -1407,7 +1285,7 @@ export class MainScene extends Scene {
         this.spaceships.forEach(target => {
           if (source.id === target.id) return;
 
-          const { canConnect, dropRate } = CommunicationSystem.getLinkQuality(source, target, activeNodes, this.planets);
+          const { canConnect, dropRate } = CommunicationSystem.getLinkQuality(source, target, activeNodes, this.planetSystem.getPlanets());
           
           // Check if there's a recent CMD success (Emergency path)
           const key = [source.id, target.id].sort().join('-');
@@ -1528,7 +1406,7 @@ export class MainScene extends Scene {
 
       // 2. All Linked Success (Must have connection to HQ)
       if (hqNode) {
-        const { canConnect } = CommunicationSystem.getLinkQuality(ship, hqNode, nodes, this.planets);
+        const { canConnect } = CommunicationSystem.getLinkQuality(ship, hqNode, nodes, this.planetSystem.getPlanets());
         if (!canConnect && ship.id !== hqNode.id) {
           allLinkedSuccess = false;
         }
@@ -1613,7 +1491,17 @@ export class MainScene extends Scene {
   public closeUnitAndPlanetModals(): void {
     this.selectedUnitId = null;
     this.domUnitModal?.classList.add('hidden');
-    this.domPlanetModal?.classList.add('hidden');
+    this.planetSystem.closeModal();
+  }
+
+  /**
+   * PlanetSystem から呼ばれる排他クローズ。
+   * Unit/Meteor モーダルを閉じ、選択ユニットをクリアする。
+   */
+  public closeUnitAndMeteorModals(): void {
+    this.selectedUnitId = null;
+    this.domUnitModal?.classList.add('hidden');
+    this.meteorSystem.closeModal();
   }
 
 }
