@@ -1,14 +1,13 @@
 import { Scene } from 'phaser';
 import { Spaceship } from '../models/Spaceship';
-import { PacketType, FreqShort, FreqLong, SystemDisplayMode } from '../models/DataPacket';
+import { PacketType, SystemDisplayMode } from '../models/DataPacket';
 import { CommunicationSystem } from '../models/CommunicationSystem';
 import { OpticalMaster } from '../models/OpticalMaster';
 import { MeteorSystem } from '../systems/MeteorSystem';
 import { PlanetSystem } from '../systems/PlanetSystem';
-import legacyDestroyerImg from '../assets/Legacy_Destroyer.png';
+import { UIManager } from '../ui/UIManager';
 import planetImg from '../assets/Planet_01.png';
 import meteorImg from '../assets/meteor/meteor_01.png';
-import monitorVideoSrc from '../assets/monitor_01.mp4';
 
 export class MainScene extends Scene {
   // 隕石サブシステム（MeteorSystem からアクセスされるため public）
@@ -22,49 +21,19 @@ export class MainScene extends Scene {
 
   public textLabels: Map<string, Phaser.GameObjects.Text> = new Map();
 
-  // サブシステム
+  // サブシステム（他システムから参照されるため public）
   private meteorSystem!: MeteorSystem;
-  private planetSystem!: PlanetSystem;
+  public planetSystem!: PlanetSystem;
+  private uiManager!: UIManager;
 
-  // DOM Elements
-  private domGameOver!: HTMLElement | null;
-  private domGameTitle!: HTMLElement | null;
-  private domGameDesc!: HTMLElement | null;
-
-  // Unit Modal DOM Elements
-  private domUnitModal!: HTMLElement | null;
-  private domUnitTitle!: HTMLElement | null;
-  private domUnitType!: HTMLElement | null;
-  private domUnitLevel!: HTMLElement | null;
-  private domShortEnable!: HTMLInputElement | null;
-  private domShortFreq!: HTMLSelectElement | null;
-  private domLongEnable!: HTMLInputElement | null;
-  private domLongFreq!: HTMLSelectElement | null;
-  private domSendCmdBtn: HTMLElement | null = null;
-  private domRgrContainer!: HTMLElement | null;
-  private domRgrList!: HTMLElement | null;
-  private domModalClose: HTMLElement | null = null;
-
-  // 惑星モーダル DOM は PlanetSystem 内で管理
-  private domMultiplexEnable!: HTMLInputElement | null;
-  private domMultiplexMaster!: HTMLSelectElement | null;
-  private domMultiplexSpeed!: HTMLSelectElement | null;
-  private domMultiplexCipher!: HTMLSelectElement | null;
-  private domMultiplexRelay!: HTMLInputElement | null;
-  private domToggleStatusBtn!: HTMLElement | null;
-  private domTimeDisplay!: HTMLElement | null;
-
-  private domScaleBarLine!: HTMLElement | null;
-  private domScaleBarText!: HTMLElement | null;
-
-  // 隕石モーダル DOM は MeteorSystem 内で管理
+  // DOM 要素は各 System / UIManager 内で管理
 
   private timeElapsedMs: number = 0;
   private isGameOver: boolean = false;
   private isBriefingActive: boolean = true;
   public systemDisplayMode: SystemDisplayMode = SystemDisplayMode.CONTROL;
   public selectedAction: 'attack' | 'jamming' | 'warning' = 'attack';
-  private vizMode: 'dots' | 'circles' | 'quality' | 'range' = 'circles';
+  public vizMode: 'dots' | 'circles' | 'quality' | 'range' = 'circles';
   
   
   private surveyPoint = { x: 3000, y: 3000, radius: 200 };
@@ -127,8 +96,9 @@ export class MainScene extends Scene {
     this.meteorSystem.init();
     this.planetSystem = new PlanetSystem(this);
     // 惑星配置は cx/cy が必要なので initGameData() 内で init() を呼ぶ
+    this.uiManager = new UIManager(this);
+    this.uiManager.init();
 
-    this.initDOM();
     this.initGameData();
 
     // Camera Setup - Unified
@@ -149,266 +119,6 @@ export class MainScene extends Scene {
       newZoom = Phaser.Math.Clamp(newZoom, 0.15, 4.0); // Balanced range
       this.cameras.main.setZoom(newZoom);
     });
-  }
-
-  private initDOM() {
-    this.domGameOver = document.getElementById('game-over-panel');
-    this.domGameTitle = document.getElementById('game-over-title');
-    this.domGameDesc = document.getElementById('game-over-desc');
-
-    this.domUnitModal = document.getElementById('unit-modal');
-    this.domUnitTitle = document.getElementById('unit-title');
-    this.domUnitType = document.getElementById('unit-type');
-    this.domUnitLevel = document.getElementById('unit-level');
-    this.domShortEnable = document.getElementById('short-enable') as HTMLInputElement;
-    this.domShortFreq = document.getElementById('short-freq') as HTMLSelectElement;
-    this.domLongEnable = document.getElementById('long-enable') as HTMLInputElement;
-    this.domLongFreq = document.getElementById('long-freq') as HTMLSelectElement;
-    
-    const updateLocal = (e?: Event) => {
-      // Only update if the event was triggered by actual user interaction
-      if (e && e.isTrusted && this.selectedUnitId) {
-        const ship = this.spaceships.get(this.selectedUnitId);
-        if (ship) {
-           ship.isShortEnabled = this.domShortEnable?.checked || false;
-           ship.shortFreq = this.domShortFreq?.value as any;
-           ship.isLongEnabled = this.domLongEnable?.checked || false;
-           ship.longFreq = this.domLongFreq?.value as any;
-        }
-      }
-    };
-
-    if (this.domShortEnable) this.domShortEnable.onchange = (e) => updateLocal(e);
-    if (this.domShortFreq) this.domShortFreq.onchange = (e) => updateLocal(e);
-    if (this.domLongEnable) this.domLongEnable.onchange = (e) => updateLocal(e);
-    if (this.domLongFreq) this.domLongFreq.onchange = (e) => updateLocal(e);
-
-    this.domMultiplexEnable = document.getElementById('multiplex-enable') as HTMLInputElement;
-    this.domMultiplexMaster = document.getElementById('multiplex-master') as HTMLSelectElement;
-    this.domMultiplexSpeed = document.getElementById('multiplex-speed') as HTMLSelectElement;
-    this.domMultiplexCipher = document.getElementById('multiplex-cipher') as HTMLSelectElement;
-    this.domMultiplexRelay = document.getElementById('multiplex-relay') as HTMLInputElement;
-    this.domToggleStatusBtn = document.getElementById('toggle-status-btn');
-    this.domTimeDisplay = document.getElementById('time-display');
-
-    const updateMultiplex = (e?: Event) => {
-      if (e && e.isTrusted && this.selectedUnitId) {
-        const ship = this.spaceships.get(this.selectedUnitId);
-        if (ship) {
-          if (this.domMultiplexEnable) ship.isMultiplexEnabled = this.domMultiplexEnable.checked;
-          if (this.domMultiplexMaster) ship.selectedMasterId = this.domMultiplexMaster.value || null;
-          if (this.domMultiplexSpeed) ship.multiplexSpeed = this.domMultiplexSpeed.value as any;
-          if (this.domMultiplexCipher) ship.multiplexCipher = this.domMultiplexCipher.value as any;
-          if (this.domMultiplexRelay) ship.isOpticalRelayEnabled = this.domMultiplexRelay.checked;
-          
-          if (e.target === this.domMultiplexMaster) {
-            ship.assignedSlots = [];
-          }
-        }
-      }
-    };
-
-    if (this.domMultiplexEnable) this.domMultiplexEnable.onchange = (e) => updateMultiplex(e);
-    if (this.domMultiplexMaster) this.domMultiplexMaster.onchange = (e) => updateMultiplex(e);
-    if (this.domMultiplexSpeed) this.domMultiplexSpeed.onchange = (e) => updateMultiplex(e);
-    if (this.domMultiplexCipher) this.domMultiplexCipher.onchange = (e) => updateMultiplex(e);
-    if (this.domMultiplexRelay) this.domMultiplexRelay.onchange = (e) => updateMultiplex(e);
-
-    if (this.domToggleStatusBtn) {
-      this.domToggleStatusBtn.onclick = () => {
-        if (this.domRgrContainer) {
-          const isHidden = this.domRgrContainer.classList.contains('hidden');
-          if (isHidden) {
-            this.domRgrContainer.classList.remove('hidden');
-            this.domToggleStatusBtn!.textContent = 'Communication Status 非表示';
-          } else {
-            this.domRgrContainer.classList.add('hidden');
-            this.domToggleStatusBtn!.textContent = 'Communication Status 表示';
-          }
-        }
-      };
-    }
-
-    // Accordion Logic
-    const setupAccordion = (btnId: string, contentId: string) => {
-      const btn = document.getElementById(btnId);
-      const content = document.getElementById(contentId);
-      if (btn && content) {
-        btn.onclick = () => {
-          btn.classList.toggle('open');
-          content.classList.toggle('open');
-        };
-      }
-    };
-    setupAccordion('multiplex-group-btn', 'multiplex-group-content');
-    setupAccordion('optical-group-btn', 'optical-group-content');
-
-    // ミッションパネルの折りたたみトグル（経過時間との重なり回避用）
-    const missionToggle = document.getElementById('mission-toggle');
-    const missionPanel = document.getElementById('mission-panel');
-    if (missionToggle && missionPanel) {
-      missionToggle.onclick = () => {
-        const isCollapsed = missionPanel.classList.toggle('collapsed');
-        missionToggle.setAttribute('aria-expanded', String(!isCollapsed));
-      };
-    }
-
-    this.domSendCmdBtn = document.getElementById('send-cmd-btn');
-    this.domRgrContainer = document.getElementById('rgr-container');
-    this.domRgrList = document.getElementById('rgr-list');
-    this.domModalClose = document.getElementById('unit-modal-close');
-    // 惑星モーダル DOM は PlanetSystem.init() 内で初期化済み
-    this.domScaleBarLine = document.getElementById('scale-bar-line');
-    this.domScaleBarText = document.getElementById('scale-bar-text');
-
-    const domSendCmdBtn = document.getElementById('send-cmd-btn');
-    if (domSendCmdBtn) {
-      domSendCmdBtn.onclick = () => {
-        const hq = this.spaceships.get('HQ Ship');
-        if (hq && hq.isNodeActive) {
-          const shortFreq = (document.getElementById('short-freq') as HTMLSelectElement).value as FreqShort;
-          const longFreq = (document.getElementById('long-freq') as HTMLSelectElement).value as FreqLong;
-          const isShortEnabled = (document.getElementById('short-enable') as HTMLInputElement).checked;
-          const isLongEnabled = (document.getElementById('long-enable') as HTMLInputElement).checked;
-
-          // Send ONE Broadcast Command to ALL units
-          hq.queue.push({
-            id: `cmd-broadcast-${Date.now()}-${hq.id}`,
-            type: PacketType.CMD,
-            createdAt: Date.now(),
-            originShipId: 'HQ Ship',
-            targetShipId: undefined, // Broadcast to everyone
-            payload: {
-              shortFreq,
-              longFreq,
-              isShortEnabled,
-              isLongEnabled
-            }
-          });
-          
-          this.showFloatingText(hq.x, hq.y, '全軍へ指示発令', '#f59e0b');
-        }
-      };
-    }
-
-    const domToggleRoleBtn = document.getElementById('toggle-role-btn');
-    if (domToggleRoleBtn) {
-      domToggleRoleBtn.onclick = () => {
-        if (this.selectedUnitId) this.toggleNode(this.selectedUnitId);
-      };
-    }
-
-    const domToggleModeBtn = document.getElementById('toggle-mode-btn');
-    const domVizCycleBtn = document.getElementById('viz-cycle-btn');
-
-    // Viz cycle button: cycles through modes
-    const controlVizModes: { key: 'circles' | 'dots' | 'quality', label: string }[] = [
-      { key: 'circles', label: 'サークル表示' },
-      { key: 'dots', label: 'ライン表示' },
-      { key: 'quality', label: '通信品質' }
-    ];
-    let controlVizIndex = 0;
-
-    if (domVizCycleBtn) {
-      domVizCycleBtn.onclick = () => {
-        if (this.systemDisplayMode === SystemDisplayMode.CONTROL) {
-          controlVizIndex = (controlVizIndex + 1) % controlVizModes.length;
-          this.vizMode = controlVizModes[controlVizIndex].key;
-          domVizCycleBtn.textContent = controlVizModes[controlVizIndex].label;
-        }
-        // In combat mode, only 射程 — no cycling
-      };
-    }
-
-    if (domToggleModeBtn) {
-      domToggleModeBtn.onclick = () => {
-        this.systemDisplayMode = this.systemDisplayMode === SystemDisplayMode.CONTROL 
-          ? SystemDisplayMode.COMBAT 
-          : SystemDisplayMode.CONTROL;
-        
-        const isControl = this.systemDisplayMode === SystemDisplayMode.CONTROL;
-        domToggleModeBtn.textContent = isControl ? 'モード：通信管制' : 'モード：戦闘指揮';
-        domToggleModeBtn.className = isControl ? 'mode-toggle-btn' : 'mode-toggle-btn combat';
-
-        // モーダルが開いていればUI表示を切り替える
-        if (this.selectedUnitId && this.domUnitModal && !this.domUnitModal.classList.contains('hidden')) {
-          this.applyModeToUnitModal();
-        }
-
-        if (domVizCycleBtn) {
-          if (isControl) {
-            controlVizIndex = 0;
-            this.vizMode = 'circles';
-            domVizCycleBtn.textContent = 'サークル表示';
-          } else {
-            this.vizMode = 'range';
-            domVizCycleBtn.textContent = '射程';
-          }
-        }
-      };
-    }
-
-    const domStartMissionBtn = document.getElementById('start-mission-btn');
-    const domBriefingOverlay = document.getElementById('briefing-overlay');
-
-    if (domStartMissionBtn && domBriefingOverlay) {
-      domStartMissionBtn.onclick = () => {
-        this.isBriefingActive = false;
-        domBriefingOverlay.classList.add('hidden');
-        console.log("Mission Started");
-      };
-    } else {
-      console.warn("Briefing overlay or start button not found!");
-      // Fallback: start game anyway if button missing
-      this.isBriefingActive = false;
-    }
-
-    if (this.domModalClose) {
-      this.domModalClose.onclick = () => {
-        this.selectedUnitId = null;
-        this.domUnitModal?.classList.add('hidden');
-      };
-    }
-
-    // 惑星モーダルの close ハンドラは PlanetSystem.init() 内で登録済み
-
-    // 隕石モーダル DOM は MeteorSystem.init() 内で初期化済み
-
-    // NOTE: send-cmd-btn handler is already set above (broadcast CMD via HQ queue).
-    // Do NOT add a second handler here — it would overwrite the broadcast behavior.
-
-    // 戦闘アクションボタン：クリックで 攻撃→妨害→警告 を循環
-    const actionCycleBtn = document.getElementById('action-cycle-btn');
-    if (actionCycleBtn) {
-      actionCycleBtn.onclick = () => {
-        const cycle: Array<'attack' | 'jamming' | 'warning'> = ['attack', 'jamming', 'warning'];
-        const labels: Record<string, string> = { attack: '攻撃', jamming: '妨害', warning: '警告' };
-        const next = cycle[(cycle.indexOf(this.selectedAction) + 1) % cycle.length];
-        this.selectedAction = next;
-        actionCycleBtn.textContent = labels[next];
-      };
-    }
-
-    // 背景雑音監視：動画ソースとメッセージのマッピング（将来は干渉レベルで切替）
-    const NOISE_MONITOR_CONFIG: Record<string, { src: string; message: string }> = {
-      none: { src: monitorVideoSrc, message: '干渉はありません' },
-    };
-    const noiseBtnEl   = document.getElementById('noise-monitor-btn');
-    const noiseContEl  = document.getElementById('noise-monitor-video-container') as HTMLElement | null;
-    const noiseVideoEl = document.getElementById('noise-monitor-video') as HTMLVideoElement | null;
-    if (noiseBtnEl && noiseContEl && noiseVideoEl) {
-      noiseBtnEl.onclick = () => {
-        const cfg = NOISE_MONITOR_CONFIG['none'];
-        noiseVideoEl.src = cfg.src;
-        noiseContEl.style.display = 'block';
-        window.__chatWidget?.pushSystemMessage(cfg.message);
-      };
-      noiseVideoEl.onclick = () => {
-        noiseContEl.style.display = 'none';
-        noiseVideoEl.pause();
-        noiseVideoEl.src = '';
-      };
-    }
   }
 
   private initGameData() {
@@ -518,138 +228,20 @@ export class MainScene extends Scene {
 
       if (clickedId) {
         this.selectedUnitId = clickedId;
-        this.openUnitModal();
+        this.uiManager.openUnit();
       } else {
         if (this.selectedUnitId) {
           const ship = this.spaceships.get(this.selectedUnitId);
           if (ship) { ship.targetX = worldX; ship.targetY = worldY; }
         } else {
-          this.domUnitModal?.classList.add('hidden');
+          this.uiManager.closeUnitModal();
         }
       }
     }
   }
 
-  private applyModeToUnitModal() {
-    const isCombat = this.systemDisplayMode === SystemDisplayMode.COMBAT;
-    // hidden クラス（display: none !important）で制御し CSS との競合を防ぐ
-    ['multiplex-group-btn', 'multiplex-group-content',
-     'optical-group-btn',  'optical-group-content',
-     'toggle-status-btn',  'rgr-container'
-    ].forEach(id => {
-      const el = document.getElementById(id);
-      if (el) el.classList.toggle('hidden', isCombat);
-    });
-    const actionContainer = document.getElementById('action-btn-container');
-    if (actionContainer) actionContainer.classList.toggle('hidden', !isCombat);
-  }
 
-  private openUnitModal() {
-    if (!this.selectedUnitId || !this.domUnitModal) return;
-    // 排他：惑星モーダルが開いていれば閉じる
-    this.planetSystem.closeModal();
-    if (this.domUnitModal) this.domUnitModal.classList.remove('hidden');
-    this.applyModeToUnitModal();
-    this.updateModalData();
-  }
-
-  private updateModalData() {
-    if (!this.selectedUnitId) return;
-
-    const unit = this.spaceships.get(this.selectedUnitId);
-    if (!unit) return;
-
-    // Update Master List dynamically
-    if (this.domMultiplexMaster) {
-      const currentMasterId = unit.selectedMasterId;
-      this.domMultiplexMaster.innerHTML = '<option value="">-- 連接マスターを選択 --</option>';
-      this.spaceships.forEach(s => {
-        const opt = document.createElement('option');
-        opt.value = s.id;
-        opt.textContent = `連接マスター: ${s.id}`;
-        this.domMultiplexMaster!.appendChild(opt);
-      });
-      this.domMultiplexMaster.value = currentMasterId || '';
-    }
-
-    const shipImg = document.getElementById('unit-ship-image') as HTMLImageElement | null;
-    if (shipImg) shipImg.src = legacyDestroyerImg;
-    if (this.domUnitTitle) this.domUnitTitle.textContent = unit.id;
-    if (this.domUnitType) this.domUnitType.textContent = 'Legacy Destroyer';
-    if (this.domUnitLevel) this.domUnitLevel.textContent = `1`;
-
-    if (this.domShortEnable) this.domShortEnable.checked = unit.isShortEnabled;
-    if (this.domShortFreq) this.domShortFreq.value = unit.shortFreq;
-    if (this.domLongEnable) this.domLongEnable.checked = unit.isLongEnabled;
-    if (this.domLongFreq) this.domLongFreq.value = unit.longFreq;
-
-    if (this.domMultiplexEnable) this.domMultiplexEnable.checked = unit.isMultiplexEnabled;
-    if (this.domMultiplexMaster) this.domMultiplexMaster.value = unit.selectedMasterId || '';
-    if (this.domMultiplexSpeed) this.domMultiplexSpeed.value = unit.multiplexSpeed;
-    if (this.domMultiplexCipher) this.domMultiplexCipher.value = unit.multiplexCipher;
-    if (this.domMultiplexRelay) this.domMultiplexRelay.checked = unit.isOpticalRelayEnabled;
-
-    // Authority check: Show "Send Command" only if HQ is selected AND active
-    if (unit.id === 'HQ Ship' && unit.isNodeActive) {
-        this.domSendCmdBtn?.classList.remove('hidden');
-    } else {
-        this.domSendCmdBtn?.classList.add('hidden');
-    }
-
-    const domUnitHpBar = document.getElementById('unit-hp-bar');
-    if (domUnitHpBar) {
-      const hpPercent = unit.hp / unit.maxHp;
-      domUnitHpBar.style.width = `${hpPercent * 100}%`;
-      domUnitHpBar.style.background = hpPercent < 0.3 ? '#ef4444' : '#4ade80';
-    }
-
-    const domToggleRoleBtn = document.getElementById('toggle-role-btn');
-    if (domToggleRoleBtn) {
-      domToggleRoleBtn.textContent = unit.isNodeActive ? 'ノード設定解除' : 'ノードに設定';
-    }
-
-    this.domShortEnable?.removeAttribute('disabled');
-    this.domShortFreq?.removeAttribute('disabled');
-    this.domLongEnable?.removeAttribute('disabled');
-    this.domLongFreq?.removeAttribute('disabled');
-    
-    // Communication Status Table (Keep visibility state)
-    if (this.domRgrList) {
-      this.domRgrList.innerHTML = '';
-      const activeNodes = Array.from(this.spaceships.values()).filter(s => s.isNodeActive);
-      
-      this.spaceships.forEach(s => {
-        if (s.id === unit.id) return;
-        const { canConnect: canRadio, dropRate: radioRate } = CommunicationSystem.getLinkQuality(unit, s, activeNodes, this.planetSystem.getPlanets());
-        const { canConnect: canOpt, dropRate: optRate } = CommunicationSystem.getOpticalMultiplexQuality(unit, s, activeNodes);
-        
-        let radioColor = '#ef4444'; 
-        let radioText = 'OFFLINE';
-        if (canRadio) {
-          radioColor = radioRate < 0.2 ? '#4ade80' : '#facc15';
-          radioText = radioRate < 0.2 ? 'STABLE' : 'WEAK';
-        }
-
-        let optColor = '#ef4444';
-        let optText = 'OFFLINE';
-        if (canOpt) {
-          optColor = optRate < 0.2 ? '#a855f7' : '#d8b4fe'; // Purple
-          optText = optRate < 0.2 ? 'STABLE' : 'WEAK';
-        }
-        
-        this.domRgrList!.innerHTML += `
-          <div style="padding: 6px 0; border-bottom: 1px solid rgba(255,255,255,0.05); font-size: 10px;">
-            <div style="color: #94a3b8; margin-bottom: 2px;">${s.id}</div>
-            <div style="display: flex; justify-content: space-between;">
-              <span>光通信: <span style="color: ${radioColor};">${radioText}</span></span>
-              <span>多重通信: <span style="color: ${optColor};">${optText}</span></span>
-            </div>
-          </div>`;
-      });
-    }
-  }
-
-  private toggleNode(id: string) {
+  public toggleNode(id: string) {
     const ship = this.spaceships.get(id);
     if (ship) {
       ship.isNodeActive = !ship.isNodeActive;
@@ -660,7 +252,7 @@ export class MainScene extends Scene {
       } else {
         this.showFloatingText(ship.x, ship.y, 'ノード解除', '#94a3b8');
       }
-      this.updateModalData();
+      this.uiManager.updateActiveModalDataIfOpen();
     }
   }
 
@@ -721,11 +313,8 @@ export class MainScene extends Scene {
       }
     }
 
-    if (this.domUnitModal && !this.domUnitModal.classList.contains('hidden')) {
-      if (Math.floor(time) % 10 === 0) {
-        this.updateModalData();
-        this.applyModeToUnitModal();
-      }
+    if (Math.floor(time) % 10 === 0) {
+      this.uiManager.updateActiveModalDataIfOpen();
     }
 
     // Old hub labels removed as we use spaceships now
@@ -752,24 +341,8 @@ export class MainScene extends Scene {
       }
     }
 
-    if (this.domTimeDisplay) {
-      this.domTimeDisplay.textContent = (this.timeElapsedMs / 1000).toFixed(1);
-    }
-
-    if (this.domScaleBarLine && this.domScaleBarText) {
-      const zoom = this.cameras.main.zoom;
-      // Calculate a "nice" distance based on zoom
-      let distanceKm = 100;
-      if (zoom < 0.5) distanceKm = 500;
-      else if (zoom < 0.8) distanceKm = 200;
-      else if (zoom > 1.5) distanceKm = 50;
-
-      const pxPerKm = 1;
-      const lengthPx = distanceKm * zoom * pxPerKm;
-
-      this.domScaleBarLine.style.width = `${lengthPx}px`;
-      this.domScaleBarText.textContent = `${distanceKm} km`;
-    }
+    this.uiManager.updateTimeDisplay(this.timeElapsedMs, 1);
+    this.uiManager.updateScaleBar(this.cameras.main.zoom);
 
     this.draw(time);
     
@@ -852,9 +425,7 @@ export class MainScene extends Scene {
     this.checkWinLoss();
 
     // 経過時間表示の更新（整数秒）
-    if (this.domTimeDisplay) {
-      this.domTimeDisplay.textContent = Math.floor(this.timeElapsedMs / 1000).toString();
-    }
+    this.uiManager.updateTimeDisplay(this.timeElapsedMs, 0);
 
     // 60フレームに1回（≒1秒）ゲーム状態を window.__gameState に書き出し（チャット用）
     this._gameStateTickCounter++;
@@ -1457,20 +1028,12 @@ export class MainScene extends Scene {
   public lose() {
     this.isGameOver = true;
     if (window.__chatWidget) window.__chatWidget.disabled = true;
-    if (this.domGameOver) {
-      this.domGameOver.classList.remove('hidden');
-      if (this.domGameTitle) this.domGameTitle.textContent = 'MISSION FAILED';
-      if (this.domGameDesc) this.domGameDesc.textContent = '全部隊が消滅しました。';
-    }
+    this.uiManager.showGameOver('MISSION FAILED', '全部隊が消滅しました。');
   }
 
   private win() {
     this.isGameOver = true;
-    if (this.domGameOver) {
-      this.domGameOver.classList.remove('hidden');
-      if (this.domGameTitle) this.domGameTitle.textContent = 'MISSION SUCCESS';
-      if (this.domGameDesc) this.domGameDesc.textContent = '調査データをHQに回収し、全部隊の安全を確保しました。';
-    }
+    this.uiManager.showGameOver('MISSION SUCCESS', '調査データをHQに回収し、全部隊の安全を確保しました。');
   }
 
   public showFloatingText(x: number, y: number, text: string, color: string) {
@@ -1485,23 +1048,21 @@ export class MainScene extends Scene {
   }
 
   /**
-   * 他システム（MeteorSystem 等）から呼ばれる排他クローズ。
-   * Unit/Planet モーダルを閉じ、選択ユニットをクリアする。
+   * 開く対象以外のモーダルを閉じる排他制御。
+   * 各 System / UIManager の openXxx() 内から呼ぶ。
    */
-  public closeUnitAndPlanetModals(): void {
-    this.selectedUnitId = null;
-    this.domUnitModal?.classList.add('hidden');
-    this.planetSystem.closeModal();
+  public closeOtherModals(except: 'unit' | 'planet' | 'meteor'): void {
+    if (except !== 'unit') this.uiManager.closeUnitModal();
+    if (except !== 'planet') this.planetSystem.closeModal();
+    if (except !== 'meteor') this.meteorSystem.closeModal();
   }
 
   /**
-   * PlanetSystem から呼ばれる排他クローズ。
-   * Unit/Meteor モーダルを閉じ、選択ユニットをクリアする。
+   * UIManager のブリーフィング開始ボタンから呼ばれる。
    */
-  public closeUnitAndMeteorModals(): void {
-    this.selectedUnitId = null;
-    this.domUnitModal?.classList.add('hidden');
-    this.meteorSystem.closeModal();
+  public endBriefing(): void {
+    this.isBriefingActive = false;
+    console.log('Mission Started');
   }
 
 }
