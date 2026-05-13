@@ -1,11 +1,13 @@
 import { Scene } from 'phaser';
 import { Spaceship } from '../models/Spaceship';
-import { PacketType, SystemDisplayMode } from '../models/DataPacket';
+import { SystemDisplayMode } from '../models/DataPacket';
 import { CommunicationSystem } from '../models/CommunicationSystem';
 import { OpticalMaster } from '../models/OpticalMaster';
 import { MeteorSystem } from '../systems/MeteorSystem';
 import { PlanetSystem } from '../systems/PlanetSystem';
 import { CommunicationManager } from '../systems/CommunicationManager';
+import { MissionManager } from '../systems/MissionManager';
+import { CameraController } from '../systems/CameraController';
 import { UIManager } from '../ui/UIManager';
 import planetImg from '../assets/Planet_01.png';
 import meteorImg from '../assets/meteor/meteor_01.png';
@@ -25,40 +27,24 @@ export class MainScene extends Scene {
   // サブシステム（他システムから参照されるため public）
   private meteorSystem!: MeteorSystem;
   public planetSystem!: PlanetSystem;
-  private uiManager!: UIManager;
+  public uiManager!: UIManager;
   private commManager!: CommunicationManager;
+  private missionManager!: MissionManager;
+  private cameraController!: CameraController;
 
   // DOM 要素は各 System / UIManager 内で管理
 
   private timeElapsedMs: number = 0;
-  private isGameOver: boolean = false;
-  private isBriefingActive: boolean = true;
+  public isBriefingActive: boolean = true;
   public systemDisplayMode: SystemDisplayMode = SystemDisplayMode.CONTROL;
   public selectedAction: 'attack' | 'jamming' | 'warning' = 'attack';
   public vizMode: 'dots' | 'circles' | 'quality' | 'range' = 'circles';
-  
-  
-  private surveyPoint = { x: 3000, y: 3000, radius: 200 };
 
-  // 惑星（環境ハザード）状態は PlanetSystem 内で管理
-
-  // 隕石（メテオ）状態は MeteorSystem 内で管理
+  // 惑星 / 隕石 / 通信 / ミッション / カメラ状態は各 System 内で管理
 
   public selectedUnitId: string | null = null;
 
-  // チャットウィジェット連携用：ミッション達成状況のキャッシュ
-  private _missionReach: boolean = false;
-  private _missionAllLinked: boolean = false;
-  private _missionData: boolean = false;
-  private _gameStateTickCounter: number = 0;
-  // 通信状態 (activePolls / lastLinkSuccess) は CommunicationManager 内で管理
-
-  // Camera Pan
-  private dragStartX: number = 0;
-  private dragStartY: number = 0;
-  private camStartX: number = 0;
-  private camStartY: number = 0;
-  private isDragging: boolean = false;
+  // Camera 状態は CameraController 内で管理
 
   // LV1 Features
   private interferenceZones: { x: number, y: number, radius: number }[] = [];
@@ -89,6 +75,8 @@ export class MainScene extends Scene {
     this.uiManager = new UIManager(this);
     this.uiManager.init();
     this.commManager = new CommunicationManager(this);
+    this.missionManager = new MissionManager(this);
+    this.cameraController = new CameraController(this);
 
     this.initGameData();
 
@@ -97,19 +85,13 @@ export class MainScene extends Scene {
     const cy = this.sys.game.canvas.height / 2;
     // ユニット初期位置のオフセットに合わせて bounds を拡張（クランプ回避）
     this.cameras.main.setBounds(-6000, -6000, 12000, 12000);
-    this.cameras.main.setZoom(0.4); // Doubled from 0.2 for better initial detail
+    this.cameras.main.setZoom(0.4);
     // ユニット群を画面右側に表示してミッションパネル（左上）との重なりを回避
     this.cameras.main.centerOn(cx - 3200 - 250, cy - 3200);
 
-    this.input.on('pointerdown', this.onPointerDown, this);
-    this.input.on('pointermove', this.onPointerMove, this);
-    this.input.on('pointerup', this.onPointerUp, this);
-
-    this.input.on('wheel', (_pointer: any, _gameObjects: any, _deltaX: number, deltaY: number) => {
-      let newZoom = this.cameras.main.zoom - (deltaY * 0.001);
-      newZoom = Phaser.Math.Clamp(newZoom, 0.15, 4.0); // Balanced range
-      this.cameras.main.setZoom(newZoom);
-    });
+    // クリック判定（ユニット/惑星/隕石）は MainScene 側のロジックに委譲
+    this.cameraController.setClickHandler((wx, wy) => this.handleWorldClick(wx, wy));
+    this.cameraController.attach();
   }
 
   private initGameData() {
@@ -166,68 +148,32 @@ export class MainScene extends Scene {
     }
 
     // 惑星をランダムに2つ配置（環境ハザード：通信干渉源）
-    this.planetSystem.init(cx, cy, this.surveyPoint);
+    this.planetSystem.init(cx, cy, this.missionManager.surveyPoint);
   }
 
-  private onPointerDown(pointer: Phaser.Input.Pointer) {
-    if (this.isGameOver) return;
-    this.isDragging = true;
-    this.dragStartX = pointer.x;
-    this.dragStartY = pointer.y;
-    this.camStartX = this.cameras.main.scrollX;
-    this.camStartY = this.cameras.main.scrollY;
-  }
+  /**
+   * CameraController からドラッグなしクリック時に呼ばれる。
+   * 惑星 → 隕石 → ユニットの順にクリック判定を行う。
+   */
+  private handleWorldClick(worldX: number, worldY: number): void {
+    if (this.planetSystem.handleClick(worldX, worldY)) return;
+    if (this.meteorSystem.handleClick(worldX, worldY)) return;
 
-  private onPointerMove(pointer: Phaser.Input.Pointer) {
-    if (this.isDragging) {
-      const dx = pointer.x - this.dragStartX;
-      const dy = pointer.y - this.dragStartY;
-      this.cameras.main.scrollX = this.camStartX - dx / this.cameras.main.zoom;
-      this.cameras.main.scrollY = this.camStartY - dy / this.cameras.main.zoom;
+    let clickedId: string | null = null;
+    let minDist = 30;
+    for (const [id, ship] of this.spaceships.entries()) {
+      const d = CommunicationSystem.getDistance(worldX, worldY, ship.x, ship.y);
+      if (d < minDist) { minDist = d; clickedId = id; }
     }
-  }
 
-  private onPointerUp(pointer: Phaser.Input.Pointer) {
-    this.isDragging = false;
-    if (this.isGameOver) return;
-
-    const dx = pointer.x - this.dragStartX;
-    const dy = pointer.y - this.dragStartY;
-    const dist = Math.sqrt(dx * dx + dy * dy);
-
-    if (dist < 10) {
-      const worldX = pointer.worldX;
-      const worldY = pointer.worldY;
-
-      // 惑星クリック判定（PlanetSystem に委譲）
-      if (this.planetSystem.handleClick(worldX, worldY)) {
-        return;
-      }
-
-      // 隕石クリック判定（MeteorSystem に委譲）
-      if (this.meteorSystem.handleClick(worldX, worldY)) {
-        return;
-      }
-
-      let clickedId: string | null = null;
-      let minDist = 30;
-
-      for (const [id, ship] of this.spaceships.entries()) {
-        const d = CommunicationSystem.getDistance(worldX, worldY, ship.x, ship.y);
-        if (d < minDist) { minDist = d; clickedId = id; }
-      }
-
-      if (clickedId) {
-        this.selectedUnitId = clickedId;
-        this.uiManager.openUnit();
-      } else {
-        if (this.selectedUnitId) {
-          const ship = this.spaceships.get(this.selectedUnitId);
-          if (ship) { ship.targetX = worldX; ship.targetY = worldY; }
-        } else {
-          this.uiManager.closeUnitModal();
-        }
-      }
+    if (clickedId) {
+      this.selectedUnitId = clickedId;
+      this.uiManager.openUnit();
+    } else if (this.selectedUnitId) {
+      const ship = this.spaceships.get(this.selectedUnitId);
+      if (ship) { ship.targetX = worldX; ship.targetY = worldY; }
+    } else {
+      this.uiManager.closeUnitModal();
     }
   }
 
@@ -255,7 +201,7 @@ export class MainScene extends Scene {
   }
 
   update(time: number, delta: number) {
-    if (this.isGameOver || this.isBriefingActive) return;
+    if (this.missionManager.isGameOver() || this.isBriefingActive) return;
 
     this.timeElapsedMs += delta;
 
@@ -342,16 +288,11 @@ export class MainScene extends Scene {
     // アクティブな通信ポーリングを 1 フレーム分処理
     this.commManager.processActivePolls(delta);
 
-    this.checkWinLoss();
+    // ミッション判定と gameState 公開
+    this.missionManager.update();
 
     // 経過時間表示の更新（整数秒）
     this.uiManager.updateTimeDisplay(this.timeElapsedMs, 0);
-
-    // 60フレームに1回（≒1秒）ゲーム状態を window.__gameState に書き出し（チャット用）
-    this._gameStateTickCounter++;
-    if (this._gameStateTickCounter % 60 === 0) {
-      this.exposeGameState();
-    }
   }
 
   private draw(time: number) {
@@ -379,20 +320,8 @@ export class MainScene extends Scene {
 
     // 0c. Optical Masters (Hidden from map as per request)
 
-    // 1. Draw Survey Point (Yellow Circle) with expanding pulse motion
-    const pulseRate = (time % 2000) / 2000;
-    this.clutterGraphics.lineStyle(3, 0xeab308, 0.6);
-    this.clutterGraphics.strokeCircle(this.surveyPoint.x, this.surveyPoint.y, this.surveyPoint.radius);
-    this.clutterGraphics.fillStyle(0xeab308, 0.1);
-    this.clutterGraphics.fillCircle(this.surveyPoint.x, this.surveyPoint.y, this.surveyPoint.radius);
-
-    // Expanding motion pulse
-    this.clutterGraphics.lineStyle(2, 0xeab308, 0.6 * (1 - pulseRate));
-    this.clutterGraphics.strokeCircle(this.surveyPoint.x, this.surveyPoint.y, this.surveyPoint.radius + (pulseRate * 100));
-    
-    const surveyText = this.textLabels.get('survey-point-label') || this.add.text(this.surveyPoint.x, this.surveyPoint.y - this.surveyPoint.radius - 30, '調査対象ポイント', { fontSize: '18px', color: '#eab308', fontFamily: 'Rajdhani', fontStyle: 'bold' }).setOrigin(0.5).setDepth(20);
-    this.textLabels.set('survey-point-label', surveyText);
-    surveyText.setPosition(this.surveyPoint.x, this.surveyPoint.y - this.surveyPoint.radius - 30);
+    // 1. Survey Point の描画は MissionManager に委譲
+    this.missionManager.drawSurveyPoint(this.clutterGraphics, time);
 
     // 1b. 惑星の干渉ゾーン（通信品質モード時のみ表示）→ PlanetSystem に委譲
     if (this.vizMode === 'quality') {
@@ -785,95 +714,6 @@ export class MainScene extends Scene {
     }
   }
 
-  private checkWinLoss() {
-    if (this.isGameOver) return;
-
-    let reachSuccess = false;
-    let allLinkedSuccess = true;
-    let dataSuccess = false;
-
-    const activeUnits = Array.from(this.spaceships.values());
-    const hqNode = activeUnits.find(s => s.id === 'HQ Ship');
-    const nodes = activeUnits.filter(s => s.isNodeActive);
-
-    for (const ship of activeUnits) {
-      // 1. Survey Point Reach
-      const dist = CommunicationSystem.getDistance(ship.x, ship.y, this.surveyPoint.x, this.surveyPoint.y);
-      if (dist < this.surveyPoint.radius) {
-        reachSuccess = true;
-        
-        if (this.timeElapsedMs % 1000 < 20 && !ship.queue.some(p => p.type === PacketType.SURVEY_DATA)) {
-          ship.receivePacket({
-            id: `survey-${Date.now()}-${ship.id}`,
-            type: PacketType.SURVEY_DATA,
-            createdAt: Date.now(),
-            originShipId: ship.id
-          });
-          this.showFloatingText(ship.x, ship.y, 'データ収集', '#eab308');
-        }
-      }
-
-      // 2. All Linked Success (Must have connection to HQ)
-      if (hqNode) {
-        const { canConnect } = CommunicationSystem.getLinkQuality(ship, hqNode, nodes, this.planetSystem.getPlanets());
-        if (!canConnect && ship.id !== hqNode.id) {
-          allLinkedSuccess = false;
-        }
-      }
-    }
-
-    // 3. Survey Data recovered at HQ
-    if (hqNode && hqNode.queue.some(p => p.type === PacketType.SURVEY_DATA)) {
-      dataSuccess = true;
-    }
-
-    const mReach = document.getElementById('m-reach');
-    const mAllLink = document.getElementById('m-all-link');
-    const mData = document.getElementById('m-data');
-
-    if (mReach) mReach.innerHTML = `<span class="check">${reachSuccess ? '[x]' : '[ ]'}</span> 調査対象ポイントへの到達`;
-    if (mAllLink) mAllLink.innerHTML = `<span class="check">${allLinkedSuccess ? '[x]' : '[ ]'}</span> 全ユニットの通信確保`;
-    if (mData) mData.innerHTML = `<span class="check">${dataSuccess ? '[x]' : '[ ]'}</span> 調査データの転送・回収`;
-
-    // チャットウィジェット用キャッシュ
-    this._missionReach = reachSuccess;
-    this._missionAllLinked = allLinkedSuccess;
-    this._missionData = dataSuccess;
-
-    if (reachSuccess && allLinkedSuccess && dataSuccess) {
-      this.win();
-    }
-  }
-
-  // window.__gameState にゲーム状態を公開（チャットウィジェットがDifyへのコンテキストとして利用）
-  private exposeGameState() {
-    const selectedHp = this.selectedUnitId
-      ? (this.spaceships.get(this.selectedUnitId)?.hp ?? null)
-      : null;
-    window.__gameState = {
-      shipCount: this.spaceships.size,
-      selectedUnitId: this.selectedUnitId,
-      selectedUnitHp: selectedHp,
-      missionReach: this._missionReach,
-      missionAllLinked: this._missionAllLinked,
-      missionData: this._missionData,
-      elapsedSeconds: Math.floor(this.timeElapsedMs / 1000),
-      gameMode: this.systemDisplayMode === SystemDisplayMode.CONTROL ? 'control' : 'combat',
-      gameStatus: this.isBriefingActive ? 'briefing' : this.isGameOver ? 'won' : 'active',
-    };
-  }
-
-  public lose() {
-    this.isGameOver = true;
-    if (window.__chatWidget) window.__chatWidget.disabled = true;
-    this.uiManager.showGameOver('MISSION FAILED', '全部隊が消滅しました。');
-  }
-
-  private win() {
-    this.isGameOver = true;
-    this.uiManager.showGameOver('MISSION SUCCESS', '調査データをHQに回収し、全部隊の安全を確保しました。');
-  }
-
   public showFloatingText(x: number, y: number, text: string, color: string) {
     const t = this.add.text(x, y - 20, text, { fontSize: '14px', color, fontFamily: 'Rajdhani', fontStyle: 'bold' }).setOrigin(0.5).setDepth(30);
     this.tweens.add({
@@ -901,6 +741,20 @@ export class MainScene extends Scene {
   public endBriefing(): void {
     this.isBriefingActive = false;
     console.log('Mission Started');
+  }
+
+  /**
+   * MeteorSystem 等から全ユニット消滅時に呼ばれる敗北遷移。
+   */
+  public lose(): void {
+    this.missionManager.lose();
+  }
+
+  /**
+   * CameraController からゲームオーバー判定で呼ばれる。
+   */
+  public isGameOver(): boolean {
+    return this.missionManager.isGameOver();
   }
 
 }
