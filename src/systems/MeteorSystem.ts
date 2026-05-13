@@ -125,7 +125,7 @@ export class MeteorSystem {
     const meteor = this.meteors.get(meteorId);
     if (!meteor || !this.domMeteorModal) return;
 
-    this.scene.closeUnitAndPlanetModals();
+    this.scene.closeOtherModals('meteor');
 
     this.selectedMeteorId = meteorId;
     this.domMeteorModal.classList.remove('hidden');

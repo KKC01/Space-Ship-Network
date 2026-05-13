@@ -95,7 +95,7 @@ export class PlanetSystem {
     const planet = this.planets.find(p => p.id === planetId);
     if (!planet || !this.domPlanetModal) return;
 
-    this.scene.closeUnitAndMeteorModals();
+    this.scene.closeOtherModals('planet');
 
     if (this.domPlanetId) this.domPlanetId.textContent = planet.id;
     if (this.domPlanetCommStation) {
