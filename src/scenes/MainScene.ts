@@ -5,6 +5,7 @@ import { CommunicationSystem } from '../models/CommunicationSystem';
 import { OpticalMaster } from '../models/OpticalMaster';
 import { MeteorSystem } from '../systems/MeteorSystem';
 import { PlanetSystem } from '../systems/PlanetSystem';
+import { CommunicationManager } from '../systems/CommunicationManager';
 import { UIManager } from '../ui/UIManager';
 import planetImg from '../assets/Planet_01.png';
 import meteorImg from '../assets/meteor/meteor_01.png';
@@ -25,6 +26,7 @@ export class MainScene extends Scene {
   private meteorSystem!: MeteorSystem;
   public planetSystem!: PlanetSystem;
   private uiManager!: UIManager;
+  private commManager!: CommunicationManager;
 
   // DOM 要素は各 System / UIManager 内で管理
 
@@ -49,19 +51,7 @@ export class MainScene extends Scene {
   private _missionAllLinked: boolean = false;
   private _missionData: boolean = false;
   private _gameStateTickCounter: number = 0;
-  private activePolls: {
-    hubId: string, 
-    targetId: string, 
-    startTime: number, 
-    callReached: boolean, 
-    responseStarted: boolean,
-    distance: number,
-    isBroadcast?: boolean,
-    rangeMode?: 'short' | 'long' | 'optical'
-  }[] = [];
-  
-  // Link history: Key is "id1-id2", value is timestamp of last success
-  private lastLinkSuccess: Map<string, number> = new Map();
+  // 通信状態 (activePolls / lastLinkSuccess) は CommunicationManager 内で管理
 
   // Camera Pan
   private dragStartX: number = 0;
@@ -98,6 +88,7 @@ export class MainScene extends Scene {
     // 惑星配置は cx/cy が必要なので initGameData() 内で init() を呼ぶ
     this.uiManager = new UIManager(this);
     this.uiManager.init();
+    this.commManager = new CommunicationManager(this);
 
     this.initGameData();
 
@@ -256,9 +247,11 @@ export class MainScene extends Scene {
     }
   }
 
-  private recordLinkSuccess(id1: string, id2: string) {
-    const key = [id1, id2].sort().join('-');
-    this.lastLinkSuccess.set(key, this.timeElapsedMs);
+  /**
+   * CommunicationManager 等から経過時間 ms を取得するための公開ゲッター。
+   */
+  public getTimeElapsedMs(): number {
+    return this.timeElapsedMs;
   }
 
   update(time: number, delta: number) {
@@ -273,7 +266,7 @@ export class MainScene extends Scene {
     this.planetSystem.update(delta);
 
     for (const ship of this.spaceships.values()) {
-      ship.update(delta, this.spaceships, (node, target) => this.handlePolling(node, target));
+      ship.update(delta, this.spaceships, (node, target) => this.commManager.handlePolling(node, target));
 
       // TDMA Logic
       if (ship.isMultiplexEnabled && ship.selectedMasterId) {
@@ -306,7 +299,7 @@ export class MainScene extends Scene {
             if (ship.lastTransmittedSlot !== currentSlot) {
               ship.lastTransmittedSlot = currentSlot;
               // It's our slot! Try to transmit
-              this.handleOpticalTransmission(ship);
+              this.commManager.handleOpticalTransmission(ship);
             }
           }
         }
@@ -345,82 +338,9 @@ export class MainScene extends Scene {
     this.uiManager.updateScaleBar(this.cameras.main.zoom);
 
     this.draw(time);
-    
-    // 2. Update Active Polls Logic (Scanlines)
-    const waveSpeed = 750; 
 
-    for (let i = this.activePolls.length - 1; i >= 0; i--) {
-      const poll = this.activePolls[i];
-      const elapsed = this.timeElapsedMs - poll.startTime;
-      const waveDist = elapsed * (waveSpeed / 1000);
-      
-      const node = this.spaceships.get(poll.hubId);
-      const target = this.spaceships.get(poll.targetId);
-
-      if (!node || !target) {
-        if (!poll.isBroadcast && node) {
-          node.isWaitingForResponse = false;
-        }
-        this.activePolls.splice(i, 1);
-        continue;
-      }
-
-      const maxRange = poll.rangeMode === 'long' ? 2500 : 750;
-
-      // 1. Outward Call Pulse
-      if (!poll.callReached && waveDist >= poll.distance) {
-        poll.callReached = true;
-        poll.responseStarted = true;
-        
-        // Data exchange logic
-        const activeNodes = Array.from(this.spaceships.values()).filter(s => s.isNodeActive);
-        const packetsToTx = target.getPacketsToTransmit();
-        const successfulPackets = CommunicationSystem.transferData(target, node, packetsToTx, activeNodes, this.planetSystem.getPlanets());
-        if (successfulPackets.length > 0) {
-          successfulPackets.forEach(p => node.receivePacket(p));
-          this.showFloatingText(node.x, node.y, 'データ受信', '#4ade80');
-          this.recordLinkSuccess(node.id, target.id);
-        }
-        const nodePackets = node.queue;
-        const successfulNodePackets = CommunicationSystem.transferData(node, target, nodePackets, activeNodes, this.planetSystem.getPlanets());
-        if (successfulNodePackets.length > 0) {
-          successfulNodePackets.forEach(p => {
-            target.receivePacket(p);
-          });
-          this.recordLinkSuccess(node.id, target.id);
-        }
-      }
-
-      // 2. Returning/Broadcasting Wave
-      if (poll.responseStarted) {
-        const resElapsed = elapsed - (poll.distance / (waveSpeed / 1000));
-        const resWaveDist = resElapsed * (waveSpeed / 1000);
-        const activeNodes = Array.from(this.spaceships.values()).filter(s => s.isNodeActive);
-
-        // DATA BROADCAST: Any ship hit by the expanding gold wave receives data
-        this.spaceships.forEach(nearbyShip => {
-           if (nearbyShip.id === target.id) return; // Already exchanged
-           const d = CommunicationSystem.getDistance(target.x, target.y, nearbyShip.x, nearbyShip.y);
-           // Check if wave just hit this ship
-           if (Math.abs(resWaveDist - d) < (waveSpeed * delta / 1000) * 1.5) {
-             const packets = target.getPacketsToTransmit();
-             const successful = CommunicationSystem.transferData(target, nearbyShip, packets, activeNodes, this.planetSystem.getPlanets());
-             if (successful.length > 0) {
-               successful.forEach(p => nearbyShip.receivePacket(p));
-               this.recordLinkSuccess(target.id, nearbyShip.id);
-             }
-           }
-        });
-        
-        // Remove and Trigger next poll ONLY when wave reaches max range (to ensure no overlap)
-        if (resWaveDist >= maxRange) {
-          if (!poll.isBroadcast && node) {
-            node.isWaitingForResponse = false;
-          }
-          this.activePolls.splice(i, 1);
-        }
-      }
-    }
+    // アクティブな通信ポーリングを 1 フレーム分処理
+    this.commManager.processActivePolls(delta);
 
     this.checkWinLoss();
 
@@ -431,88 +351,6 @@ export class MainScene extends Scene {
     this._gameStateTickCounter++;
     if (this._gameStateTickCounter % 60 === 0) {
       this.exposeGameState();
-    }
-  }
-
-  private handlePolling(node: Spaceship, target: Spaceship) {
-    const dist = CommunicationSystem.getDistance(node.x, node.y, target.x, target.y);
-    const activeNodes = Array.from(this.spaceships.values()).filter(s => s.isNodeActive);
-
-    // 1. CMD packets use a separate command channel — delivered regardless of frequency
-    const cmdPackets = node.queue.filter(p => p.type === PacketType.CMD);
-    if (cmdPackets.length > 0) {
-      const maxCmdRange = (node.isLongEnabled || target.isLongEnabled) ? 2500 : 750;
-      if (dist <= maxCmdRange) {
-        cmdPackets.forEach(p => {
-          // Only deliver if target hasn't received this CMD yet
-          if (!target.queue.some(q => q.id === p.id)) {
-            target.receivePacket(p);
-            this.showFloatingText(target.x, target.y, '指令受信', '#f59e0b');
-          }
-        });
-      }
-    }
-
-    // 2. Normal communication requires matching frequencies
-    const { canConnect } = CommunicationSystem.getLinkQuality(node, target, activeNodes, this.planetSystem.getPlanets());
-    
-    if (canConnect) {
-      const rangeMode = (node.isLongEnabled && target.isLongEnabled && node.longFreq === target.longFreq) ? 'long' : 'short';
-      this.activePolls.push({
-        hubId: node.id,
-        targetId: target.id,
-        startTime: this.timeElapsedMs,
-        callReached: false,
-        responseStarted: false,
-        distance: dist,
-        rangeMode
-      });
-    } else {
-      // No frequency match — no wave animation, node moves on to next target
-      node.isWaitingForResponse = false;
-    }
-  }
-
-  private handleOpticalTransmission(ship: Spaceship) {
-    let transmissionOccurred = false;
-
-    // Find targets within 750km (Optical range)
-    this.spaceships.forEach(target => {
-      if (target.id === ship.id) return;
-      
-      const { canConnect, dropRate } = CommunicationSystem.getOpticalMultiplexQuality(ship, target, Array.from(this.spaceships.values()).filter(s => s.isNodeActive));
-      
-      if (canConnect && Math.random() >= dropRate) {
-        transmissionOccurred = true;
-        // Even if queue is empty, we send a heartbeat for visual connection
-        const packetsToTransmit = ship.getPacketsToTransmit();
-        const packets = packetsToTransmit.length > 0 ? packetsToTransmit.map(p => ({
-          ...p,
-          payload: { ...p.payload, isOptical: true, cipher: ship.multiplexCipher }
-        })) : [{
-          id: `heartbeat-${Date.now()}-${ship.id}`,
-          type: PacketType.NORMAL,
-          createdAt: Date.now(),
-          originShipId: ship.id,
-          payload: { isOptical: true, isHeartbeat: true }
-        }];
-        
-        packets.forEach(p => target.receivePacket(p as any));
-        this.recordLinkSuccess(ship.id, target.id);
-      }
-    });
-
-    if (transmissionOccurred) {
-      // Trigger visual effect (Single broadcast poll for the sender)
-      this.activePolls.push({
-        hubId: ship.id,
-        targetId: ship.id, // Use sender as target for broadcast center
-        startTime: this.timeElapsedMs,
-        callReached: true, 
-        responseStarted: true,
-        distance: 0,
-        rangeMode: 'optical'
-      });
     }
   }
 
@@ -773,7 +611,7 @@ export class MainScene extends Scene {
       const waveSpeed = 750;
       const drawnCircleHubs = new Set<string>();
       
-      this.activePolls.forEach(poll => {
+      this.commManager.getActivePolls().forEach(poll => {
         const hub = this.spaceships.get(poll.hubId);
         const target = this.spaceships.get(poll.targetId);
         if (!hub || !target) return;
@@ -860,7 +698,7 @@ export class MainScene extends Scene {
           
           // Check if there's a recent CMD success (Emergency path)
           const key = [source.id, target.id].sort().join('-');
-          const lastTime = this.lastLinkSuccess.get(key);
+          const lastTime = this.commManager.getLastLinkSuccess().get(key);
           const isCommandPath = lastTime && (this.timeElapsedMs - lastTime) < 5000;
           
           if (canConnect || isCommandPath) {
