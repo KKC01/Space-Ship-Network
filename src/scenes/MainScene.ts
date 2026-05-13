@@ -4,22 +4,26 @@ import { PacketType, FreqShort, FreqLong, SystemDisplayMode } from '../models/Da
 import { CommunicationSystem } from '../models/CommunicationSystem';
 import { OpticalMaster } from '../models/OpticalMaster';
 import { Planet, PLANET_SPECS } from '../models/Planet';
-import { Meteor } from '../models/Meteor';
+import { MeteorSystem } from '../systems/MeteorSystem';
 import legacyDestroyerImg from '../assets/Legacy_Destroyer.png';
 import planetImg from '../assets/Planet_01.png';
 import meteorImg from '../assets/meteor/meteor_01.png';
 import monitorVideoSrc from '../assets/monitor_01.mp4';
 
 export class MainScene extends Scene {
-  private spaceships: Map<string, Spaceship> = new Map();
+  // 隕石サブシステム（MeteorSystem からアクセスされるため public）
+  public spaceships: Map<string, Spaceship> = new Map();
   private opticalMasters: OpticalMaster[] = [];
 
-  private shipGraphics: Map<string, Phaser.GameObjects.Graphics> = new Map();
+  public shipGraphics: Map<string, Phaser.GameObjects.Graphics> = new Map();
   private linkGraphics!: Phaser.GameObjects.Graphics;
   private clutterGraphics!: Phaser.GameObjects.Graphics;
   private interferenceGraphics!: Phaser.GameObjects.Graphics;
 
-  private textLabels: Map<string, Phaser.GameObjects.Text> = new Map();
+  public textLabels: Map<string, Phaser.GameObjects.Text> = new Map();
+
+  // サブシステム
+  private meteorSystem!: MeteorSystem;
 
   // DOM Elements
   private domGameOver!: HTMLElement | null;
@@ -57,20 +61,13 @@ export class MainScene extends Scene {
   private domScaleBarLine!: HTMLElement | null;
   private domScaleBarText!: HTMLElement | null;
 
-  // Meteor Modal DOM Elements
-  private domMeteorModal: HTMLElement | null = null;
-  private domMeteorModalClose: HTMLElement | null = null;
-  private domMeteorId: HTMLElement | null = null;
-  private domMeteorHpBar: HTMLElement | null = null;
-  private domMeteorHpText: HTMLElement | null = null;
-  private domMeteorSpeed: HTMLElement | null = null;
-  private domMeteorTarget: HTMLElement | null = null;
+  // 隕石モーダル DOM は MeteorSystem 内で管理
 
   private timeElapsedMs: number = 0;
   private isGameOver: boolean = false;
   private isBriefingActive: boolean = true;
-  private systemDisplayMode: SystemDisplayMode = SystemDisplayMode.CONTROL;
-  private selectedAction: 'attack' | 'jamming' | 'warning' = 'attack';
+  public systemDisplayMode: SystemDisplayMode = SystemDisplayMode.CONTROL;
+  public selectedAction: 'attack' | 'jamming' | 'warning' = 'attack';
   private vizMode: 'dots' | 'circles' | 'quality' | 'range' = 'circles';
   
   
@@ -80,16 +77,9 @@ export class MainScene extends Scene {
   private planets: Planet[] = [];
   private planetSprites: Phaser.GameObjects.Image[] = [];
 
-  // 隕石（メテオ）
-  private meteors: Map<string, Meteor> = new Map();
-  private meteorSprites: Map<string, Phaser.GameObjects.Image> = new Map();
-  private meteorSpawnTimer: number = 15000;
-  private meteorCounter: number = 0;
-  private meteorAlerted: Set<string> = new Set();
-  private meteorGraphics!: Phaser.GameObjects.Graphics;
-  private selectedMeteorId: string | null = null;
-  
-  private selectedUnitId: string | null = null;
+  // 隕石（メテオ）状態は MeteorSystem 内で管理
+
+  public selectedUnitId: string | null = null;
 
   // チャットウィジェット連携用：ミッション達成状況のキャッシュ
   private _missionReach: boolean = false;
@@ -137,7 +127,10 @@ export class MainScene extends Scene {
     this.interferenceGraphics = this.add.graphics().setDepth(1);
     this.clutterGraphics = this.add.graphics().setDepth(2);
     this.linkGraphics = this.add.graphics().setDepth(3);
-    this.meteorGraphics = this.add.graphics().setDepth(6);
+
+    // サブシステム初期化（DOM・Graphics は各システム内で生成）
+    this.meteorSystem = new MeteorSystem(this);
+    this.meteorSystem.init();
 
     this.initDOM();
     this.initGameData();
@@ -391,21 +384,7 @@ export class MainScene extends Scene {
       };
     }
 
-    // 隕石モーダル DOM
-    this.domMeteorModal = document.getElementById('meteor-modal');
-    this.domMeteorModalClose = document.getElementById('meteor-modal-close');
-    this.domMeteorId = document.getElementById('meteor-id');
-    this.domMeteorHpBar = document.getElementById('meteor-hp-bar');
-    this.domMeteorHpText = document.getElementById('meteor-hp-text');
-    this.domMeteorSpeed = document.getElementById('meteor-speed');
-    this.domMeteorTarget = document.getElementById('meteor-target');
-
-    if (this.domMeteorModalClose) {
-      this.domMeteorModalClose.onclick = () => {
-        this.selectedMeteorId = null;
-        this.domMeteorModal?.classList.add('hidden');
-      };
-    }
+    // 隕石モーダル DOM は MeteorSystem.init() 内で初期化済み
 
     // NOTE: send-cmd-btn handler is already set above (broadcast CMD via HQ queue).
     // Do NOT add a second handler here — it would overwrite the broadcast behavior.
@@ -612,27 +591,9 @@ export class MainScene extends Scene {
         }
       }
 
-      // 隕石クリック判定（探知済みの隕石のみ対象）
-      const METEOR_HIT_RADIUS = 60;
-      for (const [mId, meteor] of this.meteors.entries()) {
-        if (!meteor.isDetected || meteor.isDestroyed) continue;
-        const dm = CommunicationSystem.getDistance(worldX, worldY, meteor.x, meteor.y);
-        if (dm < METEOR_HIT_RADIUS) {
-          const isCombatMode = this.systemDisplayMode === SystemDisplayMode.COMBAT;
-          if (isCombatMode && this.selectedUnitId && this.selectedAction === 'attack') {
-            // 戦闘指揮モード + ユニット選択済み + 攻撃アクション → 攻撃指示
-            const ship = this.spaceships.get(this.selectedUnitId);
-            if (ship) {
-              ship.attackTargetMeteorId = mId;
-              window.__chatWidget?.pushSystemMessage(`${ship.id} → ${meteor.id} 攻撃します`);
-              this.showFloatingText(ship.x, ship.y, '攻撃指示', '#f87171');
-            }
-          } else {
-            // 通常モード → 隕石情報モーダル表示
-            this.openMeteorModal(mId);
-          }
-          return;
-        }
+      // 隕石クリック判定（MeteorSystem に委譲）
+      if (this.meteorSystem.handleClick(worldX, worldY)) {
+        return;
       }
 
       let clickedId: string | null = null;
@@ -821,11 +782,9 @@ export class MainScene extends Scene {
 
     this.timeElapsedMs += delta;
 
-    // 隕石スポーンタイマー
-    this.meteorSpawnTimer -= delta;
-    if (this.meteorSpawnTimer <= 0) {
-      this.spawnMeteor();
-    }
+    // 隕石の更新（spawn / 探知 / 衝突 / 戦闘）は MeteorSystem に委譲
+    this.meteorSystem.update(delta, time);
+
     // 惑星の移動更新
     for (let i = 0; i < this.planets.length; i++) {
       this.planets[i].update(delta);
@@ -834,10 +793,6 @@ export class MainScene extends Scene {
         ps.setPosition(this.planets[i].x, this.planets[i].y);
       }
     }
-    // 隕石の更新・探知・衝突
-    this.updateMeteors(delta);
-    // 隕石への攻撃処理
-    this.handleMeteorCombat(delta);
 
     for (const ship of this.spaceships.values()) {
       ship.update(delta, this.spaceships, (node, target) => this.handlePolling(node, target));
@@ -1109,7 +1064,7 @@ export class MainScene extends Scene {
     this.linkGraphics.setBlendMode(Phaser.BlendModes.ADD);
     this.clutterGraphics.clear();
     this.interferenceGraphics.clear();
-    this.meteorGraphics.clear();
+    this.meteorSystem.clearGraphics();
 
     // 0. Draw Clutter Haze (Fuzzy Boundaries)
     this.interferenceZones.forEach(zone => {
@@ -1507,8 +1462,8 @@ export class MainScene extends Scene {
       });
     }
 
-    // 6. Draw Meteors: スプライト更新・接近警報・攻撃エフェクト
-    this.drawMeteors(time);
+    // 6. Draw Meteors: MeteorSystem に委譲
+    this.meteorSystem.draw(time);
   }
 
   private drawStreamline(startX: number, startY: number, endX: number, endY: number, progress: number, color: number) {
@@ -1621,7 +1576,7 @@ export class MainScene extends Scene {
     };
   }
 
-  private lose() {
+  public lose() {
     this.isGameOver = true;
     if (window.__chatWidget) window.__chatWidget.disabled = true;
     if (this.domGameOver) {
@@ -1640,7 +1595,7 @@ export class MainScene extends Scene {
     }
   }
 
-  private showFloatingText(x: number, y: number, text: string, color: string) {
+  public showFloatingText(x: number, y: number, text: string, color: string) {
     const t = this.add.text(x, y - 20, text, { fontSize: '14px', color, fontFamily: 'Rajdhani', fontStyle: 'bold' }).setOrigin(0.5).setDepth(30);
     this.tweens.add({
       targets: t,
@@ -1651,461 +1606,14 @@ export class MainScene extends Scene {
     });
   }
 
-  // ==================== 隕石（メテオ）関連メソッド ====================
-
   /**
-   * 隕石をスポーンする。ランダムなユニットから500kmの位置に出現。
+   * 他システム（MeteorSystem 等）から呼ばれる排他クローズ。
+   * Unit/Planet モーダルを閉じ、選択ユニットをクリアする。
    */
-  private spawnMeteor() {
-    // 次のスポーンタイマーをリセット（15〜30秒）
-    this.meteorSpawnTimer = 15000 + Math.random() * 15000;
-
-    const shipIds = Array.from(this.spaceships.keys());
-    if (shipIds.length === 0) return;
-
-    const targetId = shipIds[Math.floor(Math.random() * shipIds.length)];
-    const targetShip = this.spaceships.get(targetId);
-    if (!targetShip) return;
-
-    this.meteorCounter++;
-    const meteorId = `METEOR-${String(this.meteorCounter).padStart(3, '0')}`;
-
-    // どのユニットからみても500km以上離れた位置から発動する
-    let mx = 0, my = 0;
-    let found = false;
-    for (let attempts = 0; attempts < 100; attempts++) {
-      const baseShip = Array.from(this.spaceships.values())[Math.floor(Math.random() * this.spaceships.size)];
-      const angle = Math.random() * Math.PI * 2;
-      const testX = baseShip.x + Math.cos(angle) * 500;
-      const testY = baseShip.y + Math.sin(angle) * 500;
-      
-      let allFar = true;
-      for (const ship of this.spaceships.values()) {
-        const d = CommunicationSystem.getDistance(testX, testY, ship.x, ship.y);
-        if (d < 490) { // マージンとして490km未満はNG
-          allFar = false;
-          break;
-        }
-      }
-      if (allFar) {
-        mx = testX;
-        my = testY;
-        found = true;
-        break;
-      }
-    }
-    
-    // 見つからなかった場合のフォールバック（ターゲットから500km）
-    if (!found) {
-      const angle = Math.random() * Math.PI * 2;
-      mx = targetShip.x + Math.cos(angle) * 500;
-      my = targetShip.y + Math.sin(angle) * 500;
-    }
-
-    // ランダムにサイズを決定
-    const r = Math.random();
-    let size: import('../models/Meteor').MeteorSize = 'SMALL';
-    if (r < 0.1) size = 'LARGE';
-    else if (r < 0.3) size = 'MEDIUM';
-    else if (r < 0.7) size = 'SMALL';
-    else size = 'TINY';
-
-    const baseSpeed = 30;
-    const speed = baseSpeed * (0.7 + Math.random() * 0.6); // ±30%: 21〜39
-    const meteor = new Meteor(meteorId, mx, my, targetId, targetShip.x, targetShip.y, size, speed);
-    this.meteors.set(meteorId, meteor);
-
-    // Phaserスプライトを作成（探知前は非表示）
-    const sprite = this.add.image(mx, my, 'meteor');
-    let scale = 0.1;
-    if (size === 'LARGE') scale = 0.1;
-    else if (size === 'MEDIUM') scale = 0.1 / 3;
-    else if (size === 'SMALL') scale = 0.1 / 5;
-    else if (size === 'TINY') scale = 0.1 / 10;
-    sprite.setScale(scale);
-    sprite.setDepth(4);
-    sprite.setVisible(false);
-    this.meteorSprites.set(meteorId, sprite);
-  }
-
-  /**
-   * 隕石の移動・探知・接近警報・衝突判定を更新する。
-   */
-  private updateMeteors(dt: number) {
-    const toRemove: string[] = [];
-
-    for (const [mId, meteor] of this.meteors.entries()) {
-      if (meteor.isDestroyed) {
-        toRemove.push(mId);
-        continue;
-      }
-
-      // 移動・回転更新
-      meteor.update(dt);
-
-      // 全ユニットとの距離をチェック → 探知判定
-      if (!meteor.isDetected) {
-        for (const ship of this.spaceships.values()) {
-          const d = CommunicationSystem.getDistance(meteor.x, meteor.y, ship.x, ship.y);
-          if (d <= 400) {
-            meteor.isDetected = true;
-            // スプライトを表示
-            const sprite = this.meteorSprites.get(mId);
-            if (sprite) sprite.setVisible(true);
-            
-            // Operator AI 警告
-            let warnMsg = '';
-            if (meteor.sizeType === 'LARGE') warnMsg = '大型隕石、探知！';
-            else if (meteor.sizeType === 'MEDIUM') warnMsg = '中型隕石、探知';
-            else if (meteor.sizeType === 'SMALL') warnMsg = '小型隕石、探知';
-            else if (meteor.sizeType === 'TINY') warnMsg = '極小隕石、探知中';
-            
-            window.__chatWidget?.pushSystemMessage(warnMsg);
-
-            if (this.systemDisplayMode === SystemDisplayMode.CONTROL) {
-              window.__chatWidget?.pushSystemMessage('戦闘指揮に変更お願いします');
-            }
-
-            this.showFloatingText(meteor.x, meteor.y, '隕石探知', '#fb923c');
-            break;
-          }
-        }
-      }
-
-      // 衝突判定（全ユニットに対して、距離 < meteor.radius）
-      let hitShip = null;
-      for (const ship of this.spaceships.values()) {
-        const distToTarget = CommunicationSystem.getDistance(meteor.x, meteor.y, ship.x, ship.y);
-        // シップ自身の半径（約10〜15km）を考慮してマージンを取る
-        if (distToTarget < meteor.radius + 15) {
-          hitShip = ship;
-          break;
-        }
-      }
-
-      if (hitShip) {
-        // ユニットにダメージ（隕石HP分）
-        hitShip.hp = Math.max(0, hitShip.hp - meteor.hp);
-        // 衝突エフェクト
-        this.createCollisionEffect(meteor.x, meteor.y);
-        this.showFloatingText(hitShip.x, hitShip.y, `衝突 -${meteor.hp} HP`, '#ef4444');
-        
-        if (hitShip.hp <= 0) {
-          // 爆発のモーションと消滅
-          this.createCollisionEffect(hitShip.x, hitShip.y);
-          window.__chatWidget?.pushSystemMessage(`${hitShip.id} 通信途絶！`);
-          this.spaceships.delete(hitShip.id);
-          const sg = this.shipGraphics.get(hitShip.id);
-          if (sg) {
-            sg.clear();
-            this.shipGraphics.delete(hitShip.id);
-          }
-          // IDラベルを破棄
-          const label = this.textLabels.get(hitShip.id);
-          if (label) { label.destroy(); this.textLabels.delete(hitShip.id); }
-          // METEOR WARNING ラベルを破棄
-          const warnLabel = this.textLabels.get(`meteor-warning-${hitShip.id}`);
-          if (warnLabel) { warnLabel.destroy(); this.textLabels.delete(`meteor-warning-${hitShip.id}`); }
-          // 全ユニット消滅チェック
-          if (this.spaceships.size === 0) this.lose();
-        } else {
-          let colMsg = '';
-          if (meteor.sizeType === 'LARGE') colMsg = `大型隕石、迎撃失敗。${hitShip.id}に衝突！被害確認中…`;
-          else if (meteor.sizeType === 'MEDIUM') colMsg = `中型隕石、迎撃失敗。${hitShip.id}に衝突！被害確認中…`;
-          else if (meteor.sizeType === 'SMALL') colMsg = `小型隕石、${hitShip.id}に衝突`;
-          if (colMsg) window.__chatWidget?.pushSystemMessage(colMsg);
-        }
-
-        // 隕石を消滅
-        meteor.isDestroyed = true;
-        toRemove.push(mId);
-      }
-    }
-
-    // 破壊された隕石を削除
-    for (const mId of toRemove) {
-      this.removeMeteor(mId);
-    }
-
-    // 隕石モーダルが開いている場合データを更新
-    if (this.selectedMeteorId && this.domMeteorModal && !this.domMeteorModal.classList.contains('hidden')) {
-      this.updateMeteorModalData();
-    }
-  }
-
-  /**
-   * ユニットから隕石への攻撃処理。
-   */
-  private handleMeteorCombat(dt: number) {
-    for (const ship of this.spaceships.values()) {
-      if (!ship.attackTargetMeteorId) continue;
-
-      const meteor = this.meteors.get(ship.attackTargetMeteorId);
-      if (!meteor || meteor.isDestroyed) {
-        ship.attackTargetMeteorId = null;
-        continue;
-      }
-
-      // クールダウン更新
-      ship.attackCooldown = Math.max(0, ship.attackCooldown - dt);
-
-      const dist = CommunicationSystem.getDistance(ship.x, ship.y, meteor.x, meteor.y);
-      if (dist <= ship.ATTACK_RANGE && ship.attackCooldown <= 0) {
-        // 攻撃！
-        meteor.takeDamage(ship.ATTACK_DAMAGE);
-        ship.attackCooldown = ship.ATTACK_COOLDOWN_MS;
-        this.showFloatingText(meteor.x, meteor.y, `HIT -${ship.ATTACK_DAMAGE}`, '#fbbf24');
-
-        if (meteor.isDestroyed) {
-          this.createExplosion(meteor.x, meteor.y);
-          window.__chatWidget?.pushSystemMessage(`${meteor.id} を撃破しました`);
-          this.removeMeteor(ship.attackTargetMeteorId);
-          ship.attackTargetMeteorId = null;
-        }
-      }
-    }
-  }
-
-  /**
-   * 隕石スプライトの位置・回転更新、接近警報、攻撃エフェクトの描画。
-   */
-  private drawMeteors(time: number) {
-    const shipsWithWarnings = new Set<string>();
-    for (const [mId, meteor] of this.meteors.entries()) {
-      if (meteor.isDestroyed) continue;
-
-      const sprite = this.meteorSprites.get(mId);
-      if (sprite && meteor.isDetected) {
-        sprite.setPosition(meteor.x, meteor.y);
-        sprite.setRotation(meteor.rotation);
-
-        // Check proximity for all ships to determine warnings
-        for (const ship of this.spaceships.values()) {
-          const d = CommunicationSystem.getDistance(meteor.x, meteor.y, ship.x, ship.y);
-          if (d < 200) {
-            shipsWithWarnings.add(ship.id);
-          }
-        }
-
-        // 隕石のHPバー表示
-        const hpPercent = meteor.hp / meteor.maxHp;
-        this.meteorGraphics.fillStyle(0x000000, 0.6);
-        this.meteorGraphics.fillRect(meteor.x - 20, meteor.y - 30, 40, 4);
-        this.meteorGraphics.fillStyle(hpPercent < 0.3 ? 0xef4444 : 0xfb923c, 0.8);
-        this.meteorGraphics.fillRect(meteor.x - 20, meteor.y - 30, 40 * hpPercent, 4);
-      }
-    }
-
-    // 接近警報の描画（集約して判定）
-    for (const ship of this.spaceships.values()) {
-      const warningId = `meteor-warning-${ship.id}`;
-      if (shipsWithWarnings.has(ship.id)) {
-        const pulse = (Math.sin(time / 200) + 1) / 2;
-        const isHQ = ship.id === 'HQ Ship';
-
-        this.meteorGraphics.lineStyle(3, 0xef4444, 0.5 + pulse * 0.5);
-        this.meteorGraphics.strokeCircle(ship.x, ship.y, isHQ ? 55 : 40);
-
-        if (!this.textLabels.has(warningId)) {
-          const wt = this.add.text(ship.x, ship.y - 55, 'METEOR WARNING', {
-            fontSize: '12px', color: '#ef4444', fontStyle: 'bold', fontFamily: 'Rajdhani'
-          }).setOrigin(0.5).setDepth(20);
-          this.textLabels.set(warningId, wt);
-        } else {
-          const txt = this.textLabels.get(warningId);
-          if (txt) {
-            txt.setPosition(ship.x, ship.y - 55).setVisible(true);
-          }
-        }
-      } else {
-        const txt = this.textLabels.get(warningId);
-        if (txt) txt.setVisible(false);
-      }
-    }
-
-    // 攻撃レーザーエフェクトの描画
-    for (const ship of this.spaceships.values()) {
-      if (!ship.attackTargetMeteorId) continue;
-      const meteor = this.meteors.get(ship.attackTargetMeteorId);
-      if (!meteor || meteor.isDestroyed) continue;
-
-      const dist = CommunicationSystem.getDistance(ship.x, ship.y, meteor.x, meteor.y);
-      if (dist <= ship.ATTACK_RANGE) {
-        // レーザービームエフェクト（攻撃クールダウンの残り時間で明滅）
-        const intensity = ship.attackCooldown > 0 ? (ship.attackCooldown / ship.ATTACK_COOLDOWN_MS) : 0;
-        const alpha = 0.3 + intensity * 0.7;
-        this.meteorGraphics.lineStyle(2, 0xfbbf24, alpha);
-        this.meteorGraphics.lineBetween(ship.x, ship.y, meteor.x, meteor.y);
-
-        // ヒットポイント光点
-        if (intensity > 0.5) {
-          this.meteorGraphics.fillStyle(0xffffff, intensity);
-          this.meteorGraphics.fillCircle(meteor.x, meteor.y, 5);
-        }
-      } else {
-        // 射程外だが追尾中 → 点線で表示
-        this.meteorGraphics.lineStyle(1, 0xfbbf24, 0.15);
-        this.meteorGraphics.lineBetween(ship.x, ship.y, meteor.x, meteor.y);
-      }
-    }
-  }
-
-  /**
-   * 爆発エフェクトを生成する（隕石撃破時）。
-   */
-  private createExplosion(x: number, y: number) {
-    // 複数の拡大・フェードアウトする円で爆発を表現
-    const colors = [0xff6b35, 0xef4444, 0xfbbf24, 0xffffff];
-    for (let i = 0; i < colors.length; i++) {
-      const g = this.add.graphics().setDepth(20);
-      const startRadius = 5 + i * 3;
-      const endRadius = 40 + i * 20;
-      const delay = i * 50;
-
-      g.fillStyle(colors[i], 0.8);
-      g.fillCircle(x, y, startRadius);
-
-      this.tweens.add({
-        targets: { radius: startRadius, alpha: 0.8 },
-        radius: endRadius,
-        alpha: 0,
-        duration: 600,
-        delay,
-        ease: 'Power2',
-        onUpdate: (tween: Phaser.Tweens.Tween) => {
-          const r = tween.getValue() as number;
-          const a = 0.8 * (1 - tween.progress);
-          g.clear();
-          g.fillStyle(colors[i], a);
-          g.fillCircle(x, y, r);
-        },
-        onComplete: () => g.destroy()
-      });
-    }
-
-    // 破片飛散エフェクト
-    for (let i = 0; i < 8; i++) {
-      const angle = (Math.PI * 2 / 8) * i + Math.random() * 0.5;
-      const speed = 30 + Math.random() * 40;
-      const particle = this.add.graphics().setDepth(20);
-      particle.fillStyle(0xfbbf24, 1);
-      particle.fillCircle(x, y, 2);
-
-      const endX = x + Math.cos(angle) * speed;
-      const endY = y + Math.sin(angle) * speed;
-
-      this.tweens.add({
-        targets: particle,
-        x: endX - x,
-        y: endY - y,
-        alpha: 0,
-        duration: 500 + Math.random() * 300,
-        ease: 'Power2',
-        onUpdate: () => {
-          particle.clear();
-          particle.fillStyle(0xfbbf24, particle.alpha);
-          particle.fillCircle(x + particle.x, y + particle.y, 2);
-        },
-        onComplete: () => particle.destroy()
-      });
-    }
-  }
-
-  /**
-   * 衝突エフェクトを生成する（隕石がユニットに到達した時）。
-   */
-  private createCollisionEffect(x: number, y: number) {
-    // 白い衝撃波リング
-    const ring = this.add.graphics().setDepth(20);
-    this.tweens.add({
-      targets: { radius: 10, alpha: 1 },
-      radius: 80,
-      alpha: 0,
-      duration: 400,
-      ease: 'Power2',
-      onUpdate: (tween: Phaser.Tweens.Tween) => {
-        const r = tween.getValue() as number;
-        const a = 1 - tween.progress;
-        ring.clear();
-        ring.lineStyle(3, 0xffffff, a);
-        ring.strokeCircle(x, y, r);
-      },
-      onComplete: () => ring.destroy()
-    });
-
-    // オレンジ爆発フラッシュ
-    const flash = this.add.graphics().setDepth(19);
-    flash.fillStyle(0xff6b35, 0.6);
-    flash.fillCircle(x, y, 30);
-    this.tweens.add({
-      targets: flash,
-      alpha: 0,
-      duration: 300,
-      onComplete: () => flash.destroy()
-    });
-
-    // カメラシェイク
-    this.cameras.main.shake(200, 0.005);
-  }
-
-  /**
-   * 隕石をマップから削除する。
-   */
-  private removeMeteor(meteorId: string) {
-    this.meteors.delete(meteorId);
-    const sprite = this.meteorSprites.get(meteorId);
-    if (sprite) {
-      sprite.destroy();
-      this.meteorSprites.delete(meteorId);
-    }
-    this.meteorAlerted.delete(meteorId);
-
-    // 隕石モーダルが開いていれば閉じる
-    if (this.selectedMeteorId === meteorId) {
-      this.selectedMeteorId = null;
-      this.domMeteorModal?.classList.add('hidden');
-    }
-
-    // 全ユニットの攻撃対象をクリア
-    for (const ship of this.spaceships.values()) {
-      if (ship.attackTargetMeteorId === meteorId) {
-        ship.attackTargetMeteorId = null;
-      }
-    }
-  }
-
-  /**
-   * 隕石情報モーダルを開く（ユニット・惑星モーダルと排他）。
-   */
-  private openMeteorModal(meteorId: string) {
-    const meteor = this.meteors.get(meteorId);
-    if (!meteor || !this.domMeteorModal) return;
-
-    // 排他制御
+  public closeUnitAndPlanetModals(): void {
     this.selectedUnitId = null;
     this.domUnitModal?.classList.add('hidden');
     this.domPlanetModal?.classList.add('hidden');
-
-    this.selectedMeteorId = meteorId;
-    this.domMeteorModal.classList.remove('hidden');
-    this.updateMeteorModalData();
   }
 
-  /**
-   * 隕石モーダルのデータを更新する。
-   */
-  private updateMeteorModalData() {
-    if (!this.selectedMeteorId) return;
-    const meteor = this.meteors.get(this.selectedMeteorId);
-    if (!meteor) return;
-
-    if (this.domMeteorId) this.domMeteorId.textContent = meteor.id;
-    if (this.domMeteorHpBar) {
-      const pct = (meteor.hp / meteor.maxHp) * 100;
-      this.domMeteorHpBar.style.width = `${pct}%`;
-    }
-    if (this.domMeteorHpText) this.domMeteorHpText.textContent = `${meteor.hp} / ${meteor.maxHp}`;
-    if (this.domMeteorSpeed) this.domMeteorSpeed.textContent = `${meteor.speed} km/s`;
-    if (this.domMeteorTarget) this.domMeteorTarget.textContent = meteor.targetUnitId;
-  }
 }
