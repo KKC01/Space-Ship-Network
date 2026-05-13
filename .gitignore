@@ -8,3 +8,8 @@ dist/
 .env.local
 .env.*.local
 
+# Playwright MCP の一時ログ・スナップショット
+.playwright-mcp/
+
+# 動作確認用スクリーンショット
+phase*.png
