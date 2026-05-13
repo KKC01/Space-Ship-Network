@@ -1,0 +1,42 @@
+- generic:
+  - generic:
+    - generic [ref=e1]:
+      - button "COMMANDER'S ORDER SURVEY MISSION ▼" [ref=e2] [cursor=pointer]:
+        - generic [ref=e3]:
+          - generic [ref=e4]: COMMANDER'S ORDER
+          - generic [ref=e5]: SURVEY MISSION
+        - generic [ref=e6]: ▼
+      - list [ref=e7]:
+        - listitem [ref=e8]: "[ ] 調査対象ポイントへの到達"
+        - listitem [ref=e9]: "[x] 全ユニットの通信確保"
+        - listitem [ref=e10]: "[ ] 調査データの転送・回収"
+    - generic [ref=e11]:
+      - generic [ref=e12]:
+        - generic [ref=e13]: 経過時間
+        - generic [ref=e14]: "54"
+      - generic [ref=e15]:
+        - button "モード：通信管制" [ref=e16] [cursor=pointer]
+        - button "サークル表示" [ref=e17] [cursor=pointer]
+    - text: ▼ ▼
+    - generic:
+      - button "チャットを開く" [ref=e24] [cursor=pointer]:
+        - img [ref=e25]
+        - generic [ref=e27]: OPERATOR
+      - dialog "オペレーターチャット" [ref=e30]:
+        - generic [ref=e31]:
+          - img "Operator AI" [ref=e32]
+          - generic [ref=e34]: Operator AI
+          - button "閉じる" [ref=e39] [cursor=pointer]: ×
+        - generic [ref=e40]:
+          - generic [ref=e41]: 中型隕石、探知
+          - generic [ref=e42]: 戦闘指揮に変更お願いします
+          - generic [ref=e43]: 中型隕石、迎撃失敗。Ship-1に衝突！被害確認中…
+          - generic [ref=e44]: 中型隕石、探知
+          - generic [ref=e45]: 戦闘指揮に変更お願いします
+        - generic [ref=e46]:
+          - textbox "メッセージ入力" [active] [ref=e47]:
+            - /placeholder: メッセージを入力... (Enter で送信)
+          - button "送信" [ref=e48] [cursor=pointer]:
+            - img [ref=e49]
+    - generic:
+      - generic: 500 km
