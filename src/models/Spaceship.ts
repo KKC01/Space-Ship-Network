@@ -38,6 +38,11 @@ export class Spaceship {
   public assignedSlots: number[] = [];
   public selectedMasterId: string | null = null;
   public lastTransmittedSlot: number = -1;
+
+  // レガシー星間通信 (通信惑星経由の一斉同報)
+  public isLegacyEnabled: boolean = false;
+  // 周期ポーリング用タイマ
+  public legacyTimer: number = 0;
   
   public hp: number = 300;
   public maxHp: number = 300;

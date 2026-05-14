@@ -40,6 +40,9 @@ export class UIManager {
   private domMultiplexCipher: HTMLSelectElement | null = null;
   private domMultiplexRelay: HTMLInputElement | null = null;
 
+  // レガシー星間通信
+  private domLegacyEnable: HTMLInputElement | null = null;
+
   private domToggleStatusBtn: HTMLElement | null = null;
   private domTimeDisplay: HTMLElement | null = null;
   private domScaleBarLine: HTMLElement | null = null;
@@ -65,6 +68,7 @@ export class UIManager {
     this.bindGameOverDom();
     this.bindUnitModalDom();
     this.bindMultiplexDom();
+    this.bindLegacyDom();
     this.bindStatusToggle();
     this.setupAccordions();
     this.setupMissionPanelToggle();
@@ -102,7 +106,8 @@ export class UIManager {
    */
   applyModeToUnitModal(): void {
     const isCombat = this.scene.systemDisplayMode === SystemDisplayMode.COMBAT;
-    ['multiplex-group-btn', 'multiplex-group-content',
+    ['legacy-group-btn', 'legacy-group-content',
+     'multiplex-group-btn', 'multiplex-group-content',
      'optical-group-btn', 'optical-group-content',
      'toggle-status-btn', 'rgr-container'
     ].forEach(id => {
@@ -225,6 +230,23 @@ export class UIManager {
     if (this.domMultiplexRelay) this.domMultiplexRelay.onchange = updateMultiplex;
   }
 
+  private bindLegacyDom(): void {
+    this.domLegacyEnable = document.getElementById('legacy-enable') as HTMLInputElement | null;
+    if (this.domLegacyEnable) {
+      this.domLegacyEnable.onchange = (e) => {
+        if (!e.isTrusted || !this.scene.selectedUnitId) return;
+        const ship = this.scene.spaceships.get(this.scene.selectedUnitId);
+        if (ship && this.domLegacyEnable) {
+          ship.isLegacyEnabled = this.domLegacyEnable.checked;
+          // 有効化時は同時発信を避けるため位相をずらす
+          if (ship.isLegacyEnabled) {
+            ship.legacyTimer = Math.random() * 2000;
+          }
+        }
+      };
+    }
+  }
+
   private bindStatusToggle(): void {
     this.domToggleStatusBtn = document.getElementById('toggle-status-btn');
     this.domTimeDisplay = document.getElementById('time-display');
@@ -255,6 +277,7 @@ export class UIManager {
         };
       }
     };
+    setup('legacy-group-btn', 'legacy-group-content');
     setup('multiplex-group-btn', 'multiplex-group-content');
     setup('optical-group-btn', 'optical-group-content');
   }
@@ -446,6 +469,8 @@ export class UIManager {
     if (this.domMultiplexCipher) this.domMultiplexCipher.value = unit.multiplexCipher;
     if (this.domMultiplexRelay) this.domMultiplexRelay.checked = unit.isOpticalRelayEnabled;
 
+    if (this.domLegacyEnable) this.domLegacyEnable.checked = unit.isLegacyEnabled;
+
     // HQ かつ active な場合のみ「指令送信」ボタンを表示
     if (unit.id === 'HQ Ship' && unit.isNodeActive) {
       this.domSendCmdBtn?.classList.remove('hidden');
@@ -474,12 +499,23 @@ export class UIManager {
     if (this.domRgrList) {
       this.domRgrList.innerHTML = '';
       const activeNodes = Array.from(this.scene.spaceships.values()).filter(s => s.isNodeActive);
+      const commPlanet = this.scene.planetSystem.getCommPlanet();
+      const regularPlanets = this.scene.planetSystem.getRegularPlanets();
       this.scene.spaceships.forEach(s => {
         if (s.id === unit.id) return;
         const { canConnect: canRadio, dropRate: radioRate } =
           CommunicationSystem.getLinkQuality(unit, s, activeNodes, this.scene.planetSystem.getPlanets());
         const { canConnect: canOpt, dropRate: optRate } =
           CommunicationSystem.getOpticalMultiplexQuality(unit, s, activeNodes);
+
+        // レガシー星間通信：通信惑星が存在し、両端で isLegacyEnabled=true である必要あり
+        let canLegacy = false;
+        let legacyRate = 1.0;
+        if (commPlanet) {
+          const q = CommunicationSystem.getLegacyLinkQuality(unit, s, regularPlanets);
+          canLegacy = q.canConnect;
+          legacyRate = q.dropRate;
+        }
 
         let radioColor = '#ef4444';
         let radioText = 'OFFLINE';
@@ -493,12 +529,21 @@ export class UIManager {
           optColor = optRate < 0.2 ? '#a855f7' : '#d8b4fe';
           optText = optRate < 0.2 ? 'STABLE' : 'WEAK';
         }
+        let legacyColor = '#ef4444';
+        let legacyText = 'OFFLINE';
+        if (canLegacy) {
+          legacyColor = legacyRate < 0.2 ? '#fde047' : '#fef08a';
+          legacyText = legacyRate < 0.2 ? 'STABLE' : 'WEAK';
+        }
         this.domRgrList!.innerHTML += `
           <div style="padding: 6px 0; border-bottom: 1px solid rgba(255,255,255,0.05); font-size: 10px;">
             <div style="color: #94a3b8; margin-bottom: 2px;">${s.id}</div>
             <div style="display: flex; justify-content: space-between;">
               <span>光通信: <span style="color: ${radioColor};">${radioText}</span></span>
               <span>多重通信: <span style="color: ${optColor};">${optText}</span></span>
+            </div>
+            <div style="margin-top: 2px;">
+              <span>レガシー星間通信: <span style="color: ${legacyColor};">${legacyText}</span></span>
             </div>
           </div>`;
       });
