@@ -30,3 +30,10 @@ export const PLANET_SPECS: PlanetSpec[] = [
   { id: 'PLN_03', hasCommStation: true, description: '通信局を有する中継惑星。電波到達圏内では干渉が発生します。' },
   { id: 'PLN_05', hasCommStation: true, description: '通信局あり。電波到達圏内では干渉が発生します。' },
 ];
+
+// レガシー星間通信用の中継惑星（固定配置・ランダムプール対象外）
+export const COMM_PLANET_SPEC: PlanetSpec = {
+  id: 'PLN_COMM',
+  hasCommStation: true,
+  description: 'レガシー星間通信用の中継惑星。発信ユニットからの信号を他全ユニットへ同時転送します。',
+};

@@ -10,6 +10,7 @@ import { MissionManager } from '../systems/MissionManager';
 import { CameraController } from '../systems/CameraController';
 import { UIManager } from '../ui/UIManager';
 import planetImg from '../assets/Planet_01.png';
+import commPlanetImg from '../assets/Comm_planet.png';
 import meteorImg from '../assets/meteor/meteor_01.png';
 
 export class MainScene extends Scene {
@@ -57,6 +58,8 @@ export class MainScene extends Scene {
   preload() {
     // 惑星画像を Phaser テクスチャとして読み込み
     this.load.image('planet', planetImg);
+    // レガシー星間通信用の中継惑星画像（背景透過済み PNG をそのまま使用）
+    this.load.image('planet_comm', commPlanetImg);
     // 隕石画像を Phaser テクスチャとして読み込み
     this.load.image('meteor', meteorImg);
   }
@@ -147,8 +150,10 @@ export class MainScene extends Scene {
       this.interferenceZones.push({ x: cX, y: cY, radius: spread * 1.1 });
     }
 
-    // 惑星をランダムに2つ配置（環境ハザード：通信干渉源）
-    this.planetSystem.init(cx, cy, this.missionManager.surveyPoint);
+    // 惑星をランダムに2つ配置（環境ハザード：通信干渉源）。
+    // 加えてレガシー星間通信用の通信惑星をユニット編隊上方に固定配置。
+    const unitSpawnCenter = { x: cx + SPAWN_OFFSET_X, y: cy + SPAWN_OFFSET_Y };
+    this.planetSystem.init(cx, cy, this.missionManager.surveyPoint, unitSpawnCenter);
   }
 
   /**
@@ -248,6 +253,16 @@ export class MainScene extends Scene {
               this.commManager.handleOpticalTransmission(ship);
             }
           }
+        }
+      }
+
+      // レガシー星間通信：有効ユニットは一定周期で通信惑星経由の同報を発信
+      if (ship.isLegacyEnabled) {
+        ship.legacyTimer -= delta;
+        if (ship.legacyTimer <= 0) {
+          // 2秒周期、ユニットごとに位相をずらして衝突を緩和
+          ship.legacyTimer = 2000;
+          this.commManager.handleLegacyTransmission(ship);
         }
       }
     }
@@ -546,6 +561,63 @@ export class MainScene extends Scene {
         if (!hub || !target) return;
 
         const elapsed = this.timeElapsedMs - poll.startTime;
+
+        // レガシー星間通信：通信惑星を経由する2フェーズ演出
+        if (poll.rangeMode === 'legacy' && poll.planetX !== undefined && poll.planetY !== undefined) {
+          const senderShip = hub;
+          const px = poll.planetX;
+          const py = poll.planetY;
+          const legacyColor = 0xfde047; // 薄黄色
+          const legacyWaveSpeed = 2250;
+          const legacyWaveDist = elapsed * (legacyWaveSpeed / 1000);
+          const receivers = Array.from(this.spaceships.values())
+            .filter(s => s.id !== senderShip.id && s.isLegacyEnabled);
+
+          // A. 往路: sender → 通信惑星
+          if (!poll.callReached) {
+            const t = Math.min(1.0, legacyWaveDist / poll.distance);
+            if (this.vizMode === 'circles') {
+              // 光通信のサークル表示と同じ：往路はストリームラインが伸びる
+              this.drawStreamline(senderShip.x, senderShip.y, px, py, t, legacyColor);
+            } else if (this.vizMode === 'dots') {
+              // ライン表示：4ドットストリーム
+              this.drawFourDots(senderShip.x, senderShip.y, px, py, t, legacyColor);
+            }
+          }
+
+          // B. 復路: 通信惑星 → 受信ユニット群
+          if (poll.responseStarted) {
+            const resElapsed = elapsed - (poll.distance / (legacyWaveSpeed / 1000));
+            const resWaveDist = resElapsed * (legacyWaveSpeed / 1000);
+            const maxRange = (poll.maxResponseDist ?? 0) + 300;
+
+            if (resWaveDist > 0 && resWaveDist <= maxRange) {
+              if (this.vizMode === 'circles') {
+                // 多重通信と同じ：通信惑星中心の二重円
+                const alpha = Math.max(0, 0.6 * (1 - resWaveDist / maxRange));
+                this.linkGraphics.lineStyle(2, legacyColor, alpha);
+                this.linkGraphics.strokeCircle(px, py, resWaveDist);
+                if (resWaveDist > 30) {
+                  this.linkGraphics.lineStyle(1, legacyColor, alpha * 0.7);
+                  this.linkGraphics.strokeCircle(px, py, resWaveDist - 30);
+                }
+              } else if (this.vizMode === 'dots') {
+                // 多重通信と同じ：4ドットを各受信ユニットへ
+                receivers.forEach(receiver => {
+                  const d = CommunicationSystem.getDistance(px, py, receiver.x, receiver.y);
+                  if (resWaveDist <= d + 100) {
+                    const t = Math.min(1.0, resWaveDist / d);
+                    if (t > 0) {
+                      this.drawFourDots(px, py, receiver.x, receiver.y, t, legacyColor);
+                    }
+                  }
+                });
+              }
+            }
+          }
+          return; // 次の poll へ
+        }
+
         const waveDist = elapsed * (waveSpeed / 1000);
 
         // A. Call Streamline (Hub -> Target)

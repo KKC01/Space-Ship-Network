@@ -23,7 +23,11 @@ const config: Phaser.Types.Core.GameConfig = {
 };
 
 window.addEventListener('load', () => {
-  new Phaser.Game(config);
+  const game = new Phaser.Game(config);
+  // 開発時のみデバッグ用にゲームインスタンスを公開
+  if (import.meta.env.DEV) {
+    (window as any).__game = game;
+  }
 
   const chatRoot = document.getElementById('chat-widget-root');
   if (chatRoot) {
