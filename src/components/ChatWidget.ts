@@ -34,6 +34,7 @@ export class ChatWidget {
   private sendBtn!: HTMLButtonElement;
   private portrait!: HTMLImageElement;
   private toggleBtn!: HTMLButtonElement;
+  private wikiCheckbox!: HTMLInputElement;
 
   constructor(mountTarget: HTMLElement) {
     this.container = mountTarget;
@@ -80,6 +81,13 @@ export class ChatWidget {
 
         <div class="chat-messages" id="chat-messages"></div>
 
+        <div class="chat-options-area">
+          <label class="chat-option-checkbox">
+            <input type="checkbox" id="chat-wiki-checkbox" />
+            <span>地球 問合せ</span>
+          </label>
+        </div>
+
         <div class="chat-input-area">
           <textarea
             id="chat-input"
@@ -103,6 +111,7 @@ export class ChatWidget {
     this.sendBtn = this.container.querySelector('#chat-send-btn') as HTMLButtonElement;
     this.portrait = this.container.querySelector('.operator-portrait') as HTMLImageElement;
     this.toggleBtn = this.container.querySelector('#chat-toggle-btn') as HTMLButtonElement;
+    this.wikiCheckbox = this.container.querySelector('#chat-wiki-checkbox') as HTMLInputElement;
   }
 
   private bindEvents(): void {
@@ -209,10 +218,12 @@ export class ChatWidget {
     }
   }
 
-  /** window.__gameState から Dify に送る inputs を構築（全値を string に変換） */
-  private collectGameStateInputs(): Record<string, string> {
+  /** window.__gameState から Dify に送る inputs を構築（wiki のみ boolean、その他は string） */
+  private collectGameStateInputs(): Record<string, string | boolean> {
+    // 「地球 問合せ」チェック時は wiki=true で Dify に送信（Dify 側 IF/ELSE の True 分岐とマッチ）
+    const wikiFlag = this.wikiCheckbox?.checked === true;
     const s = window.__gameState;
-    if (!s) return {};
+    if (!s) return { wiki: wikiFlag };
     return {
       ship_count: String(s.shipCount),
       selected_unit: s.selectedUnitId ?? '',
@@ -223,6 +234,7 @@ export class ChatWidget {
       elapsed_seconds: String(s.elapsedSeconds),
       game_mode: s.gameMode,
       game_status: s.gameStatus,
+      wiki: wikiFlag,
     };
   }
 

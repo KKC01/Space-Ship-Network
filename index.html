@@ -47,6 +47,41 @@
     .accordion-btn.open::after {
       transform: rotate(180deg);
     }
+    /* レガシー星間通信・星間通信用の即時 ON/OFF トグルボタン */
+    .comm-toggle-btn {
+      width: 100%;
+      text-align: left;
+      padding: 10px;
+      background: rgba(255,255,255,0.05);
+      border: 1px solid rgba(255,255,255,0.1);
+      color: #94a3b8;
+      cursor: pointer;
+      font-family: inherit;
+      font-weight: 600;
+      margin-bottom: 6px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      transition: background 0.15s, border-color 0.15s, color 0.15s;
+    }
+    .comm-toggle-btn:hover {
+      background: rgba(255,255,255,0.1);
+    }
+    .comm-toggle-btn::after {
+      content: 'OFF';
+      font-size: 11px;
+      letter-spacing: 1px;
+      color: #94a3b8;
+    }
+    .comm-toggle-btn[data-enabled="true"] {
+      background: rgba(34, 211, 238, 0.2);
+      border-color: rgba(34, 211, 238, 0.6);
+      color: #ecfeff;
+    }
+    .comm-toggle-btn[data-enabled="true"]::after {
+      content: 'ON';
+      color: #22d3ee;
+    }
   </style>
 </head>
 
@@ -105,28 +140,29 @@
       <div id="unit-modal-close" style="position: absolute; top: 10px; right: 15px; cursor: pointer; font-size: 24px;">
         &times;</div>
       <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 15px; border-bottom: 1px solid rgba(255,255,255,0.2); padding-bottom: 5px;">
-        <img id="unit-ship-image" style="width: 58px; height: 58px; object-fit: contain;">
-        <h2 id="unit-title" style="margin: 0; flex: 1;">UNIT ID</h2>
-        <span class="hud-label">LV</span>
-        <span id="unit-level" style="font-size: 14px; color: #fff;">1</span>
-      </div>
-
-      <div style="margin-bottom: 15px;">
-        <span class="hud-label">Type</span>
-        <span style="margin: 0 6px; color: #9ca3af;">:</span>
-        <span id="unit-type" style="font-size: 14px; color: #fff;">Legacy Destroyer</span>
-      </div>
-
-      <!-- レガシー星間通信グループ（通信惑星経由の一斉同報） -->
-      <button id="legacy-group-btn" class="accordion-btn">レガシー星間通信</button>
-      <div id="legacy-group-content" class="accordion-content">
-        <div class="comm-group">
-          <label><input type="checkbox" id="legacy-enable"> レガシー星間通信 有効</label>
+        <img id="unit-ship-image" style="width: 81px; height: 81px; object-fit: contain;">
+        <div style="flex: 1;">
+          <h2 id="unit-title" style="margin: 0;">UNIT ID</h2>
+          <div style="font-size: 11px; color: #94a3b8; margin-top: 4px;">
+            <span class="hud-label">Type</span>
+            <span style="margin: 0 4px; color: #9ca3af;">:</span>
+            <span id="unit-type" style="color: #fff;">Legacy Destroyer</span>
+          </div>
+        </div>
+        <div style="display: flex; flex-direction: column; align-items: center;">
+          <span class="hud-label">LV</span>
+          <span id="unit-level" style="font-size: 14px; color: #fff;">1</span>
         </div>
       </div>
 
-      <!-- 光多重通信グループ -->
-      <button id="multiplex-group-btn" class="accordion-btn">光多重通信設定</button>
+      <!-- 星間通信 (TCP/IP) — 即時 ON/OFF トグル -->
+      <button id="tcpip-toggle-btn" class="comm-toggle-btn" data-enabled="false">星間通信</button>
+
+      <!-- レガシー星間通信 — 即時 ON/OFF トグル -->
+      <button id="legacy-toggle-btn" class="comm-toggle-btn" data-enabled="false">レガシー星間通信</button>
+
+      <!-- 多重通信グループ -->
+      <button id="multiplex-group-btn" class="accordion-btn">多重通信</button>
       <div id="multiplex-group-content" class="accordion-content">
         <div class="comm-group">
           <label><input type="checkbox" id="multiplex-enable"> 光多重通信 (200km) 有効</label>
@@ -158,7 +194,7 @@
       </div>
 
       <!-- 光通信グループ -->
-      <button id="optical-group-btn" class="accordion-btn">光通信設定</button>
+      <button id="optical-group-btn" class="accordion-btn">光通信</button>
       <div id="optical-group-content" class="accordion-content">
         <div class="comm-group">
           <label><input type="checkbox" id="short-enable"> 短距離光通信 (750km)</label>
@@ -192,7 +228,7 @@
         <button id="action-cycle-btn" style="width: 100%; font-size: 13px; padding: 7px; background: rgba(239,68,68,0.2); border: 1px solid rgba(239,68,68,0.5); color: #f87171; cursor: pointer; font-family: Rajdhani, sans-serif; font-weight: bold; letter-spacing: 1px;">攻撃</button>
       </div>
 
-      <button id="toggle-status-btn" style="margin-top: 15px; width: 100%; font-size: 11px; padding: 5px; background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); color: #94a3b8; cursor: pointer;">Communication Status 表示</button>
+      <button id="toggle-status-btn" style="margin-top: 15px; width: 100%; font-size: 11px; padding: 5px; background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); color: #94a3b8; cursor: pointer;">通信状況 ▼</button>
       <div id="rgr-container" style="margin-top: 10px;" class="hidden">
         <div id="rgr-list" style="font-size: 11px; max-height: 150px; overflow-y: auto;"></div>
         <button id="noise-monitor-btn" style="margin-top: 8px; width: 100%; font-size: 11px; padding: 5px; background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); color: #94a3b8; cursor: pointer;">背景雑音 監視</button>

@@ -514,6 +514,34 @@ body {
   font-style: italic;
 }
 
+/* 入力前のオプション行（地球 問合せチェックボックスなど） */
+.chat-options-area {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 12px 0;
+  flex-shrink: 0;
+}
+.chat-option-checkbox {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+  font-size: 11px;
+  color: #94a3b8;
+  user-select: none;
+}
+.chat-option-checkbox input[type="checkbox"] {
+  width: 13px;
+  height: 13px;
+  accent-color: #38bdf8;
+  cursor: pointer;
+  margin: 0;
+}
+.chat-option-checkbox:hover {
+  color: #cbd5e1;
+}
+
 /* 入力エリア */
 .chat-input-area {
   display: flex;

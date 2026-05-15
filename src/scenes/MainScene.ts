@@ -10,7 +10,8 @@ import { MissionManager } from '../systems/MissionManager';
 import { CameraController } from '../systems/CameraController';
 import { UIManager } from '../ui/UIManager';
 import planetImg from '../assets/Planet_01.png';
-import commPlanetImg from '../assets/Comm_planet.png';
+import commPlanetImg from '../assets/Comm_planet_legacy.png';
+import commTcpPlanetImg from '../assets/Comm_planet.png';
 import meteorImg from '../assets/meteor/meteor_01.png';
 
 export class MainScene extends Scene {
@@ -60,6 +61,8 @@ export class MainScene extends Scene {
     this.load.image('planet', planetImg);
     // レガシー星間通信用の中継惑星画像（背景透過済み PNG をそのまま使用）
     this.load.image('planet_comm', commPlanetImg);
+    // TCP/IP 星間通信用の新型中継惑星画像
+    this.load.image('planet_comm_tcp', commTcpPlanetImg);
     // 隕石画像を Phaser テクスチャとして読み込み
     this.load.image('meteor', meteorImg);
   }
@@ -263,6 +266,18 @@ export class MainScene extends Scene {
           // 2秒周期、ユニットごとに位相をずらして衝突を緩和
           ship.legacyTimer = 2000;
           this.commManager.handleLegacyTransmission(ship);
+        }
+      }
+
+      // TCP/IP 星間通信：データ保有時に即送信（連続送信抑制クールダウンあり）
+      if (ship.isTcpIpEnabled) {
+        if (ship.tcpIpCooldown > 0) {
+          ship.tcpIpCooldown -= delta;
+        }
+        if (ship.tcpIpCooldown <= 0 && ship.queue.length > 0) {
+          // 多重通信の約2倍のスループットを実現する短いクールダウン
+          ship.tcpIpCooldown = 150;
+          this.commManager.handleTcpIpTransmission(ship);
         }
       }
     }
@@ -609,6 +624,60 @@ export class MainScene extends Scene {
                     const t = Math.min(1.0, resWaveDist / d);
                     if (t > 0) {
                       this.drawFourDots(px, py, receiver.x, receiver.y, t, legacyColor);
+                    }
+                  }
+                });
+              }
+            }
+          }
+          return; // 次の poll へ
+        }
+
+        // TCP/IP 星間通信：新型通信惑星を経由する2フェーズ演出（波速はレガシーの2倍）
+        if (poll.rangeMode === 'tcpip' && poll.planetX !== undefined && poll.planetY !== undefined) {
+          const senderShip = hub;
+          const px = poll.planetX;
+          const py = poll.planetY;
+          const tcpColor = 0x22d3ee; // シアン
+          const tcpWaveSpeed = 4500;
+          const tcpWaveDist = elapsed * (tcpWaveSpeed / 1000);
+          const receivers = Array.from(this.spaceships.values())
+            .filter(s => s.id !== senderShip.id && s.isTcpIpEnabled);
+
+          // A. 往路: sender → 新型通信惑星
+          if (!poll.callReached) {
+            const t = Math.min(1.0, tcpWaveDist / poll.distance);
+            if (this.vizMode === 'circles') {
+              const alpha = Math.max(0, 0.6 * (1 - tcpWaveDist / poll.distance));
+              this.linkGraphics.lineStyle(2, tcpColor, alpha);
+              this.linkGraphics.strokeCircle(senderShip.x, senderShip.y, tcpWaveDist);
+            } else if (this.vizMode === 'dots') {
+              this.drawFourDots(senderShip.x, senderShip.y, px, py, t, tcpColor);
+            }
+          }
+
+          // B. 復路: 新型通信惑星 → 受信ユニット群
+          if (poll.responseStarted) {
+            const resElapsed = elapsed - (poll.distance / (tcpWaveSpeed / 1000));
+            const resWaveDist = resElapsed * (tcpWaveSpeed / 1000);
+            const maxRange = (poll.maxResponseDist ?? 0) + 300;
+
+            if (resWaveDist > 0 && resWaveDist <= maxRange) {
+              if (this.vizMode === 'circles') {
+                const alpha = Math.max(0, 0.6 * (1 - resWaveDist / maxRange));
+                this.linkGraphics.lineStyle(2, tcpColor, alpha);
+                this.linkGraphics.strokeCircle(px, py, resWaveDist);
+                if (resWaveDist > 30) {
+                  this.linkGraphics.lineStyle(1, tcpColor, alpha * 0.7);
+                  this.linkGraphics.strokeCircle(px, py, resWaveDist - 30);
+                }
+              } else if (this.vizMode === 'dots') {
+                receivers.forEach(receiver => {
+                  const d = CommunicationSystem.getDistance(px, py, receiver.x, receiver.y);
+                  if (resWaveDist <= d + 100) {
+                    const t = Math.min(1.0, resWaveDist / d);
+                    if (t > 0) {
+                      this.drawFourDots(px, py, receiver.x, receiver.y, t, tcpColor);
                     }
                   }
                 });
