@@ -1,4 +1,4 @@
-import { Planet, PLANET_SPECS, COMM_PLANET_SPEC } from '../models/Planet';
+import { Planet, PLANET_SPECS, COMM_PLANET_SPEC, COMM_TCP_PLANET_SPEC } from '../models/Planet';
 import { CommunicationSystem } from '../models/CommunicationSystem';
 import type { MainScene } from '../scenes/MainScene';
 
@@ -51,6 +51,7 @@ export class PlanetSystem {
 
     this.placePlanets(cx, cy, surveyPoint);
     this.placeCommPlanet(unitSpawnCenter.x, unitSpawnCenter.y);
+    this.placeTcpIpCommPlanet(unitSpawnCenter.x, unitSpawnCenter.y);
   }
 
   /**
@@ -72,6 +73,8 @@ export class PlanetSystem {
   drawInterferenceZones(g: Phaser.GameObjects.Graphics): void {
     const PINK = 0xfb7185;
     for (const planet of this.planets) {
+      // 通信惑星（レガシー/TCP/IP）は干渉源ではないので描画しない
+      if (planet.id === COMM_PLANET_SPEC.id || planet.id === COMM_TCP_PLANET_SPEC.id) continue;
       // 長距離干渉ゾーン (2500km) - 外側、薄め
       g.fillStyle(PINK, 0.04);
       g.fillCircle(planet.x, planet.y, CommunicationSystem.PLANET_LONG_RANGE_INTERFERENCE);
@@ -140,10 +143,17 @@ export class PlanetSystem {
   }
 
   /**
-   * 通常惑星（PLN_COMM 以外）を返す。通信品質計算で干渉源として参照する。
+   * TCP/IP 星間通信用の新型中継惑星（PLN_COMM_TCP）を返す。存在しない場合は null。
+   */
+  getTcpIpCommPlanet(): Planet | null {
+    return this.planets.find(p => p.id === COMM_TCP_PLANET_SPEC.id) ?? null;
+  }
+
+  /**
+   * 通常惑星（中継惑星以外）を返す。通信品質計算で干渉源として参照する。
    */
   getRegularPlanets(): Planet[] {
-    return this.planets.filter(p => p.id !== COMM_PLANET_SPEC.id);
+    return this.planets.filter(p => p.id !== COMM_PLANET_SPEC.id && p.id !== COMM_TCP_PLANET_SPEC.id);
   }
 
   /**
@@ -274,6 +284,63 @@ export class PlanetSystem {
     sprite.setScale(0.15);
     sprite.setDepth(2);
     sprite.setData('planetId', COMM_PLANET_SPEC.id);
+    this.planetSprites.push(sprite);
+  }
+
+  /**
+   * TCP/IP 星間通信用の新型中継惑星をユニット編隊の反対側（下方）に固定配置する。
+   * - 移動しない（vx=vy=0）
+   * - レガシー通信惑星（上方）との重複を避ける
+   * - 通常惑星の干渉ゾーンと近接しすぎない位置を探索
+   */
+  private placeTcpIpCommPlanet(unitSpawnX: number, unitSpawnY: number): void {
+    const PREFERRED_OFFSET = 1000;       // 編隊からの優先距離
+    const MIN_DIST_FROM_UNIT = 600;      // ユニットとの最低距離
+    const MIN_DIST_FROM_OTHER = 800;     // 他惑星との最低距離
+    const MAX_RETRIES = 12;
+
+    // 候補位置: 編隊下方を起点に、ぶつかる場合は周回方向にずらす
+    let candidate: { x: number; y: number } | null = null;
+    for (let attempt = 0; attempt < MAX_RETRIES; attempt++) {
+      const angle = Math.PI / 2 + (attempt * Math.PI / 6); // 下方向から時計回り
+      const x = unitSpawnX + Math.cos(angle) * PREFERRED_OFFSET;
+      const y = unitSpawnY + Math.sin(angle) * PREFERRED_OFFSET;
+
+      if (CommunicationSystem.getDistance(x, y, unitSpawnX, unitSpawnY) < MIN_DIST_FROM_UNIT) continue;
+
+      let tooClose = false;
+      for (const p of this.planets) {
+        if (CommunicationSystem.getDistance(x, y, p.x, p.y) < MIN_DIST_FROM_OTHER) {
+          tooClose = true;
+          break;
+        }
+      }
+      if (tooClose) continue;
+
+      candidate = { x, y };
+      break;
+    }
+    if (!candidate) {
+      // フェイルオープン：編隊下方に強制配置
+      candidate = { x: unitSpawnX, y: unitSpawnY + PREFERRED_OFFSET };
+    }
+
+    const planet = new Planet(
+      COMM_TCP_PLANET_SPEC.id,
+      candidate.x,
+      candidate.y,
+      COMM_TCP_PLANET_SPEC.hasCommStation,
+      COMM_TCP_PLANET_SPEC.description ?? ''
+    );
+    // 中継基地として固定配置
+    planet.vx = 0;
+    planet.vy = 0;
+    this.planets.push(planet);
+
+    const sprite = this.scene.add.image(candidate.x, candidate.y, 'planet_comm_tcp');
+    sprite.setScale(0.15);
+    sprite.setDepth(2);
+    sprite.setData('planetId', COMM_TCP_PLANET_SPEC.id);
     this.planetSprites.push(sprite);
   }
 }

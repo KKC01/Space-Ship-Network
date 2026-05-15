@@ -11,7 +11,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const OUTPUT_PATH = path.join(__dirname, '..', 'src', 'assets', 'Planet_Comm.png');
+const OUTPUT_PATH = path.join(__dirname, '..', 'src', 'assets', 'Comm_planet_legacy.png');
 
 const PROMPT = `A sci-fi communication relay planet, soft glowing pale yellow gas giant with multiple orbital antenna rings, visible communication satellites and small antenna dots along the rings, subtle yellow halo glow around the planet, fully transparent background, centered square composition, clean digital illustration, 150x150 pixels.`;
 

@@ -16,7 +16,7 @@ export class CommunicationSystem {
     sender: Spaceship,
     receiver: Spaceship,
     activeNodes: Spaceship[] = [],
-    planets: { x: number; y: number }[] = []
+    planets: { id?: string; x: number; y: number }[] = []
   ): { canConnect: boolean, dropRate: number } {
     const dist = this.getDistance(sender.x, sender.y, receiver.x, receiver.y);
 
@@ -45,9 +45,10 @@ export class CommunicationSystem {
        });
     }
 
-    // 惑星による干渉ペナルティ
+    // 惑星による干渉ペナルティ（通信惑星は干渉源として扱わない）
     let interferencePenalty = 0;
     for (const planet of planets) {
+      if (planet.id === 'PLN_COMM' || planet.id === 'PLN_COMM_TCP') continue;
       const senderDistP = this.getDistance(sender.x, sender.y, planet.x, planet.y);
       const receiverDistP = this.getDistance(receiver.x, receiver.y, planet.x, planet.y);
       const inLongRange = senderDistP <= this.PLANET_LONG_RANGE_INTERFERENCE || receiverDistP <= this.PLANET_LONG_RANGE_INTERFERENCE;
@@ -64,7 +65,7 @@ export class CommunicationSystem {
    * レガシー星間通信の品質判定。
    * - 両ユニットで isLegacyEnabled = true が必要
    * - 距離制限なし（中継惑星経由のため）
-   * - 干渉ペナルティは通常通信の 1/4（影響少ない仕様）
+   * - 干渉ペナルティは標準無線と同等（妨害に弱い仕様）
    * - 通信惑星の存在チェックは呼び出し側で実施する
    */
   public static getLegacyLinkQuality(
@@ -76,18 +77,52 @@ export class CommunicationSystem {
       return { canConnect: false, dropRate: 1.0 };
     }
 
-    // 干渉ペナルティ（通常の 1/4）
-    const LEGACY_PENALTY = this.PLANET_INTERFERENCE_PENALTY / 4;
+    // 干渉ペナルティ（標準無線と同等）
+    const LEGACY_PENALTY = this.PLANET_INTERFERENCE_PENALTY;
     let interferencePenalty = 0;
     for (const planet of planets) {
-      // 通信惑星自身は干渉源として扱わない
-      if (planet.id === 'PLN_COMM') continue;
+      // 通信惑星自身（レガシー/TCP/IP 用）は干渉源として扱わない
+      if (planet.id === 'PLN_COMM' || planet.id === 'PLN_COMM_TCP') continue;
       const senderDistP = this.getDistance(sender.x, sender.y, planet.x, planet.y);
       const receiverDistP = this.getDistance(receiver.x, receiver.y, planet.x, planet.y);
       const inLongRange = senderDistP <= this.PLANET_LONG_RANGE_INTERFERENCE || receiverDistP <= this.PLANET_LONG_RANGE_INTERFERENCE;
       const inShortRange = senderDistP <= this.PLANET_SHORT_RANGE_INTERFERENCE || receiverDistP <= this.PLANET_SHORT_RANGE_INTERFERENCE;
       if (inLongRange) interferencePenalty += LEGACY_PENALTY;
       if (inShortRange) interferencePenalty += LEGACY_PENALTY;
+    }
+
+    const finalDropRate = Math.min(1.0, interferencePenalty);
+    return { canConnect: true, dropRate: finalDropRate };
+  }
+
+  /**
+   * TCP/IP 星間通信の品質判定。
+   * - 両ユニットで isTcpIpEnabled = true が必要
+   * - 距離制限なし（新型通信惑星経由のため）
+   * - 干渉ペナルティは標準無線と同等（妨害に弱い仕様）
+   * - 通信惑星の存在チェックは呼び出し側で実施する
+   */
+  public static getTcpIpLinkQuality(
+    sender: Spaceship,
+    receiver: Spaceship,
+    planets: { id?: string; x: number; y: number }[] = []
+  ): { canConnect: boolean, dropRate: number } {
+    if (!sender.isTcpIpEnabled || !receiver.isTcpIpEnabled) {
+      return { canConnect: false, dropRate: 1.0 };
+    }
+
+    // 干渉ペナルティ（標準無線と同等）
+    const TCP_PENALTY = this.PLANET_INTERFERENCE_PENALTY;
+    let interferencePenalty = 0;
+    for (const planet of planets) {
+      // 通信惑星自身（レガシー/TCP/IP 用）は干渉源として扱わない
+      if (planet.id === 'PLN_COMM' || planet.id === 'PLN_COMM_TCP') continue;
+      const senderDistP = this.getDistance(sender.x, sender.y, planet.x, planet.y);
+      const receiverDistP = this.getDistance(receiver.x, receiver.y, planet.x, planet.y);
+      const inLongRange = senderDistP <= this.PLANET_LONG_RANGE_INTERFERENCE || receiverDistP <= this.PLANET_LONG_RANGE_INTERFERENCE;
+      const inShortRange = senderDistP <= this.PLANET_SHORT_RANGE_INTERFERENCE || receiverDistP <= this.PLANET_SHORT_RANGE_INTERFERENCE;
+      if (inLongRange) interferencePenalty += TCP_PENALTY;
+      if (inShortRange) interferencePenalty += TCP_PENALTY;
     }
 
     const finalDropRate = Math.min(1.0, interferencePenalty);

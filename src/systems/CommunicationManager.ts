@@ -16,8 +16,8 @@ export interface ActivePoll {
   responseStarted: boolean;
   distance: number;
   isBroadcast?: boolean;
-  rangeMode?: 'short' | 'long' | 'optical' | 'legacy';
-  // レガシー星間通信用：通信惑星座標と、復路の最遠受信距離
+  rangeMode?: 'short' | 'long' | 'optical' | 'legacy' | 'tcpip';
+  // レガシー/TCP/IP 星間通信用：通信惑星座標と、復路の最遠受信距離
   planetX?: number;
   planetY?: number;
   maxResponseDist?: number;
@@ -167,12 +167,53 @@ export class CommunicationManager {
   }
 
   /**
+   * TCP/IP 星間通信を試行する。
+   * - 新型通信惑星 (PLN_COMM_TCP) が必須
+   * - 発信ユニットから新型通信惑星へ往路、惑星から他 TCP/IP 有効ユニットへ復路
+   * - 波速はレガシーの2倍 (4500 km/s)
+   * - データ保有時に即送信。クールダウンは MainScene 側で管理。
+   */
+  handleTcpIpTransmission(sender: Spaceship): void {
+    if (!sender.isTcpIpEnabled) return;
+    const tcpPlanet = this.scene.planetSystem.getTcpIpCommPlanet();
+    if (!tcpPlanet) return;
+
+    const receivers = Array.from(this.scene.spaceships.values())
+      .filter(s => s.id !== sender.id && s.isTcpIpEnabled);
+    if (receivers.length === 0) return;
+
+    const distToPlanet = CommunicationSystem.getDistance(sender.x, sender.y, tcpPlanet.x, tcpPlanet.y);
+
+    // 新型通信惑星から最も遠い受信ユニットまでの距離（復路の終了判定用）
+    let maxResponseDist = 0;
+    for (const r of receivers) {
+      const d = CommunicationSystem.getDistance(tcpPlanet.x, tcpPlanet.y, r.x, r.y);
+      if (d > maxResponseDist) maxResponseDist = d;
+    }
+
+    this.activePolls.push({
+      hubId: sender.id,
+      targetId: sender.id, // tcpip では使用しない（planetX/Y を中心に使う）
+      startTime: this.scene.getTimeElapsedMs(),
+      callReached: false,
+      responseStarted: false,
+      distance: distToPlanet,
+      rangeMode: 'tcpip',
+      planetX: tcpPlanet.x,
+      planetY: tcpPlanet.y,
+      maxResponseDist,
+      isBroadcast: true,
+    });
+  }
+
+  /**
    * 進行中の poll を1フレーム分処理する（往路衝突によるデータ受信、復路ブロードキャスト、削除）。
    * MainScene.update() から呼ぶ。
    */
   processActivePolls(delta: number): void {
     const waveSpeed = 750;
     const legacyWaveSpeed = 2250; // 光通信の3倍
+    const tcpIpWaveSpeed = 4500;  // レガシーの2倍
     const timeElapsedMs = this.scene.getTimeElapsedMs();
 
     for (let i = this.activePolls.length - 1; i >= 0; i--) {
@@ -226,6 +267,54 @@ export class CommunicationManager {
         if (poll.responseStarted) {
           const resElapsedMs = elapsed - (poll.distance / (legacyWaveSpeed / 1000));
           const resWaveDist = resElapsedMs * (legacyWaveSpeed / 1000);
+          if (resWaveDist >= (poll.maxResponseDist ?? 0) + 300) {
+            this.activePolls.splice(i, 1);
+          }
+        }
+        continue;
+      }
+
+      // TCP/IP 星間通信は専用ロジックで処理（レガシーと同形だが波速2倍・干渉ペナルティ強化）
+      if (poll.rangeMode === 'tcpip') {
+        const tcpNode = this.scene.spaceships.get(poll.hubId);
+        if (!tcpNode || poll.planetX === undefined || poll.planetY === undefined) {
+          this.activePolls.splice(i, 1);
+          continue;
+        }
+        const tcpWaveDist = elapsed * (tcpIpWaveSpeed / 1000);
+
+        // 1. 往路: sender → 新型通信惑星 到達時にデータ転送を一括実行
+        if (!poll.callReached && tcpWaveDist >= poll.distance) {
+          poll.callReached = true;
+          poll.responseStarted = true;
+
+          const regularPlanets = this.scene.planetSystem.getRegularPlanets();
+          const receivers = Array.from(this.scene.spaceships.values())
+            .filter(s => s.id !== tcpNode.id && s.isTcpIpEnabled);
+          // データ保有時に呼ばれる前提だが、念のため取得時に空でも空配列を許容
+          const packetsToTransmit = tcpNode.getPacketsToTransmit();
+
+          for (const receiver of receivers) {
+            const { canConnect, dropRate } = CommunicationSystem.getTcpIpLinkQuality(
+              tcpNode, receiver, regularPlanets
+            );
+            if (!canConnect || Math.random() < dropRate) continue;
+            if (packetsToTransmit.length > 0) {
+              // 多重通信の2倍の転送量を、短いクールダウン(150ms) による高頻度送信で実現。
+              // 送信パケットは id 同一の単一送信（id de-dup により再放送ループを防止）。
+              packetsToTransmit.forEach(p => receiver.receivePacket({
+                ...p,
+                payload: { ...(p.payload ?? {}), isTcpIp: true }
+              } as any));
+              this.recordLinkSuccess(tcpNode.id, receiver.id);
+            }
+          }
+        }
+
+        // 2. 復路: 新型通信惑星 → 他ユニット（描画は MainScene、ここでは寿命のみ管理）
+        if (poll.responseStarted) {
+          const resElapsedMs = elapsed - (poll.distance / (tcpIpWaveSpeed / 1000));
+          const resWaveDist = resElapsedMs * (tcpIpWaveSpeed / 1000);
           if (resWaveDist >= (poll.maxResponseDist ?? 0) + 300) {
             this.activePolls.splice(i, 1);
           }

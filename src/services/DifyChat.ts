@@ -6,7 +6,8 @@ const DIFY_BASE_URL = 'https://api.dify.ai/v1';
 export interface DifyChatOptions {
   query: string;
   conversationId: string | null;
-  inputs?: Record<string, string>;
+  // Dify は入力変数として string / number / boolean を受け付ける
+  inputs?: Record<string, string | number | boolean>;
 }
 
 export interface DifyChatResult {

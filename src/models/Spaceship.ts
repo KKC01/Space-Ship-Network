@@ -43,6 +43,11 @@ export class Spaceship {
   public isLegacyEnabled: boolean = false;
   // 周期ポーリング用タイマ
   public legacyTimer: number = 0;
+
+  // TCP/IP 星間通信 (新型通信惑星経由・データ保有時に即送信)
+  public isTcpIpEnabled: boolean = false;
+  // 連続送信抑制用クールダウン (ms)
+  public tcpIpCooldown: number = 0;
   
   public hp: number = 300;
   public maxHp: number = 300;
