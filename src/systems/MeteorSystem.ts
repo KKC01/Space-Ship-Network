@@ -2,6 +2,7 @@ import { Meteor, MeteorSize } from '../models/Meteor';
 import { CommunicationSystem } from '../models/CommunicationSystem';
 import { SystemDisplayMode } from '../models/DataPacket';
 import type { MainScene } from '../scenes/MainScene';
+import type { DamageKind, DamageSize, EquipmentLevel } from '../models/Spaceship';
 
 /**
  * 隕石（メテオ）システム。
@@ -297,6 +298,38 @@ export class MeteorSystem {
           else if (meteor.sizeType === 'MEDIUM') colMsg = `中型隕石、迎撃失敗。${hitShip.id}に衝突！被害確認中…`;
           else if (meteor.sizeType === 'SMALL') colMsg = `小型隕石、${hitShip.id}に衝突`;
           if (colMsg) window.__chatWidget?.pushSystemMessage(colMsg);
+
+          // 被害発生（ダメージ量で規模、火災/破口はランダム）
+          let dmgSize: DamageSize;
+          if (meteor.hp < 20) dmgSize = 'small';
+          else if (meteor.hp < 100) dmgSize = 'medium';
+          else dmgSize = 'large';
+
+          const dmgKind: DamageKind = Math.random() < 0.5 ? 'fire' : 'breach';
+          hitShip.damageCounter++;
+          hitShip.damages.push({
+            id: `dmg-${hitShip.id}-${hitShip.damageCounter}`,
+            kind: dmgKind,
+            size: dmgSize,
+            phase: 'active',
+            treatStartedAt: null,
+          });
+
+          if (dmgKind === 'breach') hitShip.recalcArmorStatus();
+
+          // 通信・武器ステータスはランダム劣化（既に劣化済みは現状維持か悪化のみ）
+          const randomizeStatus = (cur: EquipmentLevel): EquipmentLevel => {
+            const r = Math.random();
+            if (cur === 'UNABLE') return 'UNABLE';
+            if (cur === 'POOR') return r < 0.3 ? 'UNABLE' : 'POOR';
+            return r < 0.5 ? 'GOOD' : r < 0.85 ? 'POOR' : 'UNABLE';
+          };
+          hitShip.combatEquipment.comm = randomizeStatus(hitShip.combatEquipment.comm);
+          hitShip.combatEquipment.weapon = randomizeStatus(hitShip.combatEquipment.weapon);
+
+          const labelKind = dmgKind === 'fire' ? '火災' : '破口';
+          const labelSize = dmgSize === 'large' ? '大' : dmgSize === 'medium' ? '中' : '小';
+          window.__chatWidget?.pushSystemMessage(`${hitShip.id} に${labelSize}${labelKind}発生`);
         }
 
         meteor.isDestroyed = true;

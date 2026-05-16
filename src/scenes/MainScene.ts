@@ -222,6 +222,33 @@ export class MainScene extends Scene {
     for (const ship of this.spaceships.values()) {
       ship.update(delta, this.spaceships, (node, target) => this.commManager.handlePolling(node, target));
 
+      // === 戦闘指揮モード: 被害の進行 ===
+      // 対処中の被害は経過時間で消滅（小=10秒 / 中=20秒 / 大=30秒）
+      if (ship.damages.length > 0) {
+        const nowMs = Date.now();
+        const before = ship.damages.length;
+        ship.damages = ship.damages.filter(d => {
+          if (d.phase !== 'treating' || d.treatStartedAt == null) return true;
+          const durationMs =
+            d.size === 'large' ? 30000 :
+            d.size === 'medium' ? 20000 : 10000;
+          return (nowMs - d.treatStartedAt) < durationMs;
+        });
+        if (ship.damages.length !== before) {
+          ship.recalcArmorStatus();
+          // 全被害消滅で通信・武器も復旧
+          if (ship.damages.length === 0) {
+            ship.combatEquipment.comm = 'GOOD';
+            ship.combatEquipment.weapon = 'GOOD';
+          }
+        }
+      }
+      // 未対処被害から徐々にHP減少
+      const drain = ship.getDamageHpDrainPerSec();
+      if (drain > 0) {
+        ship.hp = Math.max(0, ship.hp - drain * (delta / 1000));
+      }
+
       // TDMA Logic
       if (ship.isMultiplexEnabled && ship.selectedMasterId) {
         let m = this.opticalMasters.find(om => om.id === ship.selectedMasterId);
@@ -282,9 +309,8 @@ export class MainScene extends Scene {
       }
     }
 
-    if (Math.floor(time) % 10 === 0) {
-      this.uiManager.updateActiveModalDataIfOpen();
-    }
+    // モーダル開放中は毎フレーム更新（HPバーがリアルタイムで反映されるように）
+    this.uiManager.updateActiveModalDataIfOpen();
 
     // Old hub labels removed as we use spaceships now
 
@@ -466,6 +492,13 @@ export class MainScene extends Scene {
       g.fillRect(ship.x - 20, ship.y - 30, 40, 4);
       g.fillStyle(0x38bdf8, 0.8);
       g.fillRect(ship.x - 20, ship.y - 30, 40 * dataPercent, 4);
+
+      // 被害発生中（対処中含む）のユニット赤パルス
+      if (ship.damages.length > 0) {
+        const dmgPulse = (Math.sin(time / 300) + 1) / 2;
+        g.lineStyle(2, 0xef4444, 0.4 + dmgPulse * 0.4);
+        g.strokeCircle(ship.x, ship.y, isHQ ? 38 : 28);
+      }
 
       // Proximity Warning Check
       let isTooClose = false;

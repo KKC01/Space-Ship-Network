@@ -52,6 +52,13 @@ export class UIManager {
   private domScaleBarLine: HTMLElement | null = null;
   private domScaleBarText: HTMLElement | null = null;
 
+  // 被害対処 UI 要素
+  private domDmgStatusArmor: HTMLElement | null = null;
+  private domDmgStatusComm: HTMLElement | null = null;
+  private domDmgStatusWeapon: HTMLElement | null = null;
+  private domDmgSituation: HTMLElement | null = null;
+  private domDmgTreatBtn: HTMLButtonElement | null = null;
+
   // viz mode 切替の内部状態（CONTROL モード時のみ循環）
   private controlVizIndex = 0;
   private readonly controlVizModes: { key: 'circles' | 'dots' | 'quality'; label: string }[] = [
@@ -84,6 +91,7 @@ export class UIManager {
     this.bindModalClose();
     this.bindActionCycleBtn();
     this.bindNoiseMonitor();
+    this.bindDamageDom();
   }
 
   /**
@@ -125,6 +133,18 @@ export class UIManager {
     if (rgrEl && isCombat) rgrEl.classList.add('hidden');
     const actionContainer = document.getElementById('action-btn-container');
     if (actionContainer) actionContainer.classList.toggle('hidden', !isCombat);
+
+    // 被害対処アコーディオン: 戦闘指揮モードのみ表示
+    const dmgBtn = document.getElementById('damage-group-btn');
+    const dmgContent = document.getElementById('damage-group-content');
+    if (dmgBtn) dmgBtn.classList.toggle('hidden', !isCombat);
+    if (dmgContent) {
+      dmgContent.classList.toggle('hidden', !isCombat);
+      if (!isCombat) {
+        dmgContent.classList.remove('open');
+        if (dmgBtn) dmgBtn.classList.remove('open');
+      }
+    }
   }
 
   /**
@@ -310,6 +330,7 @@ export class UIManager {
     };
     setup('multiplex-group-btn', 'multiplex-group-content');
     setup('optical-group-btn', 'optical-group-content');
+    setup('damage-group-btn', 'damage-group-content');
   }
 
   private setupMissionPanelToggle(): void {
@@ -437,6 +458,45 @@ export class UIManager {
     };
   }
 
+  // 被害対処タブ: DOM参照取得と「被害対処 実行」ボタンのハンドラ登録
+  private bindDamageDom(): void {
+    this.domDmgStatusArmor = document.getElementById('dmg-status-armor');
+    this.domDmgStatusComm = document.getElementById('dmg-status-comm');
+    this.domDmgStatusWeapon = document.getElementById('dmg-status-weapon');
+    this.domDmgSituation = document.getElementById('dmg-situation');
+    this.domDmgTreatBtn = document.getElementById('dmg-treat-btn') as HTMLButtonElement | null;
+    if (this.domDmgTreatBtn) {
+      this.domDmgTreatBtn.onclick = () => this.onDamageTreatClick();
+    }
+  }
+
+  // 「被害対処 実行」: 現在の active 被害を全て treating に遷移させる
+  private onDamageTreatClick(): void {
+    if (!this.scene.selectedUnitId) return;
+    const ship = this.scene.spaceships.get(this.scene.selectedUnitId);
+    if (!ship) return;
+    const now = Date.now();
+    let started = 0;
+    for (const d of ship.damages) {
+      if (d.phase === 'active') {
+        d.phase = 'treating';
+        d.treatStartedAt = now;
+        started++;
+      }
+    }
+    if (started > 0) {
+      window.__chatWidget?.pushSystemMessage(`${ship.id} 被害対処を開始（${started}件）`);
+      this.scene.showFloatingText(ship.x, ship.y, '被害対処 開始', '#fbbf24');
+      this.updateModalData();
+    }
+  }
+
+  private statusColor(level: 'GOOD' | 'POOR' | 'UNABLE'): string {
+    if (level === 'GOOD') return '#4ade80';
+    if (level === 'POOR') return '#facc15';
+    return '#ef4444';
+  }
+
   private bindNoiseMonitor(): void {
     const NOISE_MONITOR_CONFIG: Record<string, { src: string; message: string }> = {
       none: { src: monitorVideoSrc, message: '干渉はありません' },
@@ -522,6 +582,46 @@ export class UIManager {
       const pct = unit.hp / unit.maxHp;
       hpBar.style.width = `${pct * 100}%`;
       hpBar.style.background = pct < 0.3 ? '#ef4444' : '#4ade80';
+    }
+
+    // === 被害対処タブの描画 ===
+    if (this.domDmgStatusArmor) {
+      this.domDmgStatusArmor.textContent = unit.combatEquipment.armor;
+      this.domDmgStatusArmor.style.color = this.statusColor(unit.combatEquipment.armor);
+    }
+    if (this.domDmgStatusComm) {
+      this.domDmgStatusComm.textContent = unit.combatEquipment.comm;
+      this.domDmgStatusComm.style.color = this.statusColor(unit.combatEquipment.comm);
+    }
+    if (this.domDmgStatusWeapon) {
+      this.domDmgStatusWeapon.textContent = unit.combatEquipment.weapon;
+      this.domDmgStatusWeapon.style.color = this.statusColor(unit.combatEquipment.weapon);
+    }
+    if (this.domDmgSituation) {
+      if (unit.damages.length === 0) {
+        // 被害なし: HPが満タンなら「被害なし」、減っていれば応急対処完了状態
+        this.domDmgSituation.textContent = unit.hp < unit.maxHp ? '応急対処 完了' : '被害なし';
+      } else {
+        const sizeLabel = (s: 'small' | 'medium' | 'large') =>
+          s === 'large' ? '大' : s === 'medium' ? '中' : '小';
+        const parts = unit.damages.map(d => {
+          const sz = sizeLabel(d.size);
+          if (d.kind === 'fire') {
+            return d.phase === 'treating' ? `${sz}火災 消火中` : `${sz}火災 発生`;
+          } else {
+            return d.phase === 'treating' ? `${sz}破口 漏洩対策中` : `${sz}破口 空気漏洩中`;
+          }
+        });
+        this.domDmgSituation.textContent = parts.join('、');
+      }
+    }
+    if (this.domDmgTreatBtn) {
+      const hasActive = unit.damages.some(d => d.phase === 'active');
+      this.domDmgTreatBtn.disabled = !hasActive;
+      this.domDmgTreatBtn.style.opacity = hasActive ? '1' : '0.4';
+      this.domDmgTreatBtn.style.cursor = hasActive ? 'pointer' : 'not-allowed';
+      // 未対処の被害があるときだけ点滅クラスを付与
+      this.domDmgTreatBtn.classList.toggle('blinking', hasActive);
     }
 
     const roleBtn = document.getElementById('toggle-role-btn');
