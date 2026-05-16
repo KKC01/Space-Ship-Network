@@ -537,14 +537,14 @@ export class UIManager {
     const unit = this.scene.spaceships.get(this.scene.selectedUnitId);
     if (!unit) return;
 
-    // 連接マスター候補を動的更新
+    // 連接マスター候補を動的更新（ドロップダウンには艦のIDのみを表示）
     if (this.domMultiplexMaster) {
       const currentMasterId = unit.selectedMasterId;
-      this.domMultiplexMaster.innerHTML = '<option value="">-- 連接マスターを選択 --</option>';
+      this.domMultiplexMaster.innerHTML = '<option value="">--</option>';
       this.scene.spaceships.forEach(s => {
         const opt = document.createElement('option');
         opt.value = s.id;
-        opt.textContent = `連接マスター: ${s.id}`;
+        opt.textContent = s.id;
         this.domMultiplexMaster!.appendChild(opt);
       });
       this.domMultiplexMaster.value = currentMasterId || '';
@@ -620,8 +620,24 @@ export class UIManager {
       this.domDmgTreatBtn.disabled = !hasActive;
       this.domDmgTreatBtn.style.opacity = hasActive ? '1' : '0.4';
       this.domDmgTreatBtn.style.cursor = hasActive ? 'pointer' : 'not-allowed';
-      // 未対処の被害があるときだけ点滅クラスを付与
-      this.domDmgTreatBtn.classList.toggle('blinking', hasActive);
+
+      // 被害対処アコーディオンと実行ボタンの強調表示を入れ替える:
+      // - 折りたたみ時: アコーディオン本体を点滅させて発生を知らせる
+      // - 展開時: 実行ボタンを点滅させて押下を促す
+      const dmgGroupBtn = document.getElementById('damage-group-btn');
+      const dmgGroupContent = document.getElementById('damage-group-content');
+      const isOpen = dmgGroupContent?.classList.contains('open') ?? false;
+
+      if (hasActive && !isOpen) {
+        dmgGroupBtn?.classList.add('blinking');
+        this.domDmgTreatBtn.classList.remove('blinking');
+      } else if (hasActive && isOpen) {
+        dmgGroupBtn?.classList.remove('blinking');
+        this.domDmgTreatBtn.classList.add('blinking');
+      } else {
+        dmgGroupBtn?.classList.remove('blinking');
+        this.domDmgTreatBtn.classList.remove('blinking');
+      }
     }
 
     const roleBtn = document.getElementById('toggle-role-btn');

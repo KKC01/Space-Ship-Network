@@ -61,6 +61,20 @@
     #dmg-treat-btn.blinking {
       animation: dmg-treat-blink 0.8s ease-in-out infinite;
     }
+    /* 被害対処アコーディオン本体の点滅（未対処被害ありかつ折りたたみ時の強調） */
+    @keyframes accordion-dmg-blink {
+      0%, 100% {
+        background: rgba(239,68,68,0.15);
+        box-shadow: 0 0 0 0 rgba(239,68,68,0.0);
+      }
+      50% {
+        background: rgba(239,68,68,0.45);
+        box-shadow: 0 0 10px 2px rgba(239,68,68,0.55);
+      }
+    }
+    .accordion-btn.blinking {
+      animation: accordion-dmg-blink 0.8s ease-in-out infinite;
+    }
     /* レガシー星間通信・星間通信用の即時 ON/OFF トグルボタン */
     .comm-toggle-btn {
       width: 100%;
@@ -187,31 +201,31 @@
       <button id="multiplex-group-btn" class="accordion-btn">多重通信</button>
       <div id="multiplex-group-content" class="accordion-content">
         <div class="comm-group">
-          <label><input type="checkbox" id="multiplex-enable"> 光多重通信 (200km) 有効</label>
-          <div style="margin-top: 8px;">
-            <div class="hud-label" style="font-size: 10px; margin-bottom: 2px;">連接マスター</div>
-            <select id="multiplex-master" class="custom-select">
-              <option value="">-- 連接マスターを選択 --</option>
-            </select>
-          </div>
-          <div style="display: flex; gap: 5px; margin-top: 8px;">
+          <label style="font-size: 11px;"><input type="checkbox" id="multiplex-enable"> 多重通信</label>
+          <div style="display: flex; gap: 5px; margin-top: 6px;">
             <div style="flex: 1;">
-              <div class="hud-label" style="font-size: 10px; margin-bottom: 2px;">速度</div>
-              <select id="multiplex-speed" class="custom-select">
-                <option value="low">Low</option>
-                <option value="medium">Medium</option>
-                <option value="high">High</option>
+              <div class="hud-label" style="font-size: 10px; margin-bottom: 2px;">連接マスター</div>
+              <select id="multiplex-master" class="custom-select">
+                <option value="">--</option>
               </select>
             </div>
-            <div style="flex: 1;">
+            <div style="width: 70px;">
               <div class="hud-label" style="font-size: 10px; margin-bottom: 2px;">暗号</div>
               <select id="multiplex-cipher" class="custom-select">
-                <option value="AA">暗号 AA</option>
-                <option value="BB">暗号 BB</option>
+                <option value="AA">AA</option>
+                <option value="BB">BB</option>
               </select>
             </div>
           </div>
-          <label style="margin-top: 8px; display: block; font-size: 11px;"><input type="checkbox" id="multiplex-relay"> 中継 (Multi-hop) ON</label>
+          <div style="margin-top: 6px;">
+            <div class="hud-label" style="font-size: 10px; margin-bottom: 2px;">速度</div>
+            <select id="multiplex-speed" class="custom-select">
+              <option value="low">Low</option>
+              <option value="medium">Medium</option>
+              <option value="high">High</option>
+            </select>
+          </div>
+          <label style="margin-top: 6px; display: block; font-size: 11px;"><input type="checkbox" id="multiplex-relay"> 中継</label>
         </div>
       </div>
 
@@ -219,19 +233,22 @@
       <button id="optical-group-btn" class="accordion-btn">光通信</button>
       <div id="optical-group-content" class="accordion-content">
         <div class="comm-group">
-          <label><input type="checkbox" id="short-enable"> 短距離光通信 (750km)</label>
-          <select id="short-freq" class="custom-select">
-            <option value="A">周波数 A</option>
-            <option value="B">周波数 B</option>
-            <option value="C">周波数 C</option>
-          </select>
-          
-          <label style="margin-top: 10px;"><input type="checkbox" id="long-enable"> 長距離光通信 (2500km)</label>
-          <select id="long-freq" class="custom-select">
-            <option value="D">周波数 D</option>
-            <option value="E">周波数 E</option>
-            <option value="F">周波数 F</option>
-          </select>
+          <div style="display: flex; gap: 5px; align-items: center;">
+            <label style="flex: 1; font-size: 11px;"><input type="checkbox" id="short-enable"> 短距離</label>
+            <select id="short-freq" class="custom-select" style="width: 90px;">
+              <option value="A">周波数 A</option>
+              <option value="B">周波数 B</option>
+              <option value="C">周波数 C</option>
+            </select>
+          </div>
+          <div style="display: flex; gap: 5px; align-items: center; margin-top: 6px;">
+            <label style="flex: 1; font-size: 11px;"><input type="checkbox" id="long-enable"> 長距離</label>
+            <select id="long-freq" class="custom-select" style="width: 90px;">
+              <option value="D">周波数 D</option>
+              <option value="E">周波数 E</option>
+              <option value="F">周波数 F</option>
+            </select>
+          </div>
 
           <button id="toggle-role-btn" style="margin-top: 15px; width: 100%;" class="action-btn">ノード設定</button>
           <button id="send-cmd-btn" style="margin-top: 10px; width: 100%;" class="action-btn hidden">全般宛 周波数変更</button>

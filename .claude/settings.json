@@ -1,4 +1,11 @@
 {
+  "permissions": {
+    "allow": [
+      "Bash(pkill -9 -f \"vite\")",
+      "Bash(npm run *)",
+      "Bash(disown)"
+    ]
+  },
   "hooks": {
     "PreToolUse": [
       {

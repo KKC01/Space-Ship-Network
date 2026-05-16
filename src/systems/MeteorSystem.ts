@@ -15,8 +15,9 @@ export class MeteorSystem {
   private meteors: Map<string, Meteor> = new Map();
   private meteorSprites: Map<string, Phaser.GameObjects.Image> = new Map();
 
-  // スポーン制御
-  private meteorSpawnTimer: number = 15000;
+  // スポーン制御（TINY 用と非TINY 用の2系統）
+  private tinyMeteorSpawnTimer: number = 15000;
+  private normalMeteorSpawnTimer: number = 15000;
   private meteorCounter: number = 0;
   private meteorAlerted: Set<string> = new Set();
 
@@ -67,12 +68,41 @@ export class MeteorSystem {
    * MainScene.update() から呼ぶ。
    */
   update(dt: number, _time: number): void {
-    this.meteorSpawnTimer -= dt;
-    if (this.meteorSpawnTimer <= 0) {
-      this.spawnMeteor();
+    // いずれかのユニットがアステロイド帯内（リング領域）にいるか判定し、
+    // 帯内では TINY を1/5頻度、非TINY を5倍頻度にする
+    const inBelt = this.isAnyShipInAsteroidBelt();
+
+    this.tinyMeteorSpawnTimer -= dt;
+    if (this.tinyMeteorSpawnTimer <= 0) {
+      this.spawnMeteorWithSize('TINY');
+      const base = 15000 + Math.random() * 15000;
+      this.tinyMeteorSpawnTimer = inBelt ? base * 5 : base;
     }
+
+    this.normalMeteorSpawnTimer -= dt;
+    if (this.normalMeteorSpawnTimer <= 0) {
+      // 非TINY の比率: LARGE 14% / MEDIUM 29% / SMALL 57%
+      const r = Math.random();
+      const size: MeteorSize = r < 0.14 ? 'LARGE' : (r < 0.43 ? 'MEDIUM' : 'SMALL');
+      this.spawnMeteorWithSize(size);
+      const base = 15000 + Math.random() * 15000;
+      this.normalMeteorSpawnTimer = inBelt ? base / 5 : base;
+    }
+
     this.updateMeteors(dt);
     this.handleMeteorCombat(dt);
+  }
+
+  /**
+   * いずれかのユニットがアステロイド帯（環状リング）内にいるか判定。
+   */
+  private isAnyShipInAsteroidBelt(): boolean {
+    const belt = this.scene.asteroidBelt;
+    for (const ship of this.scene.spaceships.values()) {
+      const d = CommunicationSystem.getDistance(ship.x, ship.y, belt.centerX, belt.centerY);
+      if (d >= belt.innerRadius && d <= belt.outerRadius) return true;
+    }
+    return false;
   }
 
   /**
@@ -106,8 +136,16 @@ export class MeteorSystem {
           // 戦闘指揮モード + ユニット選択済み + 攻撃アクション → 攻撃指示
           const ship = this.scene.spaceships.get(this.scene.selectedUnitId);
           if (ship) {
+            // 武器:UNABLE → 標的指定すら不可、ユーザーへフィードバック
+            if (ship.combatEquipment.weapon === 'UNABLE') {
+              window.__chatWidget?.pushSystemMessage(`${ship.id} 武器使用不可（UNABLE）`);
+              this.scene.showFloatingText(ship.x, ship.y, '武器使用不可', '#9ca3af');
+              return true;
+            }
             ship.attackTargetMeteorId = mId;
-            window.__chatWidget?.pushSystemMessage(`${ship.id} → ${meteor.id} 攻撃します`);
+            // 標的指定直後の即着弾を防ぐため、クールダウンを満タンにセット
+            ship.attackCooldown = ship.ATTACK_COOLDOWN_MS;
+            window.__chatWidget?.pushSystemMessage(`${ship.id} → ${meteor.id} に攻撃指示`);
             this.scene.showFloatingText(ship.x, ship.y, '攻撃指示', '#f87171');
           }
         } else {
@@ -149,11 +187,10 @@ export class MeteorSystem {
   }
 
   /**
-   * 隕石をスポーンする。ランダムなユニットから500kmの位置に出現。
+   * 指定サイズの隕石をスポーンする。ランダムなユニットから500kmの位置に出現。
+   * アステロイド帯内に出現した TINY は速度を 1/5 にする（漂う岩屑の挙動）。
    */
-  private spawnMeteor(): void {
-    this.meteorSpawnTimer = 15000 + Math.random() * 15000;
-
+  private spawnMeteorWithSize(size: MeteorSize): void {
     const shipIds = Array.from(this.scene.spaceships.keys());
     if (shipIds.length === 0) return;
 
@@ -197,16 +234,18 @@ export class MeteorSystem {
       my = targetShip.y + Math.sin(angle) * 500;
     }
 
-    // ランダムにサイズを決定
-    const r = Math.random();
-    let size: MeteorSize = 'SMALL';
-    if (r < 0.1) size = 'LARGE';
-    else if (r < 0.3) size = 'MEDIUM';
-    else if (r < 0.7) size = 'SMALL';
-    else size = 'TINY';
-
     const baseSpeed = 30;
-    const speed = baseSpeed * (0.7 + Math.random() * 0.6); // ±30%: 21〜39
+    let speed = baseSpeed * (0.7 + Math.random() * 0.6); // ±30%: 21〜39
+
+    // TINY かつスポーン位置がアステロイド帯内の場合、速度を 1/5 に
+    if (size === 'TINY') {
+      const belt = this.scene.asteroidBelt;
+      const distToBelt = CommunicationSystem.getDistance(mx, my, belt.centerX, belt.centerY);
+      if (distToBelt >= belt.innerRadius && distToBelt <= belt.outerRadius) {
+        speed = speed / 5;
+      }
+    }
+
     const meteor = new Meteor(meteorId, mx, my, targetId, targetShip.x, targetShip.y, size, speed);
     this.meteors.set(meteorId, meteor);
 
@@ -236,31 +275,44 @@ export class MeteorSystem {
 
       meteor.update(dt);
 
-      // 探知判定
-      if (!meteor.isDetected) {
-        for (const ship of this.scene.spaceships.values()) {
-          const d = CommunicationSystem.getDistance(meteor.x, meteor.y, ship.x, ship.y);
-          if (d <= 400) {
-            meteor.isDetected = true;
-            const sprite = this.meteorSprites.get(mId);
-            if (sprite) sprite.setVisible(true);
-
-            let warnMsg = '';
-            if (meteor.sizeType === 'LARGE') warnMsg = '大型隕石、探知！';
-            else if (meteor.sizeType === 'MEDIUM') warnMsg = '中型隕石、探知';
-            else if (meteor.sizeType === 'SMALL') warnMsg = '小型隕石、探知';
-            else if (meteor.sizeType === 'TINY') warnMsg = '極小隕石、探知中';
-
-            window.__chatWidget?.pushSystemMessage(warnMsg);
-
-            if (this.scene.systemDisplayMode === SystemDisplayMode.CONTROL) {
-              window.__chatWidget?.pushSystemMessage('戦闘指揮に変更お願いします');
-            }
-
-            this.scene.showFloatingText(meteor.x, meteor.y, '隕石探知', '#fb923c');
-            break;
-          }
+      // 探知判定（双方向）: いずれかの艦の探知圏 (DETECTION_RANGE) に入っているか
+      let inRange = false;
+      for (const ship of this.scene.spaceships.values()) {
+        const d = CommunicationSystem.getDistance(meteor.x, meteor.y, ship.x, ship.y);
+        if (d <= ship.DETECTION_RANGE) {
+          inRange = true;
+          break;
         }
+      }
+
+      if (!meteor.isDetected && inRange) {
+        // 新規探知
+        meteor.isDetected = true;
+        const sprite = this.meteorSprites.get(mId);
+        if (sprite) sprite.setVisible(true);
+
+        let warnMsg = '';
+        if (meteor.sizeType === 'LARGE') warnMsg = '大型隕石、探知！';
+        else if (meteor.sizeType === 'MEDIUM') warnMsg = '中型隕石、探知';
+        else if (meteor.sizeType === 'SMALL') warnMsg = '小型隕石、探知';
+        else if (meteor.sizeType === 'TINY') warnMsg = '極小隕石、探知中';
+
+        window.__chatWidget?.pushSystemMessage(warnMsg);
+
+        if (this.scene.systemDisplayMode === SystemDisplayMode.CONTROL) {
+          window.__chatWidget?.pushSystemMessage('戦闘指揮に変更お願いします');
+        }
+
+        this.scene.showFloatingText(meteor.x, meteor.y, '隕石探知', '#fb923c');
+      } else if (meteor.isDetected && !inRange) {
+        // 探知圏外退出: 非表示に戻し、攻撃目標にしていた艦の標的を解除
+        meteor.isDetected = false;
+        const sprite = this.meteorSprites.get(mId);
+        if (sprite) sprite.setVisible(false);
+        for (const ship of this.scene.spaceships.values()) {
+          if (ship.attackTargetMeteorId === mId) ship.attackTargetMeteorId = null;
+        }
+        window.__chatWidget?.pushSystemMessage(`${meteor.id} ロスト（探知圏外）`);
       }
 
       // 衝突判定
@@ -353,6 +405,9 @@ export class MeteorSystem {
     for (const ship of this.scene.spaceships.values()) {
       if (!ship.attackTargetMeteorId) continue;
 
+      // 武器:UNABLE → 射撃不可（標的指定は維持）
+      if (ship.combatEquipment.weapon === 'UNABLE') continue;
+
       const meteor = this.meteors.get(ship.attackTargetMeteorId);
       if (!meteor || meteor.isDestroyed) {
         ship.attackTargetMeteorId = null;
@@ -364,7 +419,9 @@ export class MeteorSystem {
       const dist = CommunicationSystem.getDistance(ship.x, ship.y, meteor.x, meteor.y);
       if (dist <= ship.ATTACK_RANGE && ship.attackCooldown <= 0) {
         meteor.takeDamage(ship.ATTACK_DAMAGE);
-        ship.attackCooldown = ship.ATTACK_COOLDOWN_MS;
+        // 武器:POOR ならクールダウンを2倍に
+        const cooldownMul = ship.combatEquipment.weapon === 'POOR' ? 2 : 1;
+        ship.attackCooldown = ship.ATTACK_COOLDOWN_MS * cooldownMul;
         this.scene.showFloatingText(meteor.x, meteor.y, `HIT -${ship.ATTACK_DAMAGE}`, '#fbbf24');
 
         if (meteor.isDestroyed) {
@@ -451,9 +508,18 @@ export class MeteorSystem {
           this.meteorGraphics.fillCircle(meteor.x, meteor.y, 5);
         }
       } else {
-        // 射程外だが追尾中 → 点線
-        this.meteorGraphics.lineStyle(1, 0xfbbf24, 0.15);
-        this.meteorGraphics.lineBetween(ship.x, ship.y, meteor.x, meteor.y);
+        // 射程外: 標的を示すクロスヘア(◇)のみ表示。攻撃エフェクトは描画しない
+        const color = ship.combatEquipment.weapon === 'UNABLE' ? 0x6b7280 : 0xfbbf24;
+        this.meteorGraphics.lineStyle(1, color, 0.6);
+        const r = 12;
+        // 隕石を中心とした菱形マーカー
+        this.meteorGraphics.beginPath();
+        this.meteorGraphics.moveTo(meteor.x, meteor.y - r);
+        this.meteorGraphics.lineTo(meteor.x + r, meteor.y);
+        this.meteorGraphics.lineTo(meteor.x, meteor.y + r);
+        this.meteorGraphics.lineTo(meteor.x - r, meteor.y);
+        this.meteorGraphics.closePath();
+        this.meteorGraphics.strokePath();
       }
     }
   }
@@ -519,9 +585,10 @@ export class MeteorSystem {
   }
 
   /**
-   * 衝突エフェクト（隕石がユニットに到達した時）。
+   * 衝突エフェクト（隕石がユニットに到達した時 / ユニット同士の衝突）。
+   * MainScene からのユニット衝突演出にも再利用するため public。
    */
-  private createCollisionEffect(x: number, y: number): void {
+  public createCollisionEffect(x: number, y: number): void {
     const ring = this.scene.add.graphics().setDepth(20);
     this.scene.tweens.add({
       targets: { radius: 10, alpha: 1 },
