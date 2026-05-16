@@ -1,5 +1,6 @@
 import { Scene } from 'phaser';
 import { Spaceship } from '../models/Spaceship';
+import type { DamageKind, EquipmentLevel } from '../models/Spaceship';
 import { SystemDisplayMode } from '../models/DataPacket';
 import { CommunicationSystem } from '../models/CommunicationSystem';
 import { OpticalMaster } from '../models/OpticalMaster';
@@ -27,7 +28,7 @@ export class MainScene extends Scene {
   public textLabels: Map<string, Phaser.GameObjects.Text> = new Map();
 
   // サブシステム（他システムから参照されるため public）
-  private meteorSystem!: MeteorSystem;
+  public meteorSystem!: MeteorSystem;
   public planetSystem!: PlanetSystem;
   public uiManager!: UIManager;
   private commManager!: CommunicationManager;
@@ -51,6 +52,10 @@ export class MainScene extends Scene {
   // LV1 Features
   private interferenceZones: { x: number, y: number, radius: number }[] = [];
   private clutters: { x: number, y: number }[] = [];
+
+  // アステロイド帯（サーベイポイント周辺の環状ゾーン）
+  public asteroidBelt = { centerX: 3000, centerY: 3000, innerRadius: 800, outerRadius: 1500 };
+  private asteroidDebris: { x: number, y: number, size: number, alpha: number }[] = [];
 
   constructor() {
     super('MainScene');
@@ -157,6 +162,23 @@ export class MainScene extends Scene {
     // 加えてレガシー星間通信用の通信惑星をユニット編隊上方に固定配置。
     const unitSpawnCenter = { x: cx + SPAWN_OFFSET_X, y: cy + SPAWN_OFFSET_Y };
     this.planetSystem.init(cx, cy, this.missionManager.surveyPoint, unitSpawnCenter);
+
+    // アステロイド帯: 中心をサーベイポイントに合わせ、岩屑をプリ生成
+    this.asteroidBelt.centerX = this.missionManager.surveyPoint.x;
+    this.asteroidBelt.centerY = this.missionManager.surveyPoint.y;
+    this.asteroidDebris = [];
+    const debrisCount = 100;
+    const { centerX, centerY, innerRadius, outerRadius } = this.asteroidBelt;
+    for (let i = 0; i < debrisCount; i++) {
+      const angle = Math.random() * Math.PI * 2;
+      const r = innerRadius + Math.random() * (outerRadius - innerRadius);
+      this.asteroidDebris.push({
+        x: centerX + Math.cos(angle) * r,
+        y: centerY + Math.sin(angle) * r,
+        size: 1.5 + Math.random() * 3,
+        alpha: 0.25 + Math.random() * 0.4,
+      });
+    }
   }
 
   /**
@@ -309,6 +331,9 @@ export class MainScene extends Scene {
       }
     }
 
+    // === ユニット間衝突判定（大型隕石相当の被害を双方に与える） ===
+    this.checkShipCollisions();
+
     // モーダル開放中は毎フレーム更新（HPバーがリアルタイムで反映されるように）
     this.uiManager.updateActiveModalDataIfOpen();
 
@@ -373,6 +398,27 @@ export class MainScene extends Scene {
       this.clutterGraphics.fillStyle(0x94a3b8, alpha);
       this.clutterGraphics.fillCircle(c.x, c.y, size);
     });
+
+    // 0b'. Asteroid Belt（環状ゾーンとその中の岩屑）
+    {
+      const { centerX, centerY, innerRadius, outerRadius } = this.asteroidBelt;
+      // 帯領域の薄い茶色塗り（外周 - 内周のドーナツ）
+      this.interferenceGraphics.fillStyle(0x78350f, 0.06);
+      this.interferenceGraphics.fillCircle(centerX, centerY, outerRadius);
+      // 内側をくり抜くため背景色で再塗り（背景: #020617）
+      this.interferenceGraphics.fillStyle(0x020617, 1.0);
+      this.interferenceGraphics.fillCircle(centerX, centerY, innerRadius);
+      // 境界線（内周・外周）
+      this.interferenceGraphics.lineStyle(2, 0xa16207, 0.3);
+      this.interferenceGraphics.strokeCircle(centerX, centerY, innerRadius);
+      this.interferenceGraphics.strokeCircle(centerX, centerY, outerRadius);
+
+      // 岩屑（プリ生成された位置を毎フレーム描画）
+      this.asteroidDebris.forEach(d => {
+        this.clutterGraphics.fillStyle(0xa16207, d.alpha);
+        this.clutterGraphics.fillCircle(d.x, d.y, d.size);
+      });
+    }
 
     // 0c. Optical Masters (Hidden from map as per request)
 
@@ -922,6 +968,102 @@ export class MainScene extends Scene {
    */
   public lose(): void {
     this.missionManager.lose();
+  }
+
+  /**
+   * ユニット同士の衝突を検知し、大型隕石相当の被害を双方に与える。
+   * 衝突閾値: 30km 以内。ペア重複防止のため id 文字列比較で1回のみ処理。
+   */
+  private checkShipCollisions(): void {
+    const COLLISION_DISTANCE = 30;
+    const COLLISION_DAMAGE = 200; // 大型隕石 LARGE と同等
+    const SEPARATION_DISTANCE = 35;
+
+    // ランダム劣化（MeteorSystem.ts の randomizeStatus と同じロジック）
+    const randomizeStatus = (cur: EquipmentLevel): EquipmentLevel => {
+      const r = Math.random();
+      if (cur === 'UNABLE') return 'UNABLE';
+      if (cur === 'POOR') return r < 0.3 ? 'UNABLE' : 'POOR';
+      return r < 0.5 ? 'GOOD' : r < 0.85 ? 'POOR' : 'UNABLE';
+    };
+
+    const ships = Array.from(this.spaceships.values());
+    const removed = new Set<string>();
+
+    for (let i = 0; i < ships.length; i++) {
+      const a = ships[i];
+      if (removed.has(a.id)) continue;
+      for (let j = i + 1; j < ships.length; j++) {
+        const b = ships[j];
+        if (removed.has(b.id)) continue;
+        const dist = CommunicationSystem.getDistance(a.x, a.y, b.x, b.y);
+        if (dist >= COLLISION_DISTANCE) continue;
+
+        // 衝突発動: 双方に大型被害
+        const midX = (a.x + b.x) / 2;
+        const midY = (a.y + b.y) / 2;
+        this.meteorSystem.createCollisionEffect(midX, midY);
+        this.showFloatingText(midX, midY, `衝突 -${COLLISION_DAMAGE} HP`, '#ef4444');
+        window.__chatWidget?.pushSystemMessage(`${a.id} と ${b.id} が衝突！両艦に大被害`);
+
+        for (const ship of [a, b]) {
+          ship.hp = Math.max(0, ship.hp - COLLISION_DAMAGE);
+
+          // 大被害（火災/破口ランダム）を追加
+          const dmgKind: DamageKind = Math.random() < 0.5 ? 'fire' : 'breach';
+          ship.damageCounter++;
+          ship.damages.push({
+            id: `dmg-${ship.id}-${ship.damageCounter}`,
+            kind: dmgKind,
+            size: 'large',
+            phase: 'active',
+            treatStartedAt: null,
+          });
+          if (dmgKind === 'breach') ship.recalcArmorStatus();
+
+          // 通信・武器ステータスはランダム劣化
+          ship.combatEquipment.comm = randomizeStatus(ship.combatEquipment.comm);
+          ship.combatEquipment.weapon = randomizeStatus(ship.combatEquipment.weapon);
+        }
+
+        // 衝突直後の押し戻し: 双方を反対方向に最低 SEPARATION_DISTANCE まで離す
+        if (dist > 0.001) {
+          const dx = (b.x - a.x) / dist;
+          const dy = (b.y - a.y) / dist;
+          const push = (SEPARATION_DISTANCE - dist) / 2 + 1;
+          a.x -= dx * push;
+          a.y -= dy * push;
+          b.x += dx * push;
+          b.y += dy * push;
+        } else {
+          // 完全重なりの場合は適当な方向に分離
+          a.x -= SEPARATION_DISTANCE / 2;
+          b.x += SEPARATION_DISTANCE / 2;
+        }
+        // 慣性を打ち消し、再衝突を緩和
+        a.vx = 0; a.vy = 0; a.targetX = null; a.targetY = null;
+        b.vx = 0; b.vy = 0; b.targetX = null; b.targetY = null;
+
+        // HP 0 以下のユニットは削除（MeteorSystem の隕石衝突処理と同等）
+        for (const ship of [a, b]) {
+          if (ship.hp <= 0) {
+            removed.add(ship.id);
+            this.meteorSystem.createCollisionEffect(ship.x, ship.y);
+            window.__chatWidget?.pushSystemMessage(`${ship.id} 通信途絶！`);
+            this.spaceships.delete(ship.id);
+            const sg = this.shipGraphics.get(ship.id);
+            if (sg) { sg.clear(); this.shipGraphics.delete(ship.id); }
+            const label = this.textLabels.get(ship.id);
+            if (label) { label.destroy(); this.textLabels.delete(ship.id); }
+            const warnLabel = this.textLabels.get(`meteor-warning-${ship.id}`);
+            if (warnLabel) { warnLabel.destroy(); this.textLabels.delete(`meteor-warning-${ship.id}`); }
+            const proxLabel = this.textLabels.get(`warning-${ship.id}`);
+            if (proxLabel) { proxLabel.destroy(); this.textLabels.delete(`warning-${ship.id}`); }
+          }
+        }
+      }
+    }
+    if (this.spaceships.size === 0) this.lose();
   }
 
   /**

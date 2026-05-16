@@ -80,7 +80,8 @@ export class Spaceship {
   // 攻撃関連（隕石戦闘用）
   public attackTargetMeteorId: string | null = null;
   public attackCooldown: number = 0;
-  public readonly ATTACK_RANGE: number = 400;
+  public readonly ATTACK_RANGE: number = 100;     // 射程: 戦闘指揮モードの内側サークルと一致
+  public readonly DETECTION_RANGE: number = 400;  // 探知距離: 外側サークルと一致
   public readonly ATTACK_DAMAGE: number = 25;
   public readonly ATTACK_COOLDOWN_MS: number = 1000;
 
@@ -279,11 +280,14 @@ export class Spaceship {
            this.equipment.processor !== 'red';
   }
 
-  /** 未対処の被害から1秒あたりのHP減少量を算出（大=3 / 中=2 / 小=1） */
+  /**
+   * 残存する被害から1秒あたりのHP減少量を算出（大=3 / 中=2 / 小=1）。
+   * 応急修理中(`phase === 'treating'`)でも修理完了まで HP は減り続ける仕様。
+   * 修理完了と同時に `damages` 配列から削除されるため、ドレインも自動的に終わる。
+   */
   public getDamageHpDrainPerSec(): number {
     let total = 0;
     for (const d of this.damages) {
-      if (d.phase !== 'active') continue;
       if (d.size === 'large') total += 3;
       else if (d.size === 'medium') total += 2;
       else total += 1;
