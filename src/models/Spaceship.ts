@@ -1,5 +1,19 @@
 import { DataPacket, PacketType, FreqShort, FreqLong } from './DataPacket';
 
+// 被害種別・規模・状態（戦闘指揮モード被害対処用）
+export type DamageKind = 'fire' | 'breach';
+export type DamageSize = 'small' | 'medium' | 'large';
+export type DamagePhase = 'active' | 'treating';
+export type EquipmentLevel = 'GOOD' | 'POOR' | 'UNABLE';
+
+export interface Damage {
+  id: string;
+  kind: DamageKind;
+  size: DamageSize;
+  phase: DamagePhase;
+  treatStartedAt: number | null;
+}
+
 export class Spaceship {
   public id: string;
   public x: number;
@@ -53,6 +67,15 @@ export class Spaceship {
   public maxHp: number = 300;
   public lastReceivedSourceId: string | null = null;
   public lastReceivedAt: number = 0;
+
+  // 戦闘指揮モード被害対処
+  public damages: Damage[] = [];
+  public damageCounter: number = 0;
+  public combatEquipment = {
+    armor: 'GOOD' as EquipmentLevel,
+    comm: 'GOOD' as EquipmentLevel,
+    weapon: 'GOOD' as EquipmentLevel,
+  };
 
   // 攻撃関連（隕石戦闘用）
   public attackTargetMeteorId: string | null = null;
@@ -254,5 +277,31 @@ export class Spaceship {
     return this.equipment.longAntenna !== 'red' &&
            this.equipment.cipher !== 'red' &&
            this.equipment.processor !== 'red';
+  }
+
+  /** 未対処の被害から1秒あたりのHP減少量を算出（大=3 / 中=2 / 小=1） */
+  public getDamageHpDrainPerSec(): number {
+    let total = 0;
+    for (const d of this.damages) {
+      if (d.phase !== 'active') continue;
+      if (d.size === 'large') total += 3;
+      else if (d.size === 'medium') total += 2;
+      else total += 1;
+    }
+    return total;
+  }
+
+  /** 現存する破口から装甲ステータスを再計算（無=GOOD / 小中=POOR / 大=UNABLE） */
+  public recalcArmorStatus(): void {
+    const breaches = this.damages.filter(d => d.kind === 'breach');
+    if (breaches.length === 0) {
+      this.combatEquipment.armor = 'GOOD';
+      return;
+    }
+    if (breaches.some(b => b.size === 'large')) {
+      this.combatEquipment.armor = 'UNABLE';
+    } else {
+      this.combatEquipment.armor = 'POOR';
+    }
   }
 }
