@@ -145,6 +145,10 @@ export class UIManager {
         if (dmgBtn) dmgBtn.classList.remove('open');
       }
     }
+
+    // 残弾表示: 戦闘指揮モードのみ表示
+    const ammoContainer = document.getElementById('ammo-container');
+    if (ammoContainer) ammoContainer.style.display = isCombat ? 'block' : 'none';
   }
 
   /**
@@ -468,6 +472,18 @@ export class UIManager {
     if (this.domDmgTreatBtn) {
       this.domDmgTreatBtn.onclick = () => this.onDamageTreatClick();
     }
+
+    // 武器行クリックで詳細行をトグル
+    const weaponRow = document.getElementById('dmg-weapon-row');
+    const weaponDetail = document.getElementById('dmg-weapon-detail');
+    const weaponToggle = document.getElementById('dmg-weapon-toggle');
+    if (weaponRow && weaponDetail && weaponToggle) {
+      weaponRow.onclick = () => {
+        const isHidden = weaponDetail.style.display === 'none';
+        weaponDetail.style.display = isHidden ? 'table-row' : 'none';
+        weaponToggle.textContent = isHidden ? '▲' : '▼';
+      };
+    }
   }
 
   // 「被害対処 実行」: 現在の active 被害を全て treating に遷移させる
@@ -596,6 +612,35 @@ export class UIManager {
     if (this.domDmgStatusWeapon) {
       this.domDmgStatusWeapon.textContent = unit.combatEquipment.weapon;
       this.domDmgStatusWeapon.style.color = this.statusColor(unit.combatEquipment.weapon);
+    }
+
+    // 残弾表示
+    const ammoMissile = document.getElementById('ammo-missile');
+    const ammoLaser = document.getElementById('ammo-laser');
+    if (ammoMissile) ammoMissile.textContent = String(unit.missileAmmo);
+    if (ammoLaser) ammoLaser.textContent = String(unit.laserAmmo);
+
+    // 武器詳細: missile/laser 個別ステータスと残弾
+    const dmgWeaponMissile = document.getElementById('dmg-weapon-missile');
+    const dmgWeaponLaser = document.getElementById('dmg-weapon-laser');
+    const dmgWeaponMissileAmmo = document.getElementById('dmg-weapon-missile-ammo');
+    const dmgWeaponLaserAmmo = document.getElementById('dmg-weapon-laser-ammo');
+
+    if (dmgWeaponMissile) {
+      dmgWeaponMissile.textContent = unit.weaponStatus.missile;
+      dmgWeaponMissile.style.color = this.statusColor(unit.weaponStatus.missile);
+    }
+    if (dmgWeaponLaser) {
+      dmgWeaponLaser.textContent = unit.weaponStatus.laser;
+      dmgWeaponLaser.style.color = this.statusColor(unit.weaponStatus.laser);
+    }
+    if (dmgWeaponMissileAmmo) {
+      dmgWeaponMissileAmmo.textContent = `${unit.missileAmmo}/${unit.MISSILE_AMMO_MAX}`;
+      dmgWeaponMissileAmmo.style.color = unit.missileAmmo === 0 ? '#ef4444' : '#94a3b8';
+    }
+    if (dmgWeaponLaserAmmo) {
+      dmgWeaponLaserAmmo.textContent = `${unit.laserAmmo}/${unit.LASER_AMMO_MAX}`;
+      dmgWeaponLaserAmmo.style.color = unit.laserAmmo === 0 ? '#ef4444' : '#94a3b8';
     }
     if (this.domDmgSituation) {
       if (unit.damages.length === 0) {

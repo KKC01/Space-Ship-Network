@@ -2,6 +2,14 @@ import { DataPacket, PacketType, FreqShort, FreqLong } from './DataPacket';
 
 // 被害種別・規模・状態（戦闘指揮モード被害対処用）
 export type DamageKind = 'fire' | 'breach';
+
+export interface MissileState {
+  id: string;
+  x: number;
+  y: number;
+  targetMeteorId: string;
+  speed: number;
+}
 export type DamageSize = 'small' | 'medium' | 'large';
 export type DamagePhase = 'active' | 'treating';
 export type EquipmentLevel = 'GOOD' | 'POOR' | 'UNABLE';
@@ -84,6 +92,29 @@ export class Spaceship {
   public readonly DETECTION_RANGE: number = 400;  // 探知距離: 外側サークルと一致
   public readonly ATTACK_DAMAGE: number = 25;
   public readonly ATTACK_COOLDOWN_MS: number = 1000;
+
+  // ミサイル定数
+  public readonly MISSILE_RANGE: number = 300;
+  public readonly MISSILE_DAMAGE: number = 50;
+  public readonly MISSILE_LAUNCH_INTERVAL_MS: number = 2000;
+  public readonly MISSILE_MAX_PER_TARGET: number = 3;
+  public readonly MISSILE_MAX_TOTAL: number = 10;
+  public readonly MISSILE_SPEED: number = 200;
+
+  // 残弾定数
+  public readonly MISSILE_AMMO_MAX: number = 20;
+  public readonly LASER_AMMO_MAX: number = 30;
+
+  // ミサイル飛翔状態
+  public missilesInFlight: MissileState[] = [];
+  public lastMissileLaunchAt: number = 0;
+
+  // 残弾
+  public missileAmmo: number = 20;
+  public laserAmmo: number = 30;
+
+  // 武器別ステータス（missile/laser を個別に管理し、combatEquipment.weapon に集約）
+  public weaponStatus: { missile: EquipmentLevel; laser: EquipmentLevel } = { missile: 'GOOD', laser: 'GOOD' };
 
   // Node Functionality
   public isNodeActive: boolean = false;
@@ -307,5 +338,27 @@ export class Spaceship {
     } else {
       this.combatEquipment.armor = 'POOR';
     }
+  }
+
+  /** missile/laser の個別ステータスから集約 weapon ステータスを再計算 */
+  public recalcWeaponStatus(): void {
+    const statuses = [this.weaponStatus.missile, this.weaponStatus.laser];
+    // POOR または UNABLE を「故障」とみなし、件数で集約
+    const faultCount = statuses.filter(s => s !== 'GOOD').length;
+    if (faultCount === 0) {
+      this.combatEquipment.weapon = 'GOOD';
+    } else if (faultCount === 1) {
+      this.combatEquipment.weapon = 'POOR';
+    } else {
+      this.combatEquipment.weapon = 'UNABLE';
+    }
+  }
+
+  public canFireMissile(): boolean {
+    return this.missileAmmo > 0 && this.weaponStatus.missile !== 'UNABLE';
+  }
+
+  public canFireLaser(): boolean {
+    return this.laserAmmo > 0 && this.weaponStatus.laser !== 'UNABLE';
   }
 }

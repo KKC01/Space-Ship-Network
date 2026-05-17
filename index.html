@@ -191,6 +191,15 @@
         </div>
       </div>
 
+      <!-- 残弾表示（戦闘指揮モードのみ表示。applyModeToUnitModal で display を制御） -->
+      <div id="ammo-container" style="margin-bottom: 15px; display: none;">
+        <div class="hud-label" style="margin-bottom: 4px;">残弾</div>
+        <div style="display: flex; justify-content: space-between; font-size: 12px;">
+          <div>ミサイル: <span id="ammo-missile" style="color:#fff;">20</span> / 20</div>
+          <div>レーザー電力: <span id="ammo-laser" style="color:#fff;">30</span> / 30</div>
+        </div>
+      </div>
+
       <!-- 星間通信 (TCP/IP) — 即時 ON/OFF トグル -->
       <button id="tcpip-toggle-btn" class="comm-toggle-btn" data-enabled="false">星間通信</button>
 
@@ -275,9 +284,27 @@
                 <th style="text-align:left; color:#94a3b8; padding:3px 6px; font-weight:normal;">通信</th>
                 <td id="dmg-status-comm" style="text-align:center; color:#4ade80; padding:3px 6px;">GOOD</td>
               </tr>
-              <tr>
-                <th style="text-align:left; color:#94a3b8; padding:3px 6px; font-weight:normal;">武器</th>
+              <tr id="dmg-weapon-row" style="cursor:pointer;">
+                <th style="text-align:left; color:#94a3b8; padding:3px 6px; font-weight:normal;">武器 <span id="dmg-weapon-toggle" style="font-size:9px; color:#64748b;">▼</span></th>
                 <td id="dmg-status-weapon" style="text-align:center; color:#4ade80; padding:3px 6px;">GOOD</td>
+              </tr>
+              <tr id="dmg-weapon-detail" style="display:none;">
+                <td colspan="2" style="padding:3px 6px;">
+                  <table style="width:100%; border-collapse:collapse; font-size:10px;">
+                    <tbody>
+                      <tr>
+                        <th style="text-align:left; color:#94a3b8; padding:2px 12px; font-weight:normal;">└ ミサイル</th>
+                        <td id="dmg-weapon-missile" style="text-align:center; color:#4ade80; padding:2px 6px;">GOOD</td>
+                        <td id="dmg-weapon-missile-ammo" style="text-align:right; color:#94a3b8; padding:2px 6px;">20/20</td>
+                      </tr>
+                      <tr>
+                        <th style="text-align:left; color:#94a3b8; padding:2px 12px; font-weight:normal;">└ レーザー</th>
+                        <td id="dmg-weapon-laser" style="text-align:center; color:#4ade80; padding:2px 6px;">GOOD</td>
+                        <td id="dmg-weapon-laser-ammo" style="text-align:right; color:#94a3b8; padding:2px 6px;">30/30</td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </td>
               </tr>
             </tbody>
           </table>

@@ -13,3 +13,5 @@ dist/
 
 # 動作確認用スクリーンショット
 phase*.png
+.aidesigner/*
+!.aidesigner/.gitkeep
