@@ -98,6 +98,7 @@ export class MeteorSystem {
 
     this.updateMeteors(dt);
     this.handleMeteorCombat(dt);
+    this.updateMissiles(dt);
   }
 
   /**
@@ -384,7 +385,10 @@ export class MeteorSystem {
             return r < 0.5 ? 'GOOD' : r < 0.85 ? 'POOR' : 'UNABLE';
           };
           hitShip.combatEquipment.comm = randomizeStatus(hitShip.combatEquipment.comm);
-          hitShip.combatEquipment.weapon = randomizeStatus(hitShip.combatEquipment.weapon);
+          // missile/laser を個別に劣化させ、集約ステータスを再計算
+          hitShip.weaponStatus.missile = randomizeStatus(hitShip.weaponStatus.missile);
+          hitShip.weaponStatus.laser = randomizeStatus(hitShip.weaponStatus.laser);
+          hitShip.recalcWeaponStatus();
 
           const labelKind = dmgKind === 'fire' ? '火災' : '破口';
           const labelSize = dmgSize === 'large' ? '大' : dmgSize === 'medium' ? '中' : '小';
@@ -406,13 +410,14 @@ export class MeteorSystem {
   }
 
   /**
-   * ユニットから隕石への攻撃処理。
+   * ユニットから隕石への攻撃処理（レーザー: 100km以内 / ミサイル: 100〜300km）。
    */
   private handleMeteorCombat(dt: number): void {
+    const now = Date.now();
     for (const ship of this.scene.spaceships.values()) {
       if (!ship.attackTargetMeteorId) continue;
 
-      // 武器:UNABLE → 射撃不可（標的指定は維持）
+      // 両方 UNABLE → 射撃不可（標的指定は維持）
       if (ship.combatEquipment.weapon === 'UNABLE') continue;
 
       const meteor = this.meteors.get(ship.attackTargetMeteorId);
@@ -424,20 +429,93 @@ export class MeteorSystem {
       ship.attackCooldown = Math.max(0, ship.attackCooldown - dt);
 
       const dist = CommunicationSystem.getDistance(ship.x, ship.y, meteor.x, meteor.y);
-      if (dist <= ship.ATTACK_RANGE && ship.attackCooldown <= 0) {
-        meteor.takeDamage(ship.ATTACK_DAMAGE);
-        // 武器:POOR ならクールダウンを2倍に
-        const cooldownMul = ship.combatEquipment.weapon === 'POOR' ? 2 : 1;
-        ship.attackCooldown = ship.ATTACK_COOLDOWN_MS * cooldownMul;
-        this.scene.showFloatingText(meteor.x, meteor.y, `HIT -${ship.ATTACK_DAMAGE}`, '#fbbf24');
 
-        if (meteor.isDestroyed) {
-          this.createExplosion(meteor.x, meteor.y);
-          window.__chatWidget?.pushSystemMessage(`${meteor.id} を撃破しました`);
-          this.removeMeteor(ship.attackTargetMeteorId);
-          ship.attackTargetMeteorId = null;
+      if (dist <= ship.ATTACK_RANGE) {
+        // レーザー射程内
+        if (ship.attackCooldown <= 0 && ship.canFireLaser()) {
+          meteor.takeDamage(ship.ATTACK_DAMAGE);
+          ship.laserAmmo--;
+          // レーザー POOR ならクールダウン 2 倍
+          const cooldownMul = ship.weaponStatus.laser === 'POOR' ? 2 : 1;
+          ship.attackCooldown = ship.ATTACK_COOLDOWN_MS * cooldownMul;
+          this.scene.showFloatingText(meteor.x, meteor.y, `LASER -${ship.ATTACK_DAMAGE}`, '#fbbf24');
+
+          if (meteor.isDestroyed) {
+            this.createExplosion(meteor.x, meteor.y);
+            window.__chatWidget?.pushSystemMessage(`${meteor.id} を撃破しました`);
+            this.removeMeteor(ship.attackTargetMeteorId);
+            ship.attackTargetMeteorId = null;
+          }
+        }
+      } else if (dist <= ship.MISSILE_RANGE) {
+        // ミサイル射程内（100km < dist ≤ 300km）
+        const targetId = ship.attackTargetMeteorId;
+        const inFlightToTarget = ship.missilesInFlight.filter(m => m.targetMeteorId === targetId).length;
+
+        if (
+          ship.canFireMissile() &&
+          ship.missilesInFlight.length < ship.MISSILE_MAX_TOTAL &&
+          inFlightToTarget < ship.MISSILE_MAX_PER_TARGET &&
+          now - ship.lastMissileLaunchAt >= ship.MISSILE_LAUNCH_INTERVAL_MS
+        ) {
+          const missileId = `${ship.id}-missile-${now}`;
+          ship.missilesInFlight.push({
+            id: missileId,
+            x: ship.x,
+            y: ship.y,
+            targetMeteorId: targetId,
+            speed: ship.MISSILE_SPEED,
+          });
+          ship.lastMissileLaunchAt = now;
+          ship.missileAmmo--;
+          this.scene.showFloatingText(ship.x, ship.y, 'MISSILE LAUNCH', '#60a5fa');
         }
       }
+      // dist > MISSILE_RANGE: 何もしない（飛翔中ミサイルは updateMissiles で継続）
+    }
+  }
+
+  /**
+   * 飛翔中ミサイルの位置更新・命中判定。
+   */
+  private updateMissiles(dt: number): void {
+    for (const ship of this.scene.spaceships.values()) {
+      const toRemove: string[] = [];
+
+      for (const missile of ship.missilesInFlight) {
+        const meteor = this.meteors.get(missile.targetMeteorId);
+        if (!meteor || meteor.isDestroyed) {
+          // ターゲット消滅 → 静かに削除
+          toRemove.push(missile.id);
+          continue;
+        }
+
+        const dx = meteor.x - missile.x;
+        const dy = meteor.y - missile.y;
+        const dist = Math.sqrt(dx * dx + dy * dy);
+        const move = missile.speed * (dt / 1000);
+
+        if (dist <= move || dist <= 10) {
+          // 命中
+          meteor.takeDamage(ship.MISSILE_DAMAGE);
+          this.createExplosion(missile.x, missile.y);
+          this.scene.showFloatingText(missile.x, missile.y, `MISSILE HIT -${ship.MISSILE_DAMAGE}`, '#60a5fa');
+          toRemove.push(missile.id);
+
+          if (meteor.isDestroyed) {
+            window.__chatWidget?.pushSystemMessage(`${meteor.id} を撃破しました`);
+            this.removeMeteor(missile.targetMeteorId);
+            if (ship.attackTargetMeteorId === missile.targetMeteorId) {
+              ship.attackTargetMeteorId = null;
+            }
+          }
+        } else {
+          missile.x += (dx / dist) * move;
+          missile.y += (dy / dist) * move;
+        }
+      }
+
+      ship.missilesInFlight = ship.missilesInFlight.filter(m => !toRemove.includes(m.id));
     }
   }
 
@@ -527,6 +605,18 @@ export class MeteorSystem {
         this.meteorGraphics.lineTo(meteor.x - r, meteor.y);
         this.meteorGraphics.closePath();
         this.meteorGraphics.strokePath();
+      }
+    }
+
+    // ミサイル飛翔エフェクト
+    for (const ship of this.scene.spaceships.values()) {
+      for (const missile of ship.missilesInFlight) {
+        // 軌跡: 発射艦 → ミサイル位置
+        this.meteorGraphics.lineStyle(1, 0x60a5fa, 0.4);
+        this.meteorGraphics.lineBetween(ship.x, ship.y, missile.x, missile.y);
+        // ミサイル本体
+        this.meteorGraphics.fillStyle(0x60a5fa, 1);
+        this.meteorGraphics.fillCircle(missile.x, missile.y, 4);
       }
     }
   }
@@ -647,6 +737,8 @@ export class MeteorSystem {
       if (ship.attackTargetMeteorId === meteorId) {
         ship.attackTargetMeteorId = null;
       }
+      // 撃破された隕石に向かうミサイルを除去（他艦のものも含む）
+      ship.missilesInFlight = ship.missilesInFlight.filter(m => m.targetMeteorId !== meteorId);
     }
   }
 

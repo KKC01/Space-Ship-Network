@@ -887,14 +887,14 @@ export class MainScene extends Scene {
       });
     }
 
-    // 5. Draw Range Overlay (Combat/射程 mode: 400km detection + 100km weapon range)
+    // 5. Draw Range Overlay (Combat/射程 mode: MISSILE_RANGE 300km + 100km laser range)
     if (this.vizMode === 'range') {
       this.spaceships.forEach(ship => {
         this.linkGraphics.lineStyle(1, 0xef4444, 0.6);
         this.linkGraphics.strokeCircle(ship.x, ship.y, 100);
-        // 探知距離 400km を薄いオレンジで表示
+        // ミサイル射程 300km を薄いオレンジで表示
         this.linkGraphics.lineStyle(1, 0xfb923c, 0.25);
-        this.linkGraphics.strokeCircle(ship.x, ship.y, 400);
+        this.linkGraphics.strokeCircle(ship.x, ship.y, ship.MISSILE_RANGE);
       });
     }
 
