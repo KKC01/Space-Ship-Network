@@ -10,10 +10,10 @@ import { CommunicationManager } from '../systems/CommunicationManager';
 import { MissionManager } from '../systems/MissionManager';
 import { CameraController } from '../systems/CameraController';
 import { UIManager } from '../ui/UIManager';
-import planetImg from '../assets/Planet_01.png';
-import commPlanetImg from '../assets/Comm_planet_legacy.png';
-import commTcpPlanetImg from '../assets/Comm_planet.png';
-import meteorImg from '../assets/meteor/meteor_01.png';
+import planetImg from '../assets/Planet/Planet_01.png';
+import commPlanetImg from '../assets/Planet/Comm_planet_legacy.png';
+import commTcpPlanetImg from '../assets/Planet/Comm_planet.png';
+import meteorImg from '../assets/Planet/meteor_01.png';
 
 export class MainScene extends Scene {
   // 隕石サブシステム（MeteorSystem からアクセスされるため public）
