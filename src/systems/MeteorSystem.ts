@@ -553,7 +553,7 @@ export class MeteorSystem {
       const warningId = `meteor-warning-${ship.id}`;
       if (shipsWithWarnings.has(ship.id)) {
         const pulse = (Math.sin(time / 200) + 1) / 2;
-        const isHQ = ship.id === 'HQ Ship';
+        const isHQ = ship.id === 'L-Dest1';
 
         this.meteorGraphics.lineStyle(3, 0xef4444, 0.5 + pulse * 0.5);
         this.meteorGraphics.strokeCircle(ship.x, ship.y, isHQ ? 55 : 40);

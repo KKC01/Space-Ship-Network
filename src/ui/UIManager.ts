@@ -116,9 +116,12 @@ export class UIManager {
 
   /**
    * 戦闘指揮 / 通信管制モードに応じて Unit モーダル表示要素を切り替える。
+   * Repair Ship は星間通信 / レガシー星間通信 / 多重通信を使用不可のため、これらの UI を常に非表示にする。
    */
   applyModeToUnitModal(): void {
     const isCombat = this.scene.systemDisplayMode === SystemDisplayMode.COMBAT;
+    const unit = this.scene.selectedUnitId ? this.scene.spaceships.get(this.scene.selectedUnitId) : null;
+    const isRepair = unit?.isRepairShip() ?? false;
     ['tcpip-toggle-btn',
      'legacy-toggle-btn',
      'multiplex-group-btn', 'multiplex-group-content',
@@ -128,6 +131,16 @@ export class UIManager {
       const el = document.getElementById(id);
       if (el) el.classList.toggle('hidden', isCombat);
     });
+    // Repair Ship: 星間通信 / レガシー星間通信 / 多重通信は非表示・運用不可
+    if (isRepair) {
+      ['tcpip-toggle-btn',
+       'legacy-toggle-btn',
+       'multiplex-group-btn', 'multiplex-group-content']
+        .forEach(id => {
+          const el = document.getElementById(id);
+          if (el) el.classList.add('hidden');
+        });
+    }
     // 戦闘モード時は rgr-container を強制非表示。通信管制モード時はユーザートグル状態を維持。
     const rgrEl = document.getElementById('rgr-container');
     if (rgrEl && isCombat) rgrEl.classList.add('hidden');
@@ -361,7 +374,7 @@ export class UIManager {
     const btn = document.getElementById('send-cmd-btn');
     if (!btn) return;
     btn.onclick = () => {
-      const hq = this.scene.spaceships.get('HQ Ship');
+      const hq = this.scene.spaceships.get('L-Dest1');
       if (hq && hq.isNodeActive) {
         const shortFreq = (document.getElementById('short-freq') as HTMLSelectElement).value as FreqShort;
         const longFreq = (document.getElementById('long-freq') as HTMLSelectElement).value as FreqLong;
@@ -371,7 +384,7 @@ export class UIManager {
           id: `cmd-broadcast-${Date.now()}-${hq.id}`,
           type: PacketType.CMD,
           createdAt: Date.now(),
-          originShipId: 'HQ Ship',
+          originShipId: 'L-Dest1',
           targetShipId: undefined, // Broadcast
           payload: { shortFreq, longFreq, isShortEnabled, isLongEnabled }
         });
@@ -566,11 +579,20 @@ export class UIManager {
       this.domMultiplexMaster.value = currentMasterId || '';
     }
 
+    // 画像は Legacy Destroyer のみ既存アセットがある。他タイプは画像未提供のため非表示。
     const shipImg = document.getElementById('unit-ship-image') as HTMLImageElement | null;
-    if (shipImg) shipImg.src = legacyDestroyerImg;
+    if (shipImg) {
+      if (unit.unitType === 'Legacy Destroyer') {
+        shipImg.src = legacyDestroyerImg;
+        shipImg.style.display = '';
+      } else {
+        shipImg.removeAttribute('src');
+        shipImg.style.display = 'none';
+      }
+    }
     if (this.domUnitTitle) this.domUnitTitle.textContent = unit.id;
-    if (this.domUnitType) this.domUnitType.textContent = 'Legacy Destroyer';
-    if (this.domUnitLevel) this.domUnitLevel.textContent = '1';
+    if (this.domUnitType) this.domUnitType.textContent = unit.unitType;
+    if (this.domUnitLevel) this.domUnitLevel.textContent = String(unit.level);
 
     if (this.domShortEnable) this.domShortEnable.checked = unit.isShortEnabled;
     if (this.domShortFreq) this.domShortFreq.value = unit.shortFreq;
@@ -587,7 +609,7 @@ export class UIManager {
     if (this.domTcpIpToggleBtn) this.applyToggleBtnState(this.domTcpIpToggleBtn, unit.isTcpIpEnabled);
 
     // HQ かつ active な場合のみ「指令送信」ボタンを表示
-    if (unit.id === 'HQ Ship' && unit.isNodeActive) {
+    if (unit.id === 'L-Dest1' && unit.isNodeActive) {
       this.domSendCmdBtn?.classList.remove('hidden');
     } else {
       this.domSendCmdBtn?.classList.add('hidden');
