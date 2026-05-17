@@ -20,4 +20,7 @@ jobs:
       - uses: anthropics/claude-code-action@v1
         with:
           anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
-          create_pull_request: true
+      - name: Create PR
+        run: gh pr create --fill --base main
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
