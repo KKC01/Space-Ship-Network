@@ -54,7 +54,7 @@ export class MainScene extends Scene {
   private clutters: { x: number, y: number }[] = [];
 
   // アステロイド帯（サーベイポイント周辺の環状ゾーン）
-  public asteroidBelt = { centerX: 3000, centerY: 3000, innerRadius: 800, outerRadius: 1500 };
+  public asteroidBelt = { centerX: 3000, centerY: 3000, innerRadius: 800, outerRadius: 2200 };
   private asteroidDebris: { x: number, y: number, size: number, alpha: number }[] = [];
 
   constructor() {

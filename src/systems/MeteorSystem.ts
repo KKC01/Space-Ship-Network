@@ -18,6 +18,8 @@ export class MeteorSystem {
   // スポーン制御（TINY 用と非TINY 用の2系統）
   private tinyMeteorSpawnTimer: number = 15000;
   private normalMeteorSpawnTimer: number = 15000;
+  // アステロイド帯への進入をエッジ検出するための前フレーム状態
+  private wasInBelt: boolean = false;
   private meteorCounter: number = 0;
   private meteorAlerted: Set<string> = new Set();
 
@@ -71,6 +73,11 @@ export class MeteorSystem {
     // いずれかのユニットがアステロイド帯内（リング領域）にいるか判定し、
     // 帯内では TINY を1/5頻度、非TINY を5倍頻度にする
     const inBelt = this.isAnyShipInAsteroidBelt();
+    // 圏外→圏内のエッジで Operator から警告を1回だけ通知
+    if (inBelt && !this.wasInBelt) {
+      window.__chatWidget?.pushSystemMessage('アステロイド帯に入りました。極小隕石が急増します。');
+    }
+    this.wasInBelt = inBelt;
 
     this.tinyMeteorSpawnTimer -= dt;
     if (this.tinyMeteorSpawnTimer <= 0) {
