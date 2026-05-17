@@ -1,8 +1,8 @@
 import { CommunicationSystem } from '../models/CommunicationSystem';
 import { Spaceship } from '../models/Spaceship';
 import { PacketType, FreqShort, FreqLong, SystemDisplayMode } from '../models/DataPacket';
-import legacyDestroyerImg from '../assets/Legacy_Destroyer.png';
-import monitorVideoSrc from '../assets/monitor_01.mp4';
+import legacyDestroyerImg from '../assets/Space_Ship/Legacy_Destroyer.png';
+import monitorVideoSrc from '../assets/Radio_Console/monitor_01.mp4';
 import type { MainScene } from '../scenes/MainScene';
 
 /**

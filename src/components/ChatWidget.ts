@@ -1,4 +1,4 @@
-import operatorImg from '../assets/character/operator_AI_01.png';
+import operatorImg from '../assets/character/AI_02/operator_AI_01.png';
 import { DifyChat, DifyApiError, DifyNetworkError, DifyConfigError } from '../services/DifyChat';
 
 interface ChatMessage {
