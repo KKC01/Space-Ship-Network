@@ -292,6 +292,15 @@ export class MeteorSystem {
           break;
         }
       }
+      if (!inRange) {
+        for (const zone of this.scene.getReconDetectionZones()) {
+          const d = CommunicationSystem.getDistance(meteor.x, meteor.y, zone.x, zone.y);
+          if (d <= zone.radius) {
+            inRange = true;
+            break;
+          }
+        }
+      }
 
       if (!meteor.isDetected && inRange) {
         // 新規探知

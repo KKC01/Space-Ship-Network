@@ -15,6 +15,22 @@ import commPlanetImg from '../assets/Planet/Comm_planet_legacy.png';
 import commTcpPlanetImg from '../assets/Planet/Comm_planet.png';
 import meteorImg from '../assets/Planet/meteor_01.png';
 
+type ReconDronePhase = 'outbound' | 'orbit' | 'returning';
+
+interface ReconDrone {
+  id: string;
+  ownerId: string;
+  originX: number;
+  originY: number;
+  x: number;
+  y: number;
+  targetX: number;
+  targetY: number;
+  phase: ReconDronePhase;
+  orbitElapsedMs: number;
+  orbitAngle: number;
+}
+
 export class MainScene extends Scene {
   // 隕石サブシステム（MeteorSystem からアクセスされるため public）
   public spaceships: Map<string, Spaceship> = new Map();
@@ -46,6 +62,14 @@ export class MainScene extends Scene {
   // 惑星 / 隕石 / 通信 / ミッション / カメラ状態は各 System 内で管理
 
   public selectedUnitId: string | null = null;
+  private reconTargetingUnitId: string | null = null;
+  private reconDrones: ReconDrone[] = [];
+  private reconDroneCounter = 0;
+  private readonly RECON_DRONE_CONTROL_RANGE = 400;
+  private readonly RECON_DRONE_DETECTION_RANGE = 400;
+  private readonly RECON_DRONE_SPEED = 180;
+  private readonly RECON_DRONE_ORBIT_DURATION_MS = 5000;
+  private readonly RECON_DRONE_ORBIT_RADIUS = 36;
 
   // Camera 状態は CameraController 内で管理
 
@@ -197,6 +221,8 @@ export class MainScene extends Scene {
    * 惑星 → 隕石 → ユニットの順にクリック判定を行う。
    */
   private handleWorldClick(worldX: number, worldY: number): void {
+    if (this.handleReconTargetClick(worldX, worldY)) return;
+
     if (this.planetSystem.handleClick(worldX, worldY)) return;
     if (this.meteorSystem.handleClick(worldX, worldY)) return;
 
@@ -208,6 +234,7 @@ export class MainScene extends Scene {
     }
 
     if (clickedId) {
+      if (this.handleRepairTargetSelection(clickedId)) return;
       this.selectedUnitId = clickedId;
       this.uiManager.openUnit();
     } else if (this.selectedUnitId) {
@@ -216,6 +243,163 @@ export class MainScene extends Scene {
     } else {
       this.uiManager.closeUnitModal();
     }
+  }
+
+  private handleRepairTargetSelection(clickedId: string): boolean {
+    if (!this.selectedUnitId || this.selectedUnitId === clickedId) return false;
+
+    const repair = this.spaceships.get(this.selectedUnitId);
+    const target = this.spaceships.get(clickedId);
+    if (!repair || !target) return false;
+    if (!repair.isRepairShip() || target.isRepairShip()) return false;
+
+    this.showRepairConfirmPanel(repair.id, target.id);
+    return true;
+  }
+
+  private showRepairConfirmPanel(repairId: string, targetId: string): void {
+    document.getElementById('repair-confirm-panel')?.remove();
+
+    const panel = document.createElement('div');
+    panel.id = 'repair-confirm-panel';
+    panel.style.position = 'absolute';
+    panel.style.left = '50%';
+    panel.style.top = '50%';
+    panel.style.transform = 'translate(-50%, -50%)';
+    panel.style.zIndex = '1000';
+    panel.style.width = '280px';
+    panel.style.padding = '16px';
+    panel.style.border = '1px solid rgba(74, 222, 128, 0.45)';
+    panel.style.background = 'rgba(15, 23, 42, 0.96)';
+    panel.style.boxShadow = '0 0 24px rgba(34, 197, 94, 0.18)';
+    panel.style.color = '#e5e7eb';
+    panel.style.fontFamily = 'Rajdhani, sans-serif';
+    panel.style.pointerEvents = 'auto';
+
+    const title = document.createElement('div');
+    title.textContent = `${targetId} の修理を実施しますか？`;
+    title.style.fontSize = '15px';
+    title.style.fontWeight = 'bold';
+    title.style.marginBottom = '12px';
+
+    const actions = document.createElement('div');
+    actions.style.display = 'flex';
+    actions.style.gap = '10px';
+
+    const yesBtn = document.createElement('button');
+    yesBtn.textContent = 'YES';
+    yesBtn.style.flex = '1';
+    yesBtn.style.padding = '7px';
+    yesBtn.style.cursor = 'pointer';
+    yesBtn.style.color = '#bbf7d0';
+    yesBtn.style.border = '1px solid rgba(74, 222, 128, 0.6)';
+    yesBtn.style.background = 'rgba(34, 197, 94, 0.18)';
+
+    const noBtn = document.createElement('button');
+    noBtn.textContent = 'NO';
+    noBtn.style.flex = '1';
+    noBtn.style.padding = '7px';
+    noBtn.style.cursor = 'pointer';
+    noBtn.style.color = '#cbd5e1';
+    noBtn.style.border = '1px solid rgba(148, 163, 184, 0.45)';
+    noBtn.style.background = 'rgba(148, 163, 184, 0.12)';
+
+    yesBtn.onclick = () => {
+      const repair = this.spaceships.get(repairId);
+      const target = this.spaceships.get(targetId);
+      panel.remove();
+      if (!repair || !target) return;
+      this.startRepairDocking(repair, target);
+    };
+    noBtn.onclick = () => panel.remove();
+
+    actions.appendChild(yesBtn);
+    actions.appendChild(noBtn);
+    panel.appendChild(title);
+    panel.appendChild(actions);
+    document.body.appendChild(panel);
+  }
+
+  private startRepairDocking(repair: Spaceship, target: Spaceship): void {
+    if (repair.dockingPartnerId) this.releaseDocking(repair);
+    if (target.dockingPartnerId) this.releaseDocking(target);
+
+    repair.dockingPartnerId = target.id;
+    repair.dockingPhase = 'approaching';
+    repair.targetX = target.x;
+    repair.targetY = target.y;
+
+    target.dockingPartnerId = repair.id;
+    target.dockingPhase = 'approaching';
+
+    window.__chatWidget?.pushSystemMessage(`オペレーター: ${repair.id} が ${target.id} へ修理接近を開始します。`);
+    this.showFloatingText(repair.x, repair.y, '修理接近 開始', '#4ade80');
+  }
+
+  public beginReconDroneTargeting(): void {
+    if (this.systemDisplayMode !== SystemDisplayMode.COMBAT) {
+      window.__chatWidget?.pushSystemMessage('戦闘指揮モードで使用して下さい');
+      return;
+    }
+    if (!this.selectedUnitId) return;
+    const ship = this.spaceships.get(this.selectedUnitId);
+    if (!ship) return;
+
+    this.reconTargetingUnitId = ship.id;
+    window.__chatWidget?.pushSystemMessage('索敵ポイントを、示して下さい');
+    this.showFloatingText(ship.x, ship.y, '索敵ポイントを、示して下さい', '#7dd3fc');
+  }
+
+  public isReconDroneTargetingUnit(unitId: string): boolean {
+    return this.reconTargetingUnitId === unitId;
+  }
+
+  public getReconDetectionZones(): Array<{ x: number; y: number; radius: number }> {
+    return this.reconDrones.map(drone => ({
+      x: drone.x,
+      y: drone.y,
+      radius: this.RECON_DRONE_DETECTION_RANGE,
+    }));
+  }
+
+  private handleReconTargetClick(worldX: number, worldY: number): boolean {
+    if (!this.reconTargetingUnitId) return false;
+    const ship = this.spaceships.get(this.reconTargetingUnitId);
+    if (!ship || this.systemDisplayMode !== SystemDisplayMode.COMBAT) {
+      this.reconTargetingUnitId = null;
+      this.uiManager.updateReconDroneButtonState();
+      return false;
+    }
+
+    const distance = CommunicationSystem.getDistance(worldX, worldY, ship.x, ship.y);
+    if (distance > this.RECON_DRONE_CONTROL_RANGE) {
+      window.__chatWidget?.pushSystemMessage('指定ポイントが索敵可能エリア外です');
+      this.showFloatingText(worldX, worldY, 'エリア外', '#f87171');
+      return true;
+    }
+
+    this.launchReconDrone(ship.id, ship.x, ship.y, worldX, worldY);
+    this.reconTargetingUnitId = null;
+    this.uiManager.updateReconDroneButtonState();
+    return true;
+  }
+
+  private launchReconDrone(ownerId: string, originX: number, originY: number, targetX: number, targetY: number): void {
+    this.reconDrones.push({
+      id: `recon-${++this.reconDroneCounter}`,
+      ownerId,
+      originX,
+      originY,
+      x: originX,
+      y: originY,
+      targetX,
+      targetY,
+      phase: 'outbound',
+      orbitElapsedMs: 0,
+      orbitAngle: 0,
+    });
+    window.__chatWidget?.pushSystemMessage(`${ownerId} 索敵ドローン発進`);
+    this.showFloatingText(originX, originY, '索敵ドローン 発進', '#38bdf8');
   }
 
 
@@ -245,6 +429,8 @@ export class MainScene extends Scene {
     if (this.missionManager.isGameOver() || this.isBriefingActive) return;
 
     this.timeElapsedMs += delta;
+
+    this.updateReconDrones(delta);
 
     // 隕石の更新（spawn / 探知 / 衝突 / 戦闘）は MeteorSystem に委譲
     this.meteorSystem.update(delta, time);
@@ -388,6 +574,60 @@ export class MainScene extends Scene {
 
     // 経過時間表示の更新（整数秒）
     this.uiManager.updateTimeDisplay(this.timeElapsedMs, 0);
+  }
+
+  private updateReconDrones(delta: number): void {
+    const dtSeconds = delta / 1000;
+    const completedIds = new Set<string>();
+
+    for (const drone of this.reconDrones) {
+      if (drone.phase === 'outbound') {
+        this.moveReconDroneToward(drone, drone.targetX, drone.targetY, dtSeconds);
+        if (CommunicationSystem.getDistance(drone.x, drone.y, drone.targetX, drone.targetY) <= 2) {
+          drone.x = drone.targetX;
+          drone.y = drone.targetY;
+          drone.phase = 'orbit';
+          drone.orbitElapsedMs = 0;
+        }
+      } else if (drone.phase === 'orbit') {
+        drone.orbitElapsedMs += delta;
+        drone.orbitAngle += dtSeconds * 2.4;
+        drone.x = drone.targetX + Math.cos(drone.orbitAngle) * this.RECON_DRONE_ORBIT_RADIUS;
+        drone.y = drone.targetY + Math.sin(drone.orbitAngle) * this.RECON_DRONE_ORBIT_RADIUS;
+        if (drone.orbitElapsedMs >= this.RECON_DRONE_ORBIT_DURATION_MS) {
+          const owner = this.spaceships.get(drone.ownerId);
+          if (owner) {
+            drone.originX = owner.x;
+            drone.originY = owner.y;
+          }
+          drone.phase = 'returning';
+        }
+      } else {
+        const owner = this.spaceships.get(drone.ownerId);
+        const returnX = owner?.x ?? drone.originX;
+        const returnY = owner?.y ?? drone.originY;
+        this.moveReconDroneToward(drone, returnX, returnY, dtSeconds);
+        if (CommunicationSystem.getDistance(drone.x, drone.y, returnX, returnY) <= 4) {
+          completedIds.add(drone.id);
+          if (owner) this.showFloatingText(owner.x, owner.y, '索敵ドローン 帰投', '#7dd3fc');
+        }
+      }
+    }
+
+    if (completedIds.size > 0) {
+      this.reconDrones = this.reconDrones.filter(drone => !completedIds.has(drone.id));
+    }
+  }
+
+  private moveReconDroneToward(drone: ReconDrone, targetX: number, targetY: number, dtSeconds: number): void {
+    const dx = targetX - drone.x;
+    const dy = targetY - drone.y;
+    const dist = Math.sqrt(dx * dx + dy * dy);
+    if (dist <= 0.001) return;
+
+    const step = Math.min(dist, this.RECON_DRONE_SPEED * dtSeconds);
+    drone.x += (dx / dist) * step;
+    drone.y += (dy / dist) * step;
   }
 
   private draw(time: number) {
@@ -912,8 +1152,35 @@ export class MainScene extends Scene {
       });
     }
 
+    this.drawReconDrones(time);
+
     // 6. Draw Meteors: MeteorSystem に委譲
     this.meteorSystem.draw(time);
+  }
+
+  private drawReconDrones(time: number): void {
+    if (this.reconTargetingUnitId) {
+      const ship = this.spaceships.get(this.reconTargetingUnitId);
+      if (ship) {
+        const pulse = (Math.sin(time / 350) + 1) / 2;
+        this.linkGraphics.fillStyle(0x38bdf8, 0.05 + pulse * 0.03);
+        this.linkGraphics.fillCircle(ship.x, ship.y, this.RECON_DRONE_CONTROL_RANGE);
+        this.linkGraphics.lineStyle(2, 0x38bdf8, 0.5 + pulse * 0.3);
+        this.linkGraphics.strokeCircle(ship.x, ship.y, this.RECON_DRONE_CONTROL_RANGE);
+      }
+    }
+
+    for (const drone of this.reconDrones) {
+      const pulse = (Math.sin(time / 260 + drone.orbitAngle) + 1) / 2;
+      this.linkGraphics.lineStyle(1, 0x7dd3fc, 0.18 + pulse * 0.12);
+      this.linkGraphics.strokeCircle(drone.x, drone.y, this.RECON_DRONE_DETECTION_RANGE);
+      this.linkGraphics.lineStyle(1, 0x38bdf8, 0.35);
+      this.linkGraphics.lineBetween(drone.originX, drone.originY, drone.x, drone.y);
+      this.linkGraphics.fillStyle(0xe0f2fe, 1);
+      this.linkGraphics.fillCircle(drone.x, drone.y, 5);
+      this.linkGraphics.lineStyle(1, 0x38bdf8, 0.9);
+      this.linkGraphics.strokeCircle(drone.x, drone.y, 9 + pulse * 4);
+    }
   }
 
   private drawStreamline(startX: number, startY: number, endX: number, endY: number, progress: number, color: number) {
@@ -985,22 +1252,16 @@ export class MainScene extends Scene {
   }
 
   /**
-   * Repair Ship の横付け修理ロジック（issue #5）。
-   *   1. Repair Ship の検知半径 (DOCK_DETECT_RANGE) 内に HP が満タンでない他ユニットが入ると
-   *      互いに接近を開始し、オペレーターから接近開始を通知。
-   *   2. 横付け距離 (DOCK_DISTANCE) 以内に達したら docked フェーズに遷移、HP 回復開始。
-   *   3. 既に減少した分の半分まで回復したら離脱、回復完了をオペレーターから通知。
-   * 接近 / 横付け中の接近ユニットは Spaceship.update() 側で半速になる。
+   * Repair Ship の手動横付け修理ロジック。
+   * Repair Ship を選択中に対象ユニットをクリックし、確認後に Repair Ship 側が近接して修理する。
    */
   private updateRepairDocking(delta: number): void {
-    const DOCK_DETECT_RANGE = 400;  // 検知半径
     const DOCK_DISTANCE = 40;       // 横付け到達距離
     const HEAL_RATE_PER_SEC = 5;    // 横付け中の HP 回復速度（HP/sec）
 
     const ships = Array.from(this.spaceships.values());
-    const repairShips = ships.filter(s => s.isRepairShip());
 
-    // 1. 既存ペアの状態更新
+    // 既存ペアの状態更新
     for (const ship of ships) {
       if (!ship.dockingPartnerId) continue;
       const partner = this.spaceships.get(ship.dockingPartnerId);
@@ -1019,18 +1280,14 @@ export class MainScene extends Scene {
       const dist = CommunicationSystem.getDistance(other.x, other.y, repair.x, repair.y);
 
       if (other.dockingPhase === 'approaching') {
-        // 接近フェーズ: Repair Ship 方向にターゲット設定
-        other.targetX = repair.x;
-        other.targetY = repair.y;
+        // 接近フェーズ: Repair Ship が対象ユニットへ近接する
+        repair.targetX = other.x;
+        repair.targetY = other.y;
         if (dist <= DOCK_DISTANCE) {
           // 横付け完了
           other.dockingPhase = 'docked';
           repair.dockingPhase = 'docked';
           other.dockHealStartHp = other.hp;
-          other.targetX = null;
-          other.targetY = null;
-          other.vx = 0;
-          other.vy = 0;
           repair.targetX = null;
           repair.targetY = null;
           repair.vx = 0;
@@ -1044,59 +1301,62 @@ export class MainScene extends Scene {
         if (other.hp < healTargetHp) {
           other.hp = Math.min(healTargetHp, other.hp + HEAL_RATE_PER_SEC * (delta / 1000));
         }
-        // Repair Ship に密着追従（Repair Ship 自体は通常移動）
+        this.updateRepairCountdownLabel(other, healTargetHp, HEAL_RATE_PER_SEC);
+        // Repair Ship が対象ユニットへ密着追従する
         const offset = 25; // 横付け位置オフセット
-        other.x = repair.x + offset;
-        other.y = repair.y;
-        other.vx = 0;
-        other.vy = 0;
+        repair.x = other.x - offset;
+        repair.y = other.y;
+        repair.vx = 0;
+        repair.vy = 0;
 
         if (other.hp >= healTargetHp - 0.01) {
           // 回復完了 -> 通知して解除
           other.hp = healTargetHp;
           window.__chatWidget?.pushSystemMessage(`オペレーター: ${other.id} の HP 回復完了。${repair.id} から離脱します。`);
+          this.clearRepairCountdownLabel(other.id);
           this.releaseDocking(other);
         }
       }
     }
+  }
 
-    // 2. 新規ペアの検出（Repair Ship が空き状態のとき）
-    for (const repair of repairShips) {
-      if (repair.dockingPartnerId) continue;
+  private updateRepairCountdownLabel(target: Spaceship, healTargetHp: number, healRatePerSec: number): void {
+    const labelId = `repair-countdown-${target.id}`;
+    const remainingSec = Math.max(0, Math.ceil((healTargetHp - target.hp) / healRatePerSec));
+    const text = `修理完了まで ${remainingSec}s`;
 
-      let bestTarget: Spaceship | null = null;
-      let bestDist = Infinity;
-      for (const other of ships) {
-        if (other.id === repair.id) continue;
-        if (other.isRepairShip()) continue;
-        if (other.dockingPartnerId) continue;
-        if (other.hp >= other.maxHp) continue; // 回復不要
-        const d = CommunicationSystem.getDistance(repair.x, repair.y, other.x, other.y);
-        if (d > DOCK_DETECT_RANGE) continue;
-        if (d < bestDist) {
-          bestDist = d;
-          bestTarget = other;
-        }
-      }
-      if (bestTarget) {
-        repair.dockingPartnerId = bestTarget.id;
-        repair.dockingPhase = 'approaching';
-        bestTarget.dockingPartnerId = repair.id;
-        bestTarget.dockingPhase = 'approaching';
-        // Repair Ship も接近対象方向へ移動
-        repair.targetX = bestTarget.x;
-        repair.targetY = bestTarget.y;
-        bestTarget.targetX = repair.x;
-        bestTarget.targetY = repair.y;
-        window.__chatWidget?.pushSystemMessage(`オペレーター: ${bestTarget.id} の HP 減少を検知。${repair.id} と相互接近を開始します。`);
-      }
+    if (!this.textLabels.has(labelId)) {
+      const countdown = this.add.text(target.x, target.y - 72, text, {
+        fontSize: '12px',
+        color: '#bbf7d0',
+        fontStyle: 'bold',
+        fontFamily: 'Rajdhani',
+      }).setOrigin(0.5).setDepth(25);
+      countdown.setBackgroundColor('rgba(15, 23, 42, 0.88)');
+      countdown.setPadding(6, 4);
+      this.textLabels.set(labelId, countdown);
+    } else {
+      this.textLabels.get(labelId)?.setText(text).setPosition(target.x, target.y - 72).setVisible(true);
     }
+  }
 
+  private clearRepairCountdownLabel(targetId: string): void {
+    const labelId = `repair-countdown-${targetId}`;
+    const label = this.textLabels.get(labelId);
+    if (label) {
+      label.destroy();
+      this.textLabels.delete(labelId);
+    }
   }
 
   /** Repair Ship との横付け / 接近状態を双方解除する */
   private releaseDocking(ship: Spaceship): void {
     const partner = ship.dockingPartnerId ? this.spaceships.get(ship.dockingPartnerId) : null;
+    if (ship.isRepairShip()) {
+      if (partner) this.clearRepairCountdownLabel(partner.id);
+    } else {
+      this.clearRepairCountdownLabel(ship.id);
+    }
     ship.dockingPartnerId = null;
     ship.dockingPhase = null;
     ship.dockHealStartHp = null;
@@ -1137,8 +1397,8 @@ export class MainScene extends Scene {
       for (let j = i + 1; j < ships.length; j++) {
         const b = ships[j];
         if (removed.has(b.id)) continue;
-        // Repair Ship と接近 / 横付け中のペアは衝突扱いしない
-        if ((a.dockingPartnerId === b.id) || (b.dockingPartnerId === a.id)) continue;
+        // Repair Ship は他ユニットとの衝突扱いにしない
+        if (a.isRepairShip() || b.isRepairShip()) continue;
         const dist = CommunicationSystem.getDistance(a.x, a.y, b.x, b.y);
         if (dist >= COLLISION_DISTANCE) continue;
 

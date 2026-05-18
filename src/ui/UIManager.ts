@@ -58,6 +58,7 @@ export class UIManager {
   private domDmgStatusWeapon: HTMLElement | null = null;
   private domDmgSituation: HTMLElement | null = null;
   private domDmgTreatBtn: HTMLButtonElement | null = null;
+  private domReconDroneBtn: HTMLButtonElement | null = null;
 
   // viz mode 切替の内部状態（CONTROL モード時のみ循環）
   private controlVizIndex = 0;
@@ -162,6 +163,7 @@ export class UIManager {
     // 残弾表示: 戦闘指揮モードのみ表示
     const ammoContainer = document.getElementById('ammo-container');
     if (ammoContainer) ammoContainer.style.display = isCombat ? 'block' : 'none';
+    this.updateReconDroneButtonState();
   }
 
   /**
@@ -465,14 +467,33 @@ export class UIManager {
 
   private bindActionCycleBtn(): void {
     const actionCycleBtn = document.getElementById('action-cycle-btn');
-    if (!actionCycleBtn) return;
-    actionCycleBtn.onclick = () => {
-      const cycle: Array<'attack' | 'jamming' | 'warning'> = ['attack', 'jamming', 'warning'];
-      const labels: Record<string, string> = { attack: '攻撃', jamming: '妨害', warning: '警告' };
-      const next = cycle[(cycle.indexOf(this.scene.selectedAction) + 1) % cycle.length];
-      this.scene.selectedAction = next;
-      actionCycleBtn.textContent = labels[next];
-    };
+    if (actionCycleBtn) {
+      actionCycleBtn.onclick = () => {
+        const cycle: Array<'attack' | 'jamming' | 'warning'> = ['attack', 'jamming', 'warning'];
+        const labels: Record<string, string> = { attack: '攻撃', jamming: '妨害', warning: '警告' };
+        const next = cycle[(cycle.indexOf(this.scene.selectedAction) + 1) % cycle.length];
+        this.scene.selectedAction = next;
+        actionCycleBtn.textContent = labels[next];
+      };
+    }
+
+    this.domReconDroneBtn = document.getElementById('recon-drone-btn') as HTMLButtonElement | null;
+    if (this.domReconDroneBtn) {
+      this.domReconDroneBtn.onclick = () => {
+        this.scene.beginReconDroneTargeting();
+        this.updateReconDroneButtonState();
+      };
+    }
+  }
+
+  public updateReconDroneButtonState(): void {
+    if (!this.domReconDroneBtn) return;
+    const selectedId = this.scene.selectedUnitId;
+    const isTargeting = selectedId ? this.scene.isReconDroneTargetingUnit(selectedId) : false;
+    this.domReconDroneBtn.textContent = isTargeting ? '索敵ポイント指定中' : '索敵ドローン';
+    this.domReconDroneBtn.style.background = isTargeting ? 'rgba(250,204,21,0.18)' : 'rgba(56,189,248,0.16)';
+    this.domReconDroneBtn.style.borderColor = isTargeting ? 'rgba(250,204,21,0.55)' : 'rgba(56,189,248,0.45)';
+    this.domReconDroneBtn.style.color = isTargeting ? '#fde68a' : '#7dd3fc';
   }
 
   // 被害対処タブ: DOM参照取得と「被害対処 実行」ボタンのハンドラ登録
@@ -639,6 +660,9 @@ export class UIManager {
     // 残弾表示
     const ammoMissile = document.getElementById('ammo-missile');
     const ammoLaser = document.getElementById('ammo-laser');
+    const canShowMissile = unit.canEquipMissile();
+    const ammoMissileRow = ammoMissile?.parentElement as HTMLElement | null;
+    if (ammoMissileRow) ammoMissileRow.style.display = canShowMissile ? '' : 'none';
     if (ammoMissile) ammoMissile.textContent = String(unit.missileAmmo);
     if (ammoLaser) ammoLaser.textContent = String(unit.laserAmmo);
 
@@ -647,6 +671,8 @@ export class UIManager {
     const dmgWeaponLaser = document.getElementById('dmg-weapon-laser');
     const dmgWeaponMissileAmmo = document.getElementById('dmg-weapon-missile-ammo');
     const dmgWeaponLaserAmmo = document.getElementById('dmg-weapon-laser-ammo');
+    const dmgWeaponMissileRow = dmgWeaponMissile?.closest('tr') as HTMLTableRowElement | null;
+    if (dmgWeaponMissileRow) dmgWeaponMissileRow.style.display = canShowMissile ? '' : 'none';
 
     if (dmgWeaponMissile) {
       dmgWeaponMissile.textContent = unit.weaponStatus.missile;
