@@ -1,6 +1,6 @@
 import { Scene } from 'phaser';
 import { Spaceship } from '../models/Spaceship';
-import type { DamageKind, EquipmentLevel } from '../models/Spaceship';
+import type { DamageKind, EquipmentLevel, UnitType } from '../models/Spaceship';
 import { SystemDisplayMode } from '../models/DataPacket';
 import { CommunicationSystem } from '../models/CommunicationSystem';
 import { OpticalMaster } from '../models/OpticalMaster';
@@ -109,21 +109,32 @@ export class MainScene extends Scene {
     const cx = this.sys.game.canvas.width / 2;
     const cy = this.sys.game.canvas.height / 2;
 
-    const shipCount = 4;
     const SPAWN_OFFSET_X = -3200;
     const SPAWN_OFFSET_Y = -3200;
-    for (let i = 0; i < shipCount; i++) {
-      const id = i === 0 ? 'HQ Ship' : `Ship-${i}`;
-      // Specific initial formation around HQ
-      const x = (i === 0 ? cx : cx + (i === 1 ? -400 : (i === 2 ? 400 : 0))) + SPAWN_OFFSET_X;
-      const y = (i === 0 ? cy : cy + (i === 3 ? 500 : 200)) + SPAWN_OFFSET_Y;
-      const ship = new Spaceship(id, x, y, 1);
-      
-      if (i === 0) {
+
+    // ユニット編成（issue #5）:
+    //   L-Dest1 (Legacy Destroyer / HQ, ノード設定)
+    //   Dest1   (Destroyer)
+    //   L-Frig1 (Legacy Frigate)
+    //   Frig1   (Frigate)
+    //   Rep1    (Repair Ship)
+    const formation: Array<{ id: string; type: UnitType; dx: number; dy: number }> = [
+      { id: 'L-Dest1', type: 'Legacy Destroyer', dx: 0,    dy: 0   },
+      { id: 'Dest1',   type: 'Destroyer',        dx: -400, dy: 200 },
+      { id: 'L-Frig1', type: 'Legacy Frigate',   dx: 400,  dy: 200 },
+      { id: 'Frig1',   type: 'Frigate',          dx: 0,    dy: 500 },
+      { id: 'Rep1',    type: 'Repair Ship',      dx: -200, dy: 600 },
+    ];
+
+    for (const f of formation) {
+      const x = cx + f.dx + SPAWN_OFFSET_X;
+      const y = cy + f.dy + SPAWN_OFFSET_Y;
+      const ship = new Spaceship(f.id, x, y, 1, f.type);
+      if (f.type === 'Legacy Destroyer' && f.id === 'L-Dest1') {
         ship.isNodeActive = true;
-        ship.pollingList = ['Ship-1', 'Ship-2', 'Ship-3'];
+        ship.pollingList = formation.filter(o => o.id !== f.id).map(o => o.id);
       }
-      this.spaceships.set(id, ship);
+      this.spaceships.set(f.id, ship);
     }
 
     // Initialize Optical Masters
@@ -331,6 +342,9 @@ export class MainScene extends Scene {
       }
     }
 
+    // === Repair Ship の横付け修理処理 ===
+    this.updateRepairDocking(delta);
+
     // === ユニット間衝突判定（大型隕石相当の被害を双方に与える） ===
     this.checkShipCollisions();
 
@@ -342,7 +356,7 @@ export class MainScene extends Scene {
     const isCombat = this.systemDisplayMode === SystemDisplayMode.COMBAT;
     for (const [id, s] of this.spaceships.entries()) {
       const text = this.textLabels.get(id);
-      const isHQ = (id === 'HQ Ship');
+      const isHQ = (id === 'L-Dest1');
       if (text) {
         if (isCombat) {
           text.setText(id);
@@ -440,7 +454,7 @@ export class MainScene extends Scene {
       g.clear();
 
       const isSelected = this.selectedUnitId === ship.id;
-      const isHQ = ship.id === 'HQ Ship';
+      const isHQ = ship.id === 'L-Dest1';
       const primaryColor = 0x38bdf8; // Cyan
       const accentColor = 0x38bdf8; // Unified color
       
@@ -971,6 +985,133 @@ export class MainScene extends Scene {
   }
 
   /**
+   * Repair Ship の横付け修理ロジック（issue #5）。
+   *   1. Repair Ship の検知半径 (DOCK_DETECT_RANGE) 内に HP が満タンでない他ユニットが入ると
+   *      互いに接近を開始し、オペレーターから接近開始を通知。
+   *   2. 横付け距離 (DOCK_DISTANCE) 以内に達したら docked フェーズに遷移、HP 回復開始。
+   *   3. 既に減少した分の半分まで回復したら離脱、回復完了をオペレーターから通知。
+   * 接近 / 横付け中の接近ユニットは Spaceship.update() 側で半速になる。
+   */
+  private updateRepairDocking(delta: number): void {
+    const DOCK_DETECT_RANGE = 400;  // 検知半径
+    const DOCK_DISTANCE = 40;       // 横付け到達距離
+    const HEAL_RATE_PER_SEC = 5;    // 横付け中の HP 回復速度（HP/sec）
+
+    const ships = Array.from(this.spaceships.values());
+    const repairShips = ships.filter(s => s.isRepairShip());
+
+    // 1. 既存ペアの状態更新
+    for (const ship of ships) {
+      if (!ship.dockingPartnerId) continue;
+      const partner = this.spaceships.get(ship.dockingPartnerId);
+      if (!partner) {
+        // 相方が消えた -> 解除
+        this.releaseDocking(ship);
+        continue;
+      }
+      // Repair Ship 側はパートナー側で集中管理するため処理スキップ
+      if (ship.isRepairShip()) continue;
+
+      const repair = partner.isRepairShip() ? partner : ship.isRepairShip() ? ship : null;
+      const other = ship; // ship は Repair Ship でない側
+      if (!repair) continue;
+
+      const dist = CommunicationSystem.getDistance(other.x, other.y, repair.x, repair.y);
+
+      if (other.dockingPhase === 'approaching') {
+        // 接近フェーズ: Repair Ship 方向にターゲット設定
+        other.targetX = repair.x;
+        other.targetY = repair.y;
+        if (dist <= DOCK_DISTANCE) {
+          // 横付け完了
+          other.dockingPhase = 'docked';
+          repair.dockingPhase = 'docked';
+          other.dockHealStartHp = other.hp;
+          other.targetX = null;
+          other.targetY = null;
+          other.vx = 0;
+          other.vy = 0;
+          repair.targetX = null;
+          repair.targetY = null;
+          repair.vx = 0;
+          repair.vy = 0;
+          window.__chatWidget?.pushSystemMessage(`オペレーター: ${other.id} が ${repair.id} と横付け完了。HP 回復を開始します。`);
+        }
+      } else if (other.dockingPhase === 'docked') {
+        // 横付け中: HP 回復
+        const startHp = other.dockHealStartHp ?? other.hp;
+        const healTargetHp = Math.min(other.maxHp, startHp + (other.maxHp - startHp) / 2);
+        if (other.hp < healTargetHp) {
+          other.hp = Math.min(healTargetHp, other.hp + HEAL_RATE_PER_SEC * (delta / 1000));
+        }
+        // Repair Ship に密着追従（Repair Ship 自体は通常移動）
+        const offset = 25; // 横付け位置オフセット
+        other.x = repair.x + offset;
+        other.y = repair.y;
+        other.vx = 0;
+        other.vy = 0;
+
+        if (other.hp >= healTargetHp - 0.01) {
+          // 回復完了 -> 通知して解除
+          other.hp = healTargetHp;
+          window.__chatWidget?.pushSystemMessage(`オペレーター: ${other.id} の HP 回復完了。${repair.id} から離脱します。`);
+          this.releaseDocking(other);
+        }
+      }
+    }
+
+    // 2. 新規ペアの検出（Repair Ship が空き状態のとき）
+    for (const repair of repairShips) {
+      if (repair.dockingPartnerId) continue;
+
+      let bestTarget: Spaceship | null = null;
+      let bestDist = Infinity;
+      for (const other of ships) {
+        if (other.id === repair.id) continue;
+        if (other.isRepairShip()) continue;
+        if (other.dockingPartnerId) continue;
+        if (other.hp >= other.maxHp) continue; // 回復不要
+        const d = CommunicationSystem.getDistance(repair.x, repair.y, other.x, other.y);
+        if (d > DOCK_DETECT_RANGE) continue;
+        if (d < bestDist) {
+          bestDist = d;
+          bestTarget = other;
+        }
+      }
+      if (bestTarget) {
+        repair.dockingPartnerId = bestTarget.id;
+        repair.dockingPhase = 'approaching';
+        bestTarget.dockingPartnerId = repair.id;
+        bestTarget.dockingPhase = 'approaching';
+        // Repair Ship も接近対象方向へ移動
+        repair.targetX = bestTarget.x;
+        repair.targetY = bestTarget.y;
+        bestTarget.targetX = repair.x;
+        bestTarget.targetY = repair.y;
+        window.__chatWidget?.pushSystemMessage(`オペレーター: ${bestTarget.id} の HP 減少を検知。${repair.id} と相互接近を開始します。`);
+      }
+    }
+
+  }
+
+  /** Repair Ship との横付け / 接近状態を双方解除する */
+  private releaseDocking(ship: Spaceship): void {
+    const partner = ship.dockingPartnerId ? this.spaceships.get(ship.dockingPartnerId) : null;
+    ship.dockingPartnerId = null;
+    ship.dockingPhase = null;
+    ship.dockHealStartHp = null;
+    ship.targetX = null;
+    ship.targetY = null;
+    if (partner) {
+      partner.dockingPartnerId = null;
+      partner.dockingPhase = null;
+      partner.dockHealStartHp = null;
+      partner.targetX = null;
+      partner.targetY = null;
+    }
+  }
+
+  /**
    * ユニット同士の衝突を検知し、大型隕石相当の被害を双方に与える。
    * 衝突閾値: 30km 以内。ペア重複防止のため id 文字列比較で1回のみ処理。
    */
@@ -996,6 +1137,8 @@ export class MainScene extends Scene {
       for (let j = i + 1; j < ships.length; j++) {
         const b = ships[j];
         if (removed.has(b.id)) continue;
+        // Repair Ship と接近 / 横付け中のペアは衝突扱いしない
+        if ((a.dockingPartnerId === b.id) || (b.dockingPartnerId === a.id)) continue;
         const dist = CommunicationSystem.getDistance(a.x, a.y, b.x, b.y);
         if (dist >= COLLISION_DISTANCE) continue;
 
