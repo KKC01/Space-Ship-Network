@@ -37,7 +37,35 @@ tools: Read, Bash, Grep, Glob
 - DOMPurify 等のサニタイズが必要な箇所がないか
 - Phaser テキストオブジェクトへの動的挿入は基本的に安全（DOM ではないため）が、HTML 表示部分は要確認
 
-### 4. その他
+### 4. 個人情報（PII）の流出
+- 以下のデータが**ログ・コンソール・LocalStorage・外部送信・コミット**に含まれていないか確認：
+  - メールアドレス、電話番号、氏名、住所
+  - ユーザーID、セッションID、IPアドレス
+  - クレジットカード番号、銀行口座、マイナンバー
+  - 生年月日、年齢、性別、健康情報
+- Grep パターン例：
+  ```bash
+  git diff | grep -iE '(email|phone|tel|address|birth|ssn|mynumber|credit[_-]?card)'
+  git diff | grep -E '[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}'  # メールアドレス
+  git diff | grep -E '0\d{1,4}-\d{1,4}-\d{4}'  # 日本の電話番号
+  ```
+- console.log / console.warn にユーザーデータが含まれていないか
+- 第三者送信（analytics, Sentry 等）への PII 漏洩
+
+### 5. Web Security（OWASP Top 10 準拠）
+- **XSS**: innerHTML / dangerouslySetInnerHTML / eval / document.write
+- **CSRF**: 状態変更 API に CSRF トークン or SameSite Cookie
+- **Open Redirect**: location.href, window.open に外部入力を直接渡していないか
+- **CSP（Content Security Policy）**: meta タグ or HTTP ヘッダで設定済か
+- **Mixed Content**: HTTPS ページから HTTP リソース読込みなし
+- **Cookie 設定**: HttpOnly / Secure / SameSite=Strict|Lax
+- **Click-jacking**: X-Frame-Options or frame-ancestors CSP
+- **SQL Injection / NoSQL Injection**: パラメータ化クエリ使用
+- **SSRF**: 外部 URL を fetch する箇所で内部 IP / metadata エンドポイントへのアクセスをブロック
+- **安全でない deserialization**: JSON.parse 以外のシリアライザに外部入力を渡さない
+- **依存関係の脆弱性**: `npm audit --audit-level=high`
+
+### 6. その他
 - CORS 設定の妥当性
 - 外部リソースの origin 検証
 - 依存パッケージの既知の脆弱性（`npm audit`）

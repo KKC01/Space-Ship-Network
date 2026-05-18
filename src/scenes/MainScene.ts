@@ -120,7 +120,8 @@ export class MainScene extends Scene {
     const cy = this.sys.game.canvas.height / 2;
     // ユニット初期位置のオフセットに合わせて bounds を拡張（クランプ回避）
     this.cameras.main.setBounds(-6000, -6000, 12000, 12000);
-    this.cameras.main.setZoom(0.4);
+    const initialZoom = this.isCompactViewport() ? 0.32 : 0.4;
+    this.cameras.main.setZoom(initialZoom);
     // ユニット群を画面右側に表示してミッションパネル（左上）との重なりを回避
     this.cameras.main.centerOn(cx - 3200 - 250, cy - 3200);
 
@@ -214,6 +215,10 @@ export class MainScene extends Scene {
         alpha: 0.25 + Math.random() * 0.4,
       });
     }
+  }
+
+  private isCompactViewport(): boolean {
+    return window.matchMedia('(max-width: 720px), (pointer: coarse)').matches;
   }
 
   /**

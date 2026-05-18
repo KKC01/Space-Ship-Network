@@ -286,6 +286,164 @@ body {
   box-shadow: 0 2px 10px rgba(56, 189, 248, 0.3);
 }
 
+#mobile-camera-controls {
+  position: absolute;
+  right: 20px;
+  bottom: 78px;
+  display: none;
+  pointer-events: auto;
+  padding: 6px;
+  gap: 6px;
+  z-index: 20;
+}
+
+.mobile-camera-btn {
+  width: 44px;
+  height: 44px;
+  border: 1px solid rgba(56, 189, 248, 0.55);
+  border-radius: 8px;
+  background: rgba(8, 13, 28, 0.72);
+  color: #e0f2fe;
+  font-family: 'Rajdhani', sans-serif;
+  font-size: 18px;
+  font-weight: 700;
+  cursor: pointer;
+  touch-action: manipulation;
+}
+
+.mobile-camera-btn:active {
+  background: rgba(56, 189, 248, 0.26);
+  transform: translateY(1px);
+}
+
+@media (hover: none), (pointer: coarse), (max-width: 720px) {
+  button,
+  select,
+  input,
+  textarea {
+    font-size: 16px;
+  }
+
+  #ui-layer {
+    padding: max(10px, env(safe-area-inset-top)) max(10px, env(safe-area-inset-right)) max(10px, env(safe-area-inset-bottom)) max(10px, env(safe-area-inset-left));
+  }
+
+  #mission-panel {
+    top: max(10px, env(safe-area-inset-top));
+    left: max(10px, env(safe-area-inset-left));
+    width: min(56vw, 220px);
+  }
+
+  .mission-toggle-btn {
+    min-height: 48px;
+    padding: 9px 10px;
+  }
+
+  .mission-header-text .hud-label {
+    font-size: 10px;
+    letter-spacing: 1px;
+  }
+
+  .mission-header-text #mission-title {
+    font-size: 12px;
+  }
+
+  .hud-panel {
+    position: absolute;
+    top: max(10px, env(safe-area-inset-top));
+    right: max(10px, env(safe-area-inset-right));
+    gap: 10px;
+    padding: 8px 10px;
+    align-items: center;
+  }
+
+  .hud-label {
+    font-size: 10px;
+    letter-spacing: 1px;
+  }
+
+  .hud-value {
+    font-size: 22px;
+  }
+
+  .mode-toggle-btn,
+  .viz-cycle-btn {
+    min-height: 38px;
+    padding: 7px 10px;
+    font-size: 11px;
+    letter-spacing: 0.5px;
+  }
+
+  #unit-modal,
+  #planet-modal,
+  #meteor-modal {
+    top: auto !important;
+    right: max(10px, env(safe-area-inset-right)) !important;
+    bottom: max(10px, env(safe-area-inset-bottom)) !important;
+    left: max(10px, env(safe-area-inset-left)) !important;
+    width: auto !important;
+    max-height: min(68vh, 560px) !important;
+    padding: 16px !important;
+    border-radius: 10px;
+  }
+
+  .accordion-btn,
+  .comm-toggle-btn,
+  .action-btn,
+  .custom-select {
+    min-height: 44px;
+  }
+
+  #mobile-camera-controls {
+    display: flex;
+    flex-direction: column;
+    right: max(10px, env(safe-area-inset-right));
+    bottom: calc(74px + env(safe-area-inset-bottom));
+  }
+
+  #scale-bar-container {
+    right: max(10px, env(safe-area-inset-right)) !important;
+    bottom: calc(236px + env(safe-area-inset-bottom)) !important;
+    padding: 7px 10px !important;
+  }
+
+  #scale-bar-text {
+    font-size: 11px !important;
+  }
+
+  #chat-toggle-btn {
+    left: max(10px, env(safe-area-inset-left));
+    bottom: max(10px, env(safe-area-inset-bottom));
+    min-height: 44px;
+    padding: 9px 14px;
+  }
+
+  #chat-panel {
+    left: max(10px, env(safe-area-inset-left));
+    bottom: calc(62px + env(safe-area-inset-bottom));
+    width: min(360px, calc(100vw - 20px));
+    height: min(56vh, 390px);
+  }
+
+  #briefing-overlay {
+    justify-content: flex-start !important;
+    padding: max(18px, env(safe-area-inset-top)) max(14px, env(safe-area-inset-right)) max(18px, env(safe-area-inset-bottom)) max(14px, env(safe-area-inset-left));
+    overflow-y: auto;
+  }
+
+  #briefing-overlay > div {
+    width: 100%;
+    max-width: 520px !important;
+    padding: 22px !important;
+    margin: auto 0;
+  }
+
+  #game-over-panel {
+    width: calc(100vw - 28px);
+    padding: 30px 22px;
+  }
+}
+
 /* ===================== Chat Widget ===================== */
 
 #chat-widget-root {

@@ -8,10 +8,33 @@
       "Bash(pkill -f \"ms-playwright/mcp-chrome\")",
       "Bash(pkill -f \"chrome.*--user-data-dir.*mcp-chrome\")",
       "Read(//home/node/.cache/ms-playwright/**)",
-      "Bash(rm -rf /home/node/.cache/ms-playwright/mcp-chrome-04cc2ea/SingletonLock /home/node/.cache/ms-playwright/mcp-chrome-04cc2ea/SingletonSocket /home/node/.cache/ms-playwright/mcp-chrome-04cc2ea/SingletonCookie 2>/dev/null; echo done)"
+      "Bash(rm -rf /home/node/.cache/ms-playwright/mcp-chrome-04cc2ea/SingletonLock /home/node/.cache/ms-playwright/mcp-chrome-04cc2ea/SingletonSocket /home/node/.cache/ms-playwright/mcp-chrome-04cc2ea/SingletonCookie 2>/dev/null; echo done)",
+      "Bash(git filter-branch *)",
+      "Bash(FILTER_BRANCH_SQUELCH_WARNING=1 git filter-branch --tree-filter 'rm -f .claude/settings.local.json' --prune-empty HEAD)",
+      "Bash(rm -rf .git/refs/original)",
+      "Bash(FILTER_BRANCH_SQUELCH_WARNING=1 git filter-branch --tree-filter 'rm -f .claude/settings.local.json' --prune-empty -- --all)",
+      "Bash(git checkout *)",
+      "Bash(FILTER_BRANCH_SQUELCH_WARNING=1 git filter-branch -f --tree-filter 'rm -f .claude/settings.local.json' --prune-empty -- --all)",
+      "Bash(git reset *)",
+      "Read(//home/node/.claude/**)",
+      "Bash(find ~ -name \"settings.local.json\" 2>/dev/null)",
+      "Read(//home/node/**)",
+      "Bash(wget -q https://github.com/gitleaks/gitleaks/releases/download/v8.21.2/gitleaks_8.21.2_linux_x64.tar.gz)",
+      "Bash(tar -xzf gitleaks_8.21.2_linux_x64.tar.gz)",
+      "Bash(sudo mv gitleaks /usr/local/bin/)",
+      "Bash(gitleaks version *)",
+      "Bash(ls -ld /usr/local/bin && echo \"---\" && echo \"HOME bin: $HOME/.local/bin\")",
+      "Read(//usr/local/bin/**)",
+      "Bash(chmod +x /workspaces/Space-Ship-Network/.git/hooks/pre-commit)",
+      "Bash(echo \"---exit code: $?\")",
+      "Bash(~/.local/bin/gitleaks dir *)",
+      "Bash(echo \"---exit: $?\")",
+      "Bash(node -e ' *)",
+      "Bash(git check-ignore *)"
     ],
     "additionalDirectories": [
-      "/home/node/.cache/ms-playwright/mcp-chrome-04cc2ea"
+      "/home/node/.cache/ms-playwright/mcp-chrome-04cc2ea",
+      "/home/node/.claude"
     ]
   },
   "hooks": {
