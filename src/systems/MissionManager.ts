@@ -91,7 +91,7 @@ export class MissionManager {
     let dataSuccess = false;
 
     const activeUnits = Array.from(this.scene.spaceships.values());
-    const hqNode = activeUnits.find(s => s.id === 'HQ Ship');
+    const hqNode = activeUnits.find(s => s.id === 'L-Dest1');
     const nodes = activeUnits.filter(s => s.isNodeActive);
     const planets = this.scene.planetSystem.getPlanets();
 

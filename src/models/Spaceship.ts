@@ -14,6 +14,21 @@ export type DamageSize = 'small' | 'medium' | 'large';
 export type DamagePhase = 'active' | 'treating';
 export type EquipmentLevel = 'GOOD' | 'POOR' | 'UNABLE';
 
+// ユニット種別。issue #5 で導入。
+//   Legacy Destroyer / Destroyer / Legacy Frigate / Frigate / Repair Ship
+// 既存の HQ Ship は Legacy Destroyer として扱う。
+export type UnitType =
+  | 'Legacy Destroyer'
+  | 'Destroyer'
+  | 'Legacy Frigate'
+  | 'Frigate'
+  | 'Repair Ship';
+
+// Repair Ship との横付け修理フェーズ
+//   approaching: 互いに接近中、横付け前
+//   docked: 横付け完了、HP 回復中
+export type DockingPhase = 'approaching' | 'docked';
+
 export interface Damage {
   id: string;
   kind: DamageKind;
@@ -28,7 +43,10 @@ export class Spaceship {
   public y: number;
   public vx: number = 0;
   public vy: number = 0;
-  
+
+  // ユニット種別（Legacy Destroyer / Destroyer / Legacy Frigate / Frigate / Repair Ship）
+  public unitType: UnitType;
+
   public targetX: number | null = null;
   public targetY: number | null = null;
   public readonly MAX_SPEED = 50;
@@ -129,11 +147,49 @@ export class Spaceship {
   private pendingCmdId: string | null = null;
   private processedCmdIds: Set<string> = new Set();
 
-  constructor(id: string, x: number, y: number, level: number = 1) {
+  // === Repair Ship 横付け修理 ===
+  // dockingPartnerId: 接近 / 横付け中のパートナーID（Repair Ship 側からは修理対象、他ユニット側からは Repair Ship）
+  // dockingPhase: 接近中 / 横付け中。null は未関与。
+  // dockHealStartHp: 横付け開始時の HP（回復目標 = startHp + (maxHp - startHp) / 2 の算出に使用）
+  public dockingPartnerId: string | null = null;
+  public dockingPhase: DockingPhase | null = null;
+  public dockHealStartHp: number | null = null;
+
+  constructor(id: string, x: number, y: number, level: number = 1, unitType: UnitType = 'Legacy Destroyer') {
     this.id = id;
     this.x = x;
     this.y = y;
     this.level = level;
+    this.unitType = unitType;
+    // Repair Ship は武装がレーザーのみ。ミサイル弾数を 0 にして発射不能にする。
+    if (unitType === 'Repair Ship') {
+      this.missileAmmo = 0;
+    }
+  }
+
+  /** Repair Ship かどうか */
+  public isRepairShip(): boolean {
+    return this.unitType === 'Repair Ship';
+  }
+
+  /** ミサイル運用可否（Repair Ship は不可: 武装はレーザーのみ） */
+  public canEquipMissile(): boolean {
+    return !this.isRepairShip();
+  }
+
+  /** 多重通信運用可否（Repair Ship は不可） */
+  public canUseMultiplex(): boolean {
+    return !this.isRepairShip();
+  }
+
+  /** レガシー星間通信運用可否（Repair Ship は不可） */
+  public canUseLegacyComm(): boolean {
+    return !this.isRepairShip();
+  }
+
+  /** 星間通信 (TCP/IP) 運用可否（Repair Ship は不可） */
+  public canUseTcpIpComm(): boolean {
+    return !this.isRepairShip();
   }
 
   public update(dt: number, allShips?: Map<string, Spaceship>, onPoll?: (node: Spaceship, target: Spaceship) => void) {
@@ -143,10 +199,15 @@ export class Spaceship {
       const dx = this.targetX - this.x;
       const dy = this.targetY - this.y;
       const dist = Math.sqrt(dx*dx + dy*dy);
-      
+
+      // Repair Ship との接近 / 横付け中は通常速力の半分
+      const speed = (this.dockingPartnerId && !this.isRepairShip())
+        ? this.MAX_SPEED * 0.5
+        : this.MAX_SPEED;
+
       if (dist > 2) {
-        this.vx = (dx / dist) * this.MAX_SPEED;
-        this.vy = (dy / dist) * this.MAX_SPEED;
+        this.vx = (dx / dist) * speed;
+        this.vy = (dy / dist) * speed;
       } else {
         this.vx = 0;
         this.vy = 0;
@@ -355,6 +416,7 @@ export class Spaceship {
   }
 
   public canFireMissile(): boolean {
+    if (!this.canEquipMissile()) return false;
     return this.missileAmmo > 0 && this.weaponStatus.missile !== 'UNABLE';
   }
 
