@@ -331,7 +331,7 @@ body {
   #mission-panel {
     top: max(10px, env(safe-area-inset-top));
     left: max(10px, env(safe-area-inset-left));
-    width: min(56vw, 220px);
+    width: min(60vw, 220px);
   }
 
   .mission-toggle-btn {
@@ -350,11 +350,14 @@ body {
 
   .hud-panel {
     position: absolute;
-    top: max(10px, env(safe-area-inset-top));
-    right: max(10px, env(safe-area-inset-right));
-    gap: 10px;
-    padding: 8px 10px;
+    top: calc(max(10px, env(safe-area-inset-top)) + 52px);
+    left: max(10px, env(safe-area-inset-left));
+    right: auto;
+    gap: 6px;
+    padding: 6px 10px;
     align-items: center;
+    width: auto;
+    min-width: min(60vw, 220px);
   }
 
   .hud-label {
@@ -368,10 +371,15 @@ body {
 
   .mode-toggle-btn,
   .viz-cycle-btn {
-    min-height: 38px;
-    padding: 7px 10px;
+    min-height: 36px;
+    padding: 6px 8px;
     font-size: 11px;
-    letter-spacing: 0.5px;
+    font-family: system-ui, -apple-system, sans-serif;
+    letter-spacing: 0px;
+    max-width: min(60vw, 220px);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
   }
 
   #unit-modal,
