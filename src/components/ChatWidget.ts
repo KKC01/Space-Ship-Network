@@ -64,7 +64,7 @@ export class ChatWidget {
         <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
           <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
         </svg>
-        <span>OPERATOR</span>
+        <span>CHAT</span>
       </button>
 
       <div id="chat-panel" class="glass-panel" role="dialog" aria-label="オペレーターチャット">
@@ -280,10 +280,6 @@ export class ChatWidget {
   }
 
   private appendMessageBubble(msg: ChatMessage): void {
-    if (msg.role === 'assistant') {
-      this.pushToMissionLog(msg.content);
-      return;
-    }
     const el = document.createElement('div');
     el.className = `chat-bubble chat-bubble-${msg.role}`;
     el.dataset.id = msg.id;
@@ -312,24 +308,12 @@ export class ChatWidget {
   }
 
   /**
-   * Operator AI からのシステムメッセージをチャットバブルに追加する。
+   * システムメッセージをミッションログにのみ流す（チャットには表示しない）。
    * MainScene などの外部モジュールから呼び出し可能。
    */
   public pushSystemMessage(content: string): void {
     if (this.disabled) return;
-    const msg: ChatMessage = {
-      id: crypto.randomUUID(),
-      role: 'assistant',
-      content,
-    };
-    this.state.messages.push(msg);
-    this.appendMessageBubble(msg);
-
-    // パネルが閉じていれば自動で開く
-    if (!this.state.isOpen) {
-      this.open();
-    }
-    this.scrollToBottom();
+    this.pushToMissionLog(content);
   }
 
   destroy(): void {

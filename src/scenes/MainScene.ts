@@ -317,8 +317,14 @@ export class MainScene extends Scene {
       panel.remove();
       if (!repair || !target) return;
       this.startRepairDocking(repair, target);
+      this.selectedUnitId = null;
+      this.uiManager.closeUnitModal();
     };
-    noBtn.onclick = () => panel.remove();
+    noBtn.onclick = () => {
+      panel.remove();
+      this.selectedUnitId = null;
+      this.uiManager.closeUnitModal();
+    };
 
     actions.appendChild(yesBtn);
     actions.appendChild(noBtn);

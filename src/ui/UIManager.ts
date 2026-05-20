@@ -326,18 +326,32 @@ export class UIManager {
     this.domTimeDisplay = document.getElementById('time-display');
     if (this.domToggleStatusBtn) {
       this.domToggleStatusBtn.onclick = () => {
-        if (this.domRgrContainer) {
-          const isHidden = this.domRgrContainer.classList.contains('hidden');
-          if (isHidden) {
-            this.domRgrContainer.classList.remove('hidden');
-            this.domToggleStatusBtn!.textContent = '通信状況 ▲';
-          } else {
-            this.domRgrContainer.classList.add('hidden');
-            this.domToggleStatusBtn!.textContent = '通信状況 ▼';
-          }
+        if (!this.domRgrContainer) return;
+        const isHidden = this.domRgrContainer.classList.contains('hidden');
+        if (isHidden) {
+          this.closeNoiseMonitor();
+          this.domRgrContainer.classList.remove('hidden');
+          this.domToggleStatusBtn!.textContent = '通信状況 ▲';
+        } else {
+          this.domRgrContainer.classList.add('hidden');
+          this.domToggleStatusBtn!.textContent = '通信状況 ▼';
         }
       };
     }
+  }
+
+  private closeNoiseMonitor(): void {
+    const cont = document.getElementById('noise-monitor-video-container') as HTMLElement | null;
+    const video = document.getElementById('noise-monitor-video') as HTMLVideoElement | null;
+    const btn = document.getElementById('noise-monitor-btn');
+    if (cont) cont.style.display = 'none';
+    if (video) { video.pause(); video.src = ''; }
+    if (btn) btn.textContent = '背景雑音 ▼';
+  }
+
+  private closeRgrContainer(): void {
+    if (this.domRgrContainer) this.domRgrContainer.classList.add('hidden');
+    if (this.domToggleStatusBtn) this.domToggleStatusBtn.textContent = '通信状況 ▼';
   }
 
   private setupAccordions(): void {
@@ -562,21 +576,18 @@ export class UIManager {
       btn.onclick = () => {
         const isVisible = cont.style.display === 'block';
         if (isVisible) {
-          // トグル：表示中ならば非表示にする
-          cont.style.display = 'none';
-          video.pause();
-          video.src = '';
+          this.closeNoiseMonitor();
         } else {
+          this.closeRgrContainer();
           const cfg = NOISE_MONITOR_CONFIG['none'];
           video.src = cfg.src;
           cont.style.display = 'block';
+          btn.textContent = '背景雑音 ▲';
           window.__chatWidget?.pushSystemMessage(cfg.message);
         }
       };
       video.onclick = () => {
-        cont.style.display = 'none';
-        video.pause();
-        video.src = '';
+        this.closeNoiseMonitor();
       };
     }
   }
