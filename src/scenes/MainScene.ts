@@ -14,6 +14,7 @@ import planetImg from '../assets/Planet/Planet_01.png';
 import commPlanetImg from '../assets/Planet/Comm_planet_legacy.png';
 import commTcpPlanetImg from '../assets/Planet/Comm_planet.png';
 import meteorImg from '../assets/Planet/meteor_01.png';
+import meteorImg2 from '../assets/Planet/meteor_02.png';
 
 type ReconDronePhase = 'outbound' | 'orbit' | 'returning';
 
@@ -94,6 +95,7 @@ export class MainScene extends Scene {
     this.load.image('planet_comm_tcp', commTcpPlanetImg);
     // 隕石画像を Phaser テクスチャとして読み込み
     this.load.image('meteor', meteorImg);
+    this.load.image('meteor2', meteorImg2);
   }
 
   create() {

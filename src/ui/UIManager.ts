@@ -2,6 +2,10 @@ import { CommunicationSystem } from '../models/CommunicationSystem';
 import { Spaceship } from '../models/Spaceship';
 import { PacketType, FreqShort, FreqLong, SystemDisplayMode } from '../models/DataPacket';
 import legacyDestroyerImg from '../assets/Space_Ship/Legacy_Destroyer.png';
+import frigateImg from '../assets/Space_Ship/Frigate.png';
+import legacyFrigateImg from '../assets/Space_Ship/Legacy_Frigate.png';
+import destroyerImg from '../assets/Space_Ship/Destroyer.png';
+import type { UnitType } from '../models/Spaceship';
 import monitorVideoSrc from '../assets/Radio_Console/monitor_01.mp4';
 import type { MainScene } from '../scenes/MainScene';
 
@@ -600,11 +604,17 @@ export class UIManager {
       this.domMultiplexMaster.value = currentMasterId || '';
     }
 
-    // 画像は Legacy Destroyer のみ既存アセットがある。他タイプは画像未提供のため非表示。
+    const shipImageMap: Partial<Record<UnitType, string>> = {
+      'Legacy Destroyer': legacyDestroyerImg,
+      'Destroyer':        destroyerImg,
+      'Legacy Frigate':   legacyFrigateImg,
+      'Frigate':          frigateImg,
+    };
     const shipImg = document.getElementById('unit-ship-image') as HTMLImageElement | null;
     if (shipImg) {
-      if (unit.unitType === 'Legacy Destroyer') {
-        shipImg.src = legacyDestroyerImg;
+      const imgSrc = shipImageMap[unit.unitType];
+      if (imgSrc) {
+        shipImg.src = imgSrc;
         shipImg.style.display = '';
       } else {
         shipImg.removeAttribute('src');

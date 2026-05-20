@@ -37,7 +37,6 @@ export class CameraController {
     this.scene.input.on('wheel', (_p: any, _g: any, _dx: number, deltaY: number) => {
       this.setZoom(this.scene.cameras.main.zoom - (deltaY * 0.001));
     });
-    this.bindMobileZoomControls();
   }
 
   /**
@@ -119,16 +118,6 @@ export class CameraController {
     }
   }
 
-  private bindMobileZoomControls(): void {
-    const zoomIn = document.getElementById('mobile-zoom-in');
-    const zoomOut = document.getElementById('mobile-zoom-out');
-    const zoomReset = document.getElementById('mobile-zoom-reset');
-
-    zoomIn?.addEventListener('click', () => this.zoomBy(1.2));
-    zoomOut?.addEventListener('click', () => this.zoomBy(1 / 1.2));
-    zoomReset?.addEventListener('click', () => this.setZoom(this.isCompactViewport() ? 0.32 : 0.4));
-  }
-
   private startPinch(): void {
     const [p1, p2] = Array.from(this.activePointers.values());
     this.pinchStartDistance = Phaser.Math.Distance.Between(p1.x, p1.y, p2.x, p2.y);
@@ -147,16 +136,8 @@ export class CameraController {
     this.setZoom(this.pinchStartZoom * zoomRatio);
   }
 
-  private zoomBy(multiplier: number): void {
-    this.setZoom(this.scene.cameras.main.zoom * multiplier);
-  }
-
   private setZoom(zoom: number): void {
     const newZoom = Phaser.Math.Clamp(zoom, this.minZoom, this.maxZoom);
     this.scene.cameras.main.setZoom(newZoom);
-  }
-
-  private isCompactViewport(): boolean {
-    return window.matchMedia('(max-width: 720px), (pointer: coarse)').matches;
   }
 }

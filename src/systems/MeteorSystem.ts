@@ -257,7 +257,8 @@ export class MeteorSystem {
     const meteor = new Meteor(meteorId, mx, my, targetId, targetShip.x, targetShip.y, size, speed);
     this.meteors.set(meteorId, meteor);
 
-    const sprite = this.scene.add.image(mx, my, 'meteor');
+    const meteorKey = Math.random() < 0.5 ? 'meteor' : 'meteor2';
+    const sprite = this.scene.add.image(mx, my, meteorKey);
     let scale = 0.1;
     if (size === 'LARGE') scale = 0.1;
     else if (size === 'MEDIUM') scale = 0.1 / 3;

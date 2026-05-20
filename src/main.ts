@@ -2,6 +2,15 @@ import 'phaser';
 import { MainScene } from './scenes/MainScene';
 import { ChatWidget } from './components/ChatWidget';
 
+if (/Android|iPhone|iPad/i.test(navigator.userAgent)) {
+  const requestFS = () => {
+    const el = document.documentElement;
+    if (el.requestFullscreen) el.requestFullscreen().catch(() => {});
+    else if ((el as any).webkitRequestFullscreen) (el as any).webkitRequestFullscreen();
+  };
+  document.addEventListener('pointerdown', requestFS, { once: true });
+}
+
 const config: Phaser.Types.Core.GameConfig = {
   type: Phaser.AUTO,
   width: window.innerWidth,

@@ -30,7 +30,8 @@
       "Bash(~/.local/bin/gitleaks dir *)",
       "Bash(echo \"---exit: $?\")",
       "Bash(node -e ' *)",
-      "Bash(git check-ignore *)"
+      "Bash(git check-ignore *)",
+      "Bash(grep -E \"\\\\.\\(html|css|ts|js|json\\)$\")"
     ],
     "additionalDirectories": [
       "/home/node/.cache/ms-playwright/mcp-chrome-04cc2ea",

@@ -1,4 +1,5 @@
 import operatorImg from '../assets/character/AI_02/operator_AI_01.png';
+import operatorMiniImg from '../assets/character/AI_02/operator_AI_00_0.png';
 import { DifyChat, DifyApiError, DifyNetworkError, DifyConfigError } from '../services/DifyChat';
 
 interface ChatMessage {
@@ -112,6 +113,9 @@ export class ChatWidget {
     this.portrait = this.container.querySelector('.operator-portrait') as HTMLImageElement;
     this.toggleBtn = this.container.querySelector('#chat-toggle-btn') as HTMLButtonElement;
     this.wikiCheckbox = this.container.querySelector('#chat-wiki-checkbox') as HTMLInputElement;
+
+    const portraitMini = document.getElementById('operator-portrait-mini') as HTMLImageElement | null;
+    if (portraitMini) portraitMini.src = operatorMiniImg;
   }
 
   private bindEvents(): void {
@@ -276,12 +280,29 @@ export class ChatWidget {
   }
 
   private appendMessageBubble(msg: ChatMessage): void {
+    if (msg.role === 'assistant') {
+      this.pushToMissionLog(msg.content);
+      return;
+    }
     const el = document.createElement('div');
     el.className = `chat-bubble chat-bubble-${msg.role}`;
     el.dataset.id = msg.id;
     el.textContent = msg.content;
     this.messageList.appendChild(el);
     this.scrollToBottom();
+  }
+
+  private pushToMissionLog(text: string): void {
+    const log = document.getElementById('mission-log');
+    if (!log) return;
+    log.querySelectorAll('.mission-log-line.new').forEach(el => el.classList.remove('new'));
+    const line = document.createElement('div');
+    line.className = 'mission-log-line new';
+    line.textContent = text;
+    log.appendChild(line);
+    while (log.children.length > 4) {
+      log.removeChild(log.firstChild!);
+    }
   }
 
   private scrollToBottom(): void {

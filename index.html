@@ -4,6 +4,9 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <link rel="manifest" href="./manifest.json">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-fullscreen">
   <title>Space Network Game</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -117,18 +120,16 @@
   <div id="ui-layer">
       <div id="mission-panel" class="glass-panel collapsed">
         <button id="mission-toggle" class="mission-toggle-btn" type="button" aria-expanded="false">
-          <div class="mission-header-text">
-            <span class="hud-label" style="color: #f59e0b; font-weight: 700;">COMMANDER'S ORDER</span>
-            <span id="mission-title">SURVEY MISSION</span>
-          </div>
+          COMMANDER'S ORDER
           <span class="mission-chevron">▼</span>
         </button>
         <div id="mission-body" class="mission-body">
-          <ul id="mission-list">
-            <li id="m-reach"><span class="check">[ ]</span> 調査対象ポイントへの到達</li>
-            <li id="m-all-link"><span class="check">[ ]</span> 全ユニットの通信確保</li>
-            <li id="m-data"><span class="check">[ ]</span> 調査データの転送・回収</li>
-          </ul>
+          <div class="operator-log-header">
+            <img id="operator-portrait-mini" src="" alt="Operator AI" class="operator-portrait-mini">
+            <span class="operator-log-name">OPERATOR AI</span>
+          </div>
+          <div id="mission-log" class="mission-log">
+          </div>
         </div>
       </div>
 
@@ -387,12 +388,6 @@
 
     <!-- チャットウィジェット マウントポイント -->
     <div id="chat-widget-root"></div>
-
-    <div id="mobile-camera-controls" class="glass-panel" aria-label="Camera controls">
-      <button id="mobile-zoom-in" class="mobile-camera-btn" type="button" aria-label="Zoom in">+</button>
-      <button id="mobile-zoom-reset" class="mobile-camera-btn" type="button" aria-label="Reset zoom">1x</button>
-      <button id="mobile-zoom-out" class="mobile-camera-btn" type="button" aria-label="Zoom out">-</button>
-    </div>
 
     <div id="scale-bar-container" class="glass-panel"
       style="position: absolute; bottom: 20px; right: 20px; pointer-events: none; padding: 10px 15px;">

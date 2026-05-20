@@ -53,6 +53,7 @@ body {
   pointer-events: auto;
   border-left: 4px solid #f59e0b;
   overflow: hidden;
+  z-index: 15;
 }
 
 .mission-toggle-btn {
@@ -60,30 +61,21 @@ body {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  gap: 8px;
   padding: 10px 12px;
   background: transparent;
   border: none;
-  color: #fff;
+  color: #f59e0b;
   cursor: pointer;
-  font-family: inherit;
+  font-family: 'Rajdhani', sans-serif;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 1.5px;
+  text-align: left;
   text-align: left;
 }
 
 .mission-toggle-btn:hover {
   background: rgba(255, 255, 255, 0.04);
-}
-
-.mission-header-text {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-}
-
-.mission-header-text #mission-title {
-  font-size: 14px;
-  font-weight: 700;
-  color: #fff;
 }
 
 .mission-chevron {
@@ -104,31 +96,52 @@ body {
 }
 
 #mission-panel:not(.collapsed) .mission-body {
-  max-height: 200px;
-  padding: 0 15px 12px 15px;
+  max-height: 180px;
+  padding: 0 0 8px 0;
 }
 
-#mission-list {
-  list-style: none;
-  padding: 0;
-  margin: 0;
-  font-size: 13px;
-  color: #9ca3af;
+.operator-log-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 12px 4px;
 }
 
-#mission-list li {
-  margin-bottom: 5px;
-  transition: color 0.3s;
+.operator-portrait-mini {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  border: 1px solid rgba(56, 189, 248, 0.4);
+  object-fit: cover;
+  flex-shrink: 0;
 }
 
-#mission-list li.completed {
-  color: #4ade80;
-  text-decoration: line-through;
-  opacity: 0.7;
+.operator-log-name {
+  font-size: 9px;
+  color: #38bdf8;
+  letter-spacing: 1px;
+  font-family: 'Rajdhani', sans-serif;
 }
 
-#mission-list li.completed .check {
-  content: '[x]';
+.mission-log {
+  padding: 2px 12px 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.mission-log-line {
+  font-size: 10px;
+  color: #64748b;
+  line-height: 1.4;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-family: 'Rajdhani', sans-serif;
+}
+
+.mission-log-line.new {
+  color: #cbd5e1;
 }
 
 .hud-panel {
@@ -286,35 +299,6 @@ body {
   box-shadow: 0 2px 10px rgba(56, 189, 248, 0.3);
 }
 
-#mobile-camera-controls {
-  position: absolute;
-  right: 20px;
-  bottom: 78px;
-  display: none;
-  pointer-events: auto;
-  padding: 6px;
-  gap: 6px;
-  z-index: 20;
-}
-
-.mobile-camera-btn {
-  width: 44px;
-  height: 44px;
-  border: 1px solid rgba(56, 189, 248, 0.55);
-  border-radius: 8px;
-  background: rgba(8, 13, 28, 0.72);
-  color: #e0f2fe;
-  font-family: 'Rajdhani', sans-serif;
-  font-size: 18px;
-  font-weight: 700;
-  cursor: pointer;
-  touch-action: manipulation;
-}
-
-.mobile-camera-btn:active {
-  background: rgba(56, 189, 248, 0.26);
-  transform: translateY(1px);
-}
 
 @media (hover: none), (pointer: coarse), (max-width: 720px) {
   button,
@@ -334,30 +318,16 @@ body {
     width: min(60vw, 220px);
   }
 
-  .mission-toggle-btn {
-    min-height: 48px;
-    padding: 9px 10px;
-  }
-
-  .mission-header-text .hud-label {
-    font-size: 10px;
-    letter-spacing: 1px;
-  }
-
-  .mission-header-text #mission-title {
-    font-size: 12px;
-  }
-
   .hud-panel {
     position: absolute;
-    top: calc(max(10px, env(safe-area-inset-top)) + 52px);
-    left: max(10px, env(safe-area-inset-left));
-    right: auto;
+    top: max(10px, env(safe-area-inset-top));
+    left: auto;
+    right: max(10px, env(safe-area-inset-right));
     gap: 6px;
     padding: 6px 10px;
     align-items: center;
     width: auto;
-    min-width: min(60vw, 220px);
+    min-width: min(40vw, 150px);
   }
 
   .hud-label {
@@ -402,16 +372,9 @@ body {
     min-height: 44px;
   }
 
-  #mobile-camera-controls {
-    display: flex;
-    flex-direction: column;
-    right: max(10px, env(safe-area-inset-right));
-    bottom: calc(74px + env(safe-area-inset-bottom));
-  }
-
   #scale-bar-container {
     right: max(10px, env(safe-area-inset-right)) !important;
-    bottom: calc(236px + env(safe-area-inset-bottom)) !important;
+    bottom: calc(20px + env(safe-area-inset-bottom)) !important;
     padding: 7px 10px !important;
   }
 
@@ -429,8 +392,8 @@ body {
   #chat-panel {
     left: max(10px, env(safe-area-inset-left));
     bottom: calc(62px + env(safe-area-inset-bottom));
-    width: min(360px, calc(100vw - 20px));
-    height: min(56vh, 390px);
+    width: min(300px, calc(100vw - 20px));
+    height: min(38vh, 260px);
   }
 
   #briefing-overlay {
@@ -450,6 +413,10 @@ body {
     width: calc(100vw - 28px);
     padding: 30px 22px;
   }
+}
+
+#unit-ship-image {
+  mix-blend-mode: screen;
 }
 
 /* ===================== Chat Widget ===================== */
