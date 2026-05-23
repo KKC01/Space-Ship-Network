@@ -122,6 +122,9 @@ EOF
   )
   gh issue comment "$issue" --repo "$REPO" --body "$body" >/dev/null
   log "← Issue: posted approval request"
+  # 自分の投稿を次のポーリングでスキップするため ID を更新
+  LAST_COMMENT_ID=$(get_latest_comment "$issue" | jq -r '.id // ""')
+  save_state
 }
 
 post_completion() {
@@ -142,6 +145,9 @@ EOF
   )
   gh issue comment "$issue" --repo "$REPO" --body "$body" >/dev/null
   log "← Issue: posted completion"
+  # 自分の投稿を次のポーリングでスキップするため ID を更新
+  LAST_COMMENT_ID=$(get_latest_comment "$issue" | jq -r '.id // ""')
+  save_state
 }
 
 # === 検知パターン ===
