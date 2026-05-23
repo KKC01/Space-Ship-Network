@@ -22,8 +22,10 @@ body {
 }
 
 #game-container {
-  width: 100%;
-  height: 100%;
+  width: 100vw;
+  height: 100dvh;      /* 新しいブラウザ向け（ダイナミックビューポート対応） */
+  height: 100vh;       /* フォールバック */
+  height: 100%;        /* 究極のフォールバック */
   position: fixed;
   top: 0;
   left: 0;
