@@ -1,0 +1,29 @@
+[mcp_servers.aidesigner]
+url = "https://api.aidesigner.ai/api/v1/mcp"
+
+[mcp_servers.gemini]
+args = ["gemini-image-mcp.js"]
+command = "node"
+env_vars = ["GEMINI_API_KEY"]
+
+[mcp_servers.magic]
+args = [
+    "-y",
+    "@21st-dev/magic@latest",
+]
+command = "npx"
+env_vars = ["TWENTY_FIRST_API_KEY"]
+
+[mcp_servers.playwright]
+args = [
+    "-y",
+    "@playwright/mcp@latest",
+]
+command = "npx"
+
+[shell_environment_policy]
+inherit = "core"
+
+[shell_environment_policy.set]
+GEMINI_API_KEY = ""
+TWENTY_FIRST_API_KEY = ""

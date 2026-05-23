@@ -265,6 +265,7 @@ export class MeteorSystem {
     else if (size === 'SMALL') scale = 0.1 / 5;
     else if (size === 'TINY') scale = 0.1 / 10;
     sprite.setScale(scale);
+    sprite.setAlpha(0.55);
     sprite.setDepth(4);
     sprite.setVisible(false);
     this.meteorSprites.set(meteorId, sprite);
@@ -395,6 +396,10 @@ export class MeteorSystem {
             return r < 0.5 ? 'GOOD' : r < 0.85 ? 'POOR' : 'UNABLE';
           };
           hitShip.combatEquipment.comm = randomizeStatus(hitShip.combatEquipment.comm);
+          hitShip.combatEquipment.tcpIp = randomizeStatus(hitShip.combatEquipment.tcpIp);
+          hitShip.combatEquipment.legacy = randomizeStatus(hitShip.combatEquipment.legacy);
+          hitShip.combatEquipment.multiplex = randomizeStatus(hitShip.combatEquipment.multiplex);
+          hitShip.combatEquipment.optical = randomizeStatus(hitShip.combatEquipment.optical);
           // missile/laser を個別に劣化させ、集約ステータスを再計算
           hitShip.weaponStatus.missile = randomizeStatus(hitShip.weaponStatus.missile);
           hitShip.weaponStatus.laser = randomizeStatus(hitShip.weaponStatus.laser);

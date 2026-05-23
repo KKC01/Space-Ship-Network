@@ -29,6 +29,7 @@ export class UIManager {
   private domUnitTitle: HTMLElement | null = null;
   private domUnitType: HTMLElement | null = null;
   private domUnitLevel: HTMLElement | null = null;
+  private unitModalSwipeStart: { x: number; y: number; time: number } | null = null;
   private domShortEnable: HTMLInputElement | null = null;
   private domShortFreq: HTMLSelectElement | null = null;
   private domLongEnable: HTMLInputElement | null = null;
@@ -60,6 +61,10 @@ export class UIManager {
   private domDmgStatusArmor: HTMLElement | null = null;
   private domDmgStatusComm: HTMLElement | null = null;
   private domDmgStatusWeapon: HTMLElement | null = null;
+  private domDmgStatusTcpIp: HTMLElement | null = null;
+  private domDmgStatusLegacy: HTMLElement | null = null;
+  private domDmgStatusMultiplex: HTMLElement | null = null;
+  private domDmgStatusOptical: HTMLElement | null = null;
   private domDmgSituation: HTMLElement | null = null;
   private domDmgTreatBtn: HTMLButtonElement | null = null;
   private domReconDroneBtn: HTMLButtonElement | null = null;
@@ -92,7 +97,6 @@ export class UIManager {
     this.bindAuxDom();
     this.bindSendCmdBtn();
     this.bindRoleAndModeToggles();
-    this.bindBriefing();
     this.bindModalClose();
     this.bindActionCycleBtn();
     this.bindNoiseMonitor();
@@ -176,6 +180,11 @@ export class UIManager {
   updateActiveModalDataIfOpen(): void {
     if (!this.scene.selectedUnitId) return;
     if (!this.domUnitModal || this.domUnitModal.classList.contains('hidden')) return;
+    // ユニットが消滅していたらモーダルを閉じる
+    if (!this.scene.spaceships.has(this.scene.selectedUnitId)) {
+      this.closeUnitModal();
+      return;
+    }
     this.updateModalData();
     this.applyModeToUnitModal();
   }
@@ -251,6 +260,32 @@ export class UIManager {
     if (this.domShortFreq) this.domShortFreq.onchange = updateLocal;
     if (this.domLongEnable) this.domLongEnable.onchange = updateLocal;
     if (this.domLongFreq) this.domLongFreq.onchange = updateLocal;
+    this.bindUnitModalSwipeClose();
+  }
+
+  private bindUnitModalSwipeClose(): void {
+    if (!this.domUnitModal) return;
+
+    this.domUnitModal.addEventListener('pointerdown', (e: PointerEvent) => {
+      this.unitModalSwipeStart = { x: e.clientX, y: e.clientY, time: Date.now() };
+    });
+
+    this.domUnitModal.addEventListener('pointerup', (e: PointerEvent) => {
+      if (!this.unitModalSwipeStart) return;
+      const dx = e.clientX - this.unitModalSwipeStart.x;
+      const dy = e.clientY - this.unitModalSwipeStart.y;
+      const elapsed = Date.now() - this.unitModalSwipeStart.time;
+      this.unitModalSwipeStart = null;
+
+      // 下方向の明確なフリックだけを閉じる操作として扱う。
+      if (dy > 70 && Math.abs(dy) > Math.abs(dx) * 1.4 && elapsed < 700) {
+        this.closeUnitModal();
+      }
+    });
+
+    this.domUnitModal.addEventListener('pointercancel', () => {
+      this.unitModalSwipeStart = null;
+    });
   }
 
   private bindMultiplexDom(): void {
@@ -460,20 +495,6 @@ export class UIManager {
     }
   }
 
-  private bindBriefing(): void {
-    const startBtn = document.getElementById('start-mission-btn');
-    const overlay = document.getElementById('briefing-overlay');
-    if (startBtn && overlay) {
-      startBtn.onclick = () => {
-        this.scene.endBriefing();
-        overlay.classList.add('hidden');
-      };
-    } else {
-      console.warn('Briefing overlay or start button not found!');
-      this.scene.endBriefing();
-    }
-  }
-
   private bindModalClose(): void {
     if (this.domModalClose) {
       this.domModalClose.onclick = () => {
@@ -507,11 +528,27 @@ export class UIManager {
   public updateReconDroneButtonState(): void {
     if (!this.domReconDroneBtn) return;
     const selectedId = this.scene.selectedUnitId;
+    const isDestroyed = selectedId ? this.scene.isReconDroneDestroyedForUnit(selectedId) : false;
     const isTargeting = selectedId ? this.scene.isReconDroneTargetingUnit(selectedId) : false;
-    this.domReconDroneBtn.textContent = isTargeting ? '索敵ポイント指定中' : '索敵ドローン';
-    this.domReconDroneBtn.style.background = isTargeting ? 'rgba(250,204,21,0.18)' : 'rgba(56,189,248,0.16)';
-    this.domReconDroneBtn.style.borderColor = isTargeting ? 'rgba(250,204,21,0.55)' : 'rgba(56,189,248,0.45)';
-    this.domReconDroneBtn.style.color = isTargeting ? '#fde68a' : '#7dd3fc';
+    if (isDestroyed) {
+      this.domReconDroneBtn.textContent = '索敵ドローン（消滅）';
+      this.domReconDroneBtn.style.background = 'rgba(100,116,139,0.12)';
+      this.domReconDroneBtn.style.borderColor = 'rgba(100,116,139,0.3)';
+      this.domReconDroneBtn.style.color = '#64748b';
+      this.domReconDroneBtn.disabled = true;
+    } else if (isTargeting) {
+      this.domReconDroneBtn.textContent = '索敵ポイント指定中';
+      this.domReconDroneBtn.style.background = 'rgba(250,204,21,0.18)';
+      this.domReconDroneBtn.style.borderColor = 'rgba(250,204,21,0.55)';
+      this.domReconDroneBtn.style.color = '#fde68a';
+      this.domReconDroneBtn.disabled = false;
+    } else {
+      this.domReconDroneBtn.textContent = '索敵ドローン';
+      this.domReconDroneBtn.style.background = 'rgba(56,189,248,0.16)';
+      this.domReconDroneBtn.style.borderColor = 'rgba(56,189,248,0.45)';
+      this.domReconDroneBtn.style.color = '#7dd3fc';
+      this.domReconDroneBtn.disabled = false;
+    }
   }
 
   // 被害対処タブ: DOM参照取得と「被害対処 実行」ボタンのハンドラ登録
@@ -519,6 +556,10 @@ export class UIManager {
     this.domDmgStatusArmor = document.getElementById('dmg-status-armor');
     this.domDmgStatusComm = document.getElementById('dmg-status-comm');
     this.domDmgStatusWeapon = document.getElementById('dmg-status-weapon');
+    this.domDmgStatusTcpIp = document.getElementById('dmg-status-tcpip');
+    this.domDmgStatusLegacy = document.getElementById('dmg-status-legacy');
+    this.domDmgStatusMultiplex = document.getElementById('dmg-status-multiplex');
+    this.domDmgStatusOptical = document.getElementById('dmg-status-optical');
     this.domDmgSituation = document.getElementById('dmg-situation');
     this.domDmgTreatBtn = document.getElementById('dmg-treat-btn') as HTMLButtonElement | null;
     if (this.domDmgTreatBtn) {
@@ -615,11 +656,16 @@ export class UIManager {
       this.domMultiplexMaster.value = currentMasterId || '';
     }
 
+    // 新規 3 種 (Light Carrier / Carrier / Cruiser) は専用画像が未生成のため
+    // 暫定的に Destroyer の画像を流用する。Gemini で生成完了後に import を差し替える。
     const shipImageMap: Partial<Record<UnitType, string>> = {
       'Legacy Destroyer': legacyDestroyerImg,
       'Destroyer':        destroyerImg,
       'Legacy Frigate':   legacyFrigateImg,
       'Frigate':          frigateImg,
+      'Light Carrier':    destroyerImg,
+      'Carrier':          destroyerImg,
+      'Cruiser':          destroyerImg,
     };
     const shipImg = document.getElementById('unit-ship-image') as HTMLImageElement | null;
     if (shipImg) {
@@ -672,6 +718,22 @@ export class UIManager {
     if (this.domDmgStatusComm) {
       this.domDmgStatusComm.textContent = unit.combatEquipment.comm;
       this.domDmgStatusComm.style.color = this.statusColor(unit.combatEquipment.comm);
+    }
+    if (this.domDmgStatusTcpIp) {
+      this.domDmgStatusTcpIp.textContent = unit.combatEquipment.tcpIp;
+      this.domDmgStatusTcpIp.style.color = this.statusColor(unit.combatEquipment.tcpIp);
+    }
+    if (this.domDmgStatusLegacy) {
+      this.domDmgStatusLegacy.textContent = unit.combatEquipment.legacy;
+      this.domDmgStatusLegacy.style.color = this.statusColor(unit.combatEquipment.legacy);
+    }
+    if (this.domDmgStatusMultiplex) {
+      this.domDmgStatusMultiplex.textContent = unit.combatEquipment.multiplex;
+      this.domDmgStatusMultiplex.style.color = this.statusColor(unit.combatEquipment.multiplex);
+    }
+    if (this.domDmgStatusOptical) {
+      this.domDmgStatusOptical.textContent = unit.combatEquipment.optical;
+      this.domDmgStatusOptical.style.color = this.statusColor(unit.combatEquipment.optical);
     }
     if (this.domDmgStatusWeapon) {
       this.domDmgStatusWeapon.textContent = unit.combatEquipment.weapon;

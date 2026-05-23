@@ -1,0 +1,16 @@
+{
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Read|Edit|Write|Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash 'C:\\Users\\kench\\Documents\\VS_Code\\Space-Ship-Network\\.codex\\hooks\\block-sensitive-files.sh'",
+            "statusMessage": "機密ファイルチェック中..."
+          }
+        ]
+      }
+    ]
+  }
+}

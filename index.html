@@ -10,7 +10,7 @@
   <title>Space Network Game</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@400;600;700&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@400;600;700&family=Noto+Sans+JP:wght@400;500;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="/src/style.css" />
   <style>
     .accordion-content {
@@ -22,13 +22,13 @@
     }
     .accordion-content.open {
       max-height: 500px;
-      padding: 10px;
-      margin-bottom: 10px;
+      padding: 6px;
+      margin-bottom: 6px;
     }
     .accordion-btn {
       width: 100%;
       text-align: left;
-      padding: 10px;
+      padding: 7px 9px;
       background: rgba(255,255,255,0.05);
       border: 1px solid rgba(255,255,255,0.1);
       color: #fff;
@@ -82,14 +82,14 @@
     .comm-toggle-btn {
       width: 100%;
       text-align: left;
-      padding: 10px;
+      padding: 7px 9px;
       background: rgba(255,255,255,0.05);
       border: 1px solid rgba(255,255,255,0.1);
       color: #94a3b8;
       cursor: pointer;
       font-family: inherit;
       font-weight: 600;
-      margin-bottom: 6px;
+      margin-bottom: 4px;
       display: flex;
       justify-content: space-between;
       align-items: center;
@@ -118,8 +118,8 @@
 
 <body>
   <div id="ui-layer">
-      <div id="mission-panel" class="glass-panel collapsed">
-        <button id="mission-toggle" class="mission-toggle-btn" type="button" aria-expanded="false">
+      <div id="mission-panel" class="glass-panel">
+        <button id="mission-toggle" class="mission-toggle-btn" type="button" aria-expanded="true">
           OPERATOR AI
           <span class="mission-chevron">▼</span>
         </button>
@@ -133,9 +133,9 @@
       </div>
 
     <div class="hud-panel glass-panel">
-      <div class="hud-item">
-        <span class="hud-label">経過時間</span>
-        <span class="hud-value" id="time-display">0.0</span>
+      <div class="hud-item" style="font-size:9px; opacity:0.5; line-height:1.2;">
+        <span class="hud-label" style="font-size:8px;">経過時間</span>
+        <span class="hud-value" id="time-display" style="font-size:10px;">0.0</span>
       </div>
       <div class="mode-viz-stack">
         <button id="toggle-mode-btn" class="mode-toggle-btn">モード：通信管制</button>
@@ -143,19 +143,8 @@
       </div>
     </div>
 
-    <!-- ブリーフィング画面 (復元) -->
-    <div id="briefing-overlay" class="glass-panel" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 1000; display: flex; flex-direction: column; justify-content: center; align-items: center; background: rgba(2, 6, 23, 0.95); backdrop-filter: blur(10px); pointer-events: auto;">
-      <div style="max-width: 600px; padding: 40px; border: 1px solid rgba(245, 158, 11, 0.3); border-radius: 8px;">
-        <div style="color: #f59e0b; font-size: 12px; letter-spacing: 2px; margin-bottom: 20px;">[ INCOMING TRANSMISSION FROM HQ ]</div>
-        <div style="color: #fff; font-size: 20px; line-height: 1.6; margin-bottom: 30px; font-weight: 300;">
-          「情報によると、特定ポイントにおいて敵の活動が活発化している。各ユニットは通信連絡を密とし、調査に向かえ。正当防衛、緊急避難以外の武器使用は禁止する」
-        </div>
-        <div style="color: #38bdf8; font-size: 16px; margin-bottom: 40px; border-left: 3px solid #38bdf8; padding-left: 15px;">
-          オペレーター：「指示ポイントを黄サークルで表示しました」
-        </div>
-        <button id="start-mission-btn" class="action-btn" style="width: 100%; padding: 15px; font-size: 18px; background: linear-gradient(135deg, #f59e0b, #d97706);">了解</button>
-      </div>
-    </div>
+    <div id="title-overlay" class="title-overlay" style="display: none;"></div>
+    <div id="customize-overlay" class="customize-overlay" style="display: none;"></div>
 
     <div id="game-over-panel" class="glass-panel hidden">
       <h1 id="game-over-title">SUCCESS</h1>
@@ -164,11 +153,11 @@
     </div>
 
     <div id="unit-modal" class="glass-panel hidden"
-      style="position: absolute; top: 20px; right: 20px; width: 320px; padding: 14px 16px; pointer-events: auto; max-height: 90vh; overflow-y: auto;">
-      <div id="unit-modal-close" style="position: absolute; top: 10px; right: 15px; cursor: pointer; font-size: 24px;">
+      style="position: absolute; top: 20px; right: 20px; width: 320px; padding: 10px 12px; pointer-events: auto; max-height: 90vh; overflow-y: auto;">
+      <div id="unit-modal-close" style="position: absolute; top: 6px; right: 12px; cursor: pointer; font-size: 22px;">
         &times;</div>
-      <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 15px; border-bottom: 1px solid rgba(255,255,255,0.2); padding-bottom: 5px;">
-        <img id="unit-ship-image" style="width: 81px; height: 81px; object-fit: contain;">
+      <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 8px; border-bottom: 1px solid rgba(255,255,255,0.2); padding-bottom: 4px;">
+        <img id="unit-ship-image" style="width: 64px; height: 64px; object-fit: contain; mix-blend-mode: screen;">
         <div style="flex: 1;">
           <h2 id="unit-title" style="margin: 0;">UNIT ID</h2>
           <div style="font-size: 11px; color: #94a3b8; margin-top: 4px;">
@@ -184,7 +173,7 @@
       </div>
 
       <!-- HP バー（モードに依らずヘッダー直下の同一位置で表示） -->
-      <div id="unit-hp-container" style="margin-bottom: 10px;">
+      <div id="unit-hp-container" style="margin-bottom: 6px;">
         <div class="hud-label">Unit Condition (HP)</div>
         <div style="width: 100%; height: 6px; background: rgba(0,0,0,0.5); border-radius: 3px; margin-top: 5px; overflow: hidden;">
           <div id="unit-hp-bar" style="width: 100%; height: 100%; background: #4ade80;"></div>
@@ -192,7 +181,7 @@
       </div>
 
       <!-- 残弾表示（戦闘指揮モードのみ表示。applyModeToUnitModal で display を制御） -->
-      <div id="ammo-container" style="margin-bottom: 10px; display: none;">
+      <div id="ammo-container" style="margin-bottom: 6px; display: none;">
         <div class="hud-label" style="margin-bottom: 4px;">残弾</div>
         <div style="display: flex; justify-content: space-between; font-size: 12px;">
           <div>ミサイル: <span id="ammo-missile" style="color:#fff;">20</span> / 20</div>
@@ -267,13 +256,13 @@
       </div>
 
       <!-- 戦闘アクションボタン（戦闘指揮モードのみ表示） -->
-      <div id="action-btn-container" class="hidden" style="margin-top: 10px;">
+      <div id="action-btn-container" class="hidden" style="margin-top: 6px;">
         <button id="action-cycle-btn" style="width: 100%; font-size: 13px; padding: 7px; background: rgba(239,68,68,0.2); border: 1px solid rgba(239,68,68,0.5); color: #f87171; cursor: pointer; font-family: Rajdhani, sans-serif; font-weight: bold; letter-spacing: 1px;">攻撃</button>
         <button id="recon-drone-btn" style="width: 100%; font-size: 13px; padding: 7px; margin-top: 8px; background: rgba(56,189,248,0.16); border: 1px solid rgba(56,189,248,0.45); color: #7dd3fc; cursor: pointer; font-family: Rajdhani, sans-serif; font-weight: bold; letter-spacing: 1px;">索敵ドローン</button>
       </div>
 
       <!-- 被害対処（戦闘指揮モードのみ表示） -->
-      <button id="damage-group-btn" class="accordion-btn" style="margin-top: 10px;">被害対処</button>
+      <button id="damage-group-btn" class="accordion-btn" style="margin-top: 6px;">被害対処</button>
       <div id="damage-group-content" class="accordion-content">
         <div style="margin-bottom: 10px;">
           <div class="hud-label" style="margin-bottom: 4px;">機器ステータス</div>
@@ -286,6 +275,22 @@
               <tr>
                 <th style="text-align:left; color:#94a3b8; padding:3px 6px; font-weight:normal;">通信</th>
                 <td id="dmg-status-comm" style="text-align:center; color:#4ade80; padding:3px 6px;">GOOD</td>
+              </tr>
+              <tr>
+                <th style="text-align:left; color:#94a3b8; padding:3px 6px 3px 18px; font-weight:normal; font-size:10px;">└ 星間通信</th>
+                <td id="dmg-status-tcpip" style="text-align:center; color:#4ade80; padding:3px 6px; font-size:10px;">GOOD</td>
+              </tr>
+              <tr>
+                <th style="text-align:left; color:#94a3b8; padding:3px 6px 3px 18px; font-weight:normal; font-size:10px;">└ レガシー星間</th>
+                <td id="dmg-status-legacy" style="text-align:center; color:#4ade80; padding:3px 6px; font-size:10px;">GOOD</td>
+              </tr>
+              <tr>
+                <th style="text-align:left; color:#94a3b8; padding:3px 6px 3px 18px; font-weight:normal; font-size:10px;">└ 多重通信</th>
+                <td id="dmg-status-multiplex" style="text-align:center; color:#4ade80; padding:3px 6px; font-size:10px;">GOOD</td>
+              </tr>
+              <tr>
+                <th style="text-align:left; color:#94a3b8; padding:3px 6px 3px 18px; font-weight:normal; font-size:10px;">└ 光通信</th>
+                <td id="dmg-status-optical" style="text-align:center; color:#4ade80; padding:3px 6px; font-size:10px;">GOOD</td>
               </tr>
               <tr id="dmg-weapon-row" style="cursor:pointer;">
                 <th style="text-align:left; color:#94a3b8; padding:3px 6px; font-weight:normal;">武器 <span id="dmg-weapon-toggle" style="font-size:9px; color:#64748b;">▼</span></th>
@@ -323,7 +328,7 @@
         </button>
       </div>
 
-      <div style="display: flex; gap: 6px; margin-top: 12px;">
+      <div style="display: flex; gap: 6px; margin-top: 8px;">
         <button id="toggle-status-btn" style="flex: 1; font-size: 11px; padding: 5px; background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); color: #94a3b8; cursor: pointer;">通信状況 ▼</button>
         <button id="noise-monitor-btn" style="flex: 1; font-size: 11px; padding: 5px; background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); color: #94a3b8; cursor: pointer;">背景雑音 ▼</button>
       </div>
@@ -393,7 +398,7 @@
     <div id="chat-widget-root"></div>
 
     <div id="scale-bar-container" class="glass-panel"
-      style="position: absolute; bottom: 20px; right: 20px; pointer-events: none; padding: 10px 15px;">
+      style="position: absolute; bottom: 20px; left: 50%; transform: translateX(-50%); pointer-events: none; padding: 6px 12px;">
       <div id="scale-bar-text"
         style="text-align: center; font-size: 14px; margin-bottom: 2px; color: #9ca3af; font-weight: 600; letter-spacing: 1px;">
         100 km</div>

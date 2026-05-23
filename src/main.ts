@@ -1,6 +1,7 @@
 import 'phaser';
 import { MainScene } from './scenes/MainScene';
 import { ChatWidget } from './components/ChatWidget';
+import { TitleScreen } from './ui/TitleScreen';
 
 if (/Android|iPhone|iPad/i.test(navigator.userAgent)) {
   const requestFS = () => {
@@ -42,4 +43,12 @@ window.addEventListener('load', () => {
   if (chatRoot) {
     new ChatWidget(chatRoot);
   }
+
+  // MainScene の create 完了後に TitleScreen を起動する
+  game.events.once('ready', () => {
+    const mainScene = game.scene.getScene('MainScene') as MainScene;
+    mainScene.events.once('create', () => {
+      new TitleScreen(mainScene).init();
+    });
+  });
 });

@@ -65,6 +65,8 @@ export class CommunicationManager {
       node, target, activeNodes, this.scene.planetSystem.getPlanets()
     );
     if (canConnect) {
+      if (node.combatEquipment.optical === 'UNABLE') { node.isShortEnabled = false; node.isLongEnabled = false; return; }
+      if (node.combatEquipment.optical === 'POOR' && Math.random() < 0.5) return;
       const rangeMode: 'short' | 'long' =
         (node.isLongEnabled && target.isLongEnabled && node.longFreq === target.longFreq) ? 'long' : 'short';
       this.activePolls.push({
@@ -86,6 +88,8 @@ export class CommunicationManager {
    * TDMA タイミングで呼ばれる。光多重通信を試行する。
    */
   handleOpticalTransmission(ship: Spaceship): void {
+    if (ship.combatEquipment.multiplex === 'UNABLE') { ship.isMultiplexEnabled = false; return; }
+    if (ship.combatEquipment.multiplex === 'POOR' && Math.random() < 0.5) return;
     let transmissionOccurred = false;
     const activeNodes = Array.from(this.scene.spaceships.values()).filter(s => s.isNodeActive);
 
@@ -135,6 +139,8 @@ export class CommunicationManager {
    */
   handleLegacyTransmission(sender: Spaceship): void {
     if (!sender.isLegacyEnabled) return;
+    if (sender.combatEquipment.legacy === 'UNABLE') { sender.isLegacyEnabled = false; return; }
+    if (sender.combatEquipment.legacy === 'POOR' && Math.random() < 0.5) return;
     const commPlanet = this.scene.planetSystem.getCommPlanet();
     if (!commPlanet) return;
 
@@ -175,6 +181,8 @@ export class CommunicationManager {
    */
   handleTcpIpTransmission(sender: Spaceship): void {
     if (!sender.isTcpIpEnabled) return;
+    if (sender.combatEquipment.tcpIp === 'UNABLE') { sender.isTcpIpEnabled = false; return; }
+    if (sender.combatEquipment.tcpIp === 'POOR' && Math.random() < 0.5) return;
     const tcpPlanet = this.scene.planetSystem.getTcpIpCommPlanet();
     if (!tcpPlanet) return;
 

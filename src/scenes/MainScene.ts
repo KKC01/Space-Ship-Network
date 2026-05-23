@@ -1,6 +1,7 @@
 import { Scene } from 'phaser';
 import { Spaceship } from '../models/Spaceship';
-import type { DamageKind, EquipmentLevel, UnitType } from '../models/Spaceship';
+import type { DamageKind, EquipmentLevel } from '../models/Spaceship';
+import { MISSION_CATALOG, type MissionId, type FormationEntry } from '../systems/MissionCatalog';
 import { SystemDisplayMode } from '../models/DataPacket';
 import { CommunicationSystem } from '../models/CommunicationSystem';
 import { OpticalMaster } from '../models/OpticalMaster';
@@ -55,7 +56,13 @@ export class MainScene extends Scene {
   // DOM 要素は各 System / UIManager 内で管理
 
   private timeElapsedMs: number = 0;
-  public isBriefingActive: boolean = true;
+  // タイトル/カスタマイズ/プレイの3状態。'playing' 以外は Phaser シミュレーションを停止する。
+  private _appPhase: 'title' | 'customize' | 'playing' = 'title';
+  // 現在選択中のミッション ID（タイトル→カスタマイズ→プレイ間で共有）
+  public currentMissionId: MissionId | null = null;
+  // 後方互換: 既存の isBriefingActive 参照（MissionManager / handleWorldClick 内）から見える形を維持
+  public get isBriefingActive(): boolean { return this._appPhase !== 'playing'; }
+  public get appPhase(): 'title' | 'customize' | 'playing' { return this._appPhase; }
   public systemDisplayMode: SystemDisplayMode = SystemDisplayMode.CONTROL;
   public selectedAction: 'attack' | 'jamming' | 'warning' = 'attack';
   public vizMode: 'dots' | 'circles' | 'quality' | 'range' = 'circles';
@@ -66,7 +73,8 @@ export class MainScene extends Scene {
   private reconTargetingUnitId: string | null = null;
   private reconDrones: ReconDrone[] = [];
   private reconDroneCounter = 0;
-  private readonly RECON_DRONE_CONTROL_RANGE = 400;
+  private reconDroneDestroyedOwners: Set<string> = new Set();
+  private readonly RECON_DRONE_CONTROL_RANGE = 2500;
   private readonly RECON_DRONE_DETECTION_RANGE = 400;
   private readonly RECON_DRONE_SPEED = 180;
   private readonly RECON_DRONE_ORBIT_DURATION_MS = 5000;
@@ -133,46 +141,18 @@ export class MainScene extends Scene {
   }
 
   private initGameData() {
+    // 環境（クラッタ・惑星・アステロイド帯・Optical Master）のみを構築する。
+    // ユニット編成は applyFormation() で後から投入する（タイトル→カスタマイズ→出撃の流れに対応）。
+
     const cx = this.sys.game.canvas.width / 2;
     const cy = this.sys.game.canvas.height / 2;
 
     const SPAWN_OFFSET_X = -3200;
     const SPAWN_OFFSET_Y = -3200;
 
-    // ユニット編成（issue #5）:
-    //   L-Dest1 (Legacy Destroyer / HQ, ノード設定)
-    //   Dest1   (Destroyer)
-    //   L-Frig1 (Legacy Frigate)
-    //   Frig1   (Frigate)
-    //   Rep1    (Repair Ship)
-    const formation: Array<{ id: string; type: UnitType; dx: number; dy: number }> = [
-      { id: 'L-Dest1', type: 'Legacy Destroyer', dx: 0,    dy: 0   },
-      { id: 'Dest1',   type: 'Destroyer',        dx: -400, dy: 200 },
-      { id: 'L-Frig1', type: 'Legacy Frigate',   dx: 400,  dy: 200 },
-      { id: 'Frig1',   type: 'Frigate',          dx: 0,    dy: 500 },
-      { id: 'Rep1',    type: 'Repair Ship',      dx: -200, dy: 600 },
-    ];
-
-    for (const f of formation) {
-      const x = cx + f.dx + SPAWN_OFFSET_X;
-      const y = cy + f.dy + SPAWN_OFFSET_Y;
-      const ship = new Spaceship(f.id, x, y, 1, f.type);
-      if (f.type === 'Legacy Destroyer' && f.id === 'L-Dest1') {
-        ship.isNodeActive = true;
-        ship.pollingList = formation.filter(o => o.id !== f.id).map(o => o.id);
-      }
-      this.spaceships.set(f.id, ship);
-    }
-
     // Initialize Optical Masters
     this.opticalMasters.push(new OpticalMaster('Master-Alpha', cx - 1000, cy - 1000));
     this.opticalMasters.push(new OpticalMaster('Master-Beta', cx + 1000, cy + 1000));
-
-    for (const id of this.spaceships.keys()) {
-      const g = this.add.graphics().setDepth(5);
-      this.shipGraphics.set(id, g);
-      this.textLabels.set(id, this.add.text(0, 0, '', { fontSize: '12px', color: '#fff', fontFamily: 'Rajdhani' }).setDepth(10));
-    }
 
     // New Clustered Clutter Logic
     this.interferenceZones = []; 
@@ -216,6 +196,45 @@ export class MainScene extends Scene {
         size: 1.5 + Math.random() * 3,
         alpha: 0.25 + Math.random() * 0.4,
       });
+    }
+  }
+
+  /**
+   * 編成配列を元に Spaceship インスタンスと描画オブジェクトを構築する。
+   * タイトル画面の Customize Ship から確定した編成を投入する用途。
+   * 先頭の Legacy Destroyer (id 末尾が L-Dest1) を通信ノードとして自動設定する。
+   */
+  public applyFormation(formation: FormationEntry[]): void {
+    const cx = this.sys.game.canvas.width / 2;
+    const cy = this.sys.game.canvas.height / 2;
+    const SPAWN_OFFSET_X = -3200;
+    const SPAWN_OFFSET_Y = -3200;
+
+    // 既存ユニットをクリア（リトライ・編成変更時の二重生成を防ぐ）
+    for (const g of this.shipGraphics.values()) g.destroy();
+    for (const t of this.textLabels.values()) t.destroy();
+    this.spaceships.clear();
+    this.shipGraphics.clear();
+    this.textLabels.clear();
+
+    // ノード艦の決定: Legacy Destroyer が含まれていれば最初の 1 隻、無ければ先頭ユニット
+    const nodeEntry = formation.find((f) => f.type === 'Legacy Destroyer') ?? formation[0];
+
+    for (const f of formation) {
+      const x = cx + f.dx + SPAWN_OFFSET_X;
+      const y = cy + f.dy + SPAWN_OFFSET_Y;
+      const ship = new Spaceship(f.id, x, y, 1, f.type);
+      if (nodeEntry && f.id === nodeEntry.id) {
+        ship.isNodeActive = true;
+        ship.pollingList = formation.filter((o) => o.id !== f.id).map((o) => o.id);
+      }
+      this.spaceships.set(f.id, ship);
+    }
+
+    for (const id of this.spaceships.keys()) {
+      const g = this.add.graphics().setDepth(5);
+      this.shipGraphics.set(id, g);
+      this.textLabels.set(id, this.add.text(0, 0, '', { fontSize: '12px', color: '#fff', fontFamily: 'Rajdhani' }).setDepth(10));
     }
   }
 
@@ -358,6 +377,13 @@ export class MainScene extends Scene {
     const ship = this.spaceships.get(this.selectedUnitId);
     if (!ship) return;
 
+    // ドローンが消滅済みの場合は使用不可
+    if (this.reconDroneDestroyedOwners.has(ship.id)) {
+      window.__chatWidget?.pushSystemMessage(`${ship.id} 索敵ドローン 使用不可（消滅済み）`);
+      this.showFloatingText(ship.x, ship.y, 'ドローン使用不可', '#9ca3af');
+      return;
+    }
+
     this.reconTargetingUnitId = ship.id;
     window.__chatWidget?.pushSystemMessage('索敵ポイントを、示して下さい');
     this.showFloatingText(ship.x, ship.y, '索敵ポイントを、示して下さい', '#7dd3fc');
@@ -365,6 +391,10 @@ export class MainScene extends Scene {
 
   public isReconDroneTargetingUnit(unitId: string): boolean {
     return this.reconTargetingUnitId === unitId;
+  }
+
+  public isReconDroneDestroyedForUnit(unitId: string): boolean {
+    return this.reconDroneDestroyedOwners.has(unitId);
   }
 
   public getReconDetectionZones(): Array<{ x: number; y: number; radius: number }> {
@@ -594,6 +624,39 @@ export class MainScene extends Scene {
     const completedIds = new Set<string>();
 
     for (const drone of this.reconDrones) {
+      // 隕石との衝突チェック
+      let droneDestroyed = false;
+      for (const meteor of this.meteorSystem.getMeteors().values()) {
+        if (!meteor.isDetected || meteor.isDestroyed) continue;
+        const dMeteor = CommunicationSystem.getDistance(drone.x, drone.y, meteor.x, meteor.y);
+        if (dMeteor < meteor.radius + 5) {
+          this.meteorSystem.createCollisionEffect(drone.x, drone.y);
+          this.reconDroneDestroyedOwners.add(drone.ownerId);
+          window.__chatWidget?.pushSystemMessage(`${drone.ownerId} 索敵ドローン 隕石に衝突し消滅`);
+          this.showFloatingText(drone.x, drone.y, 'ドローン消滅', '#ef4444');
+          completedIds.add(drone.id);
+          droneDestroyed = true;
+          break;
+        }
+      }
+      if (droneDestroyed) continue;
+
+      // 他ユニットとの衝突チェック
+      for (const [shipId, ship] of this.spaceships.entries()) {
+        if (shipId === drone.ownerId) continue;
+        const dShip = CommunicationSystem.getDistance(drone.x, drone.y, ship.x, ship.y);
+        if (dShip < 25) {
+          this.meteorSystem.createCollisionEffect(drone.x, drone.y);
+          this.reconDroneDestroyedOwners.add(drone.ownerId);
+          window.__chatWidget?.pushSystemMessage(`${drone.ownerId} 索敵ドローン ${shipId}に衝突し消滅`);
+          this.showFloatingText(drone.x, drone.y, 'ドローン消滅', '#ef4444');
+          completedIds.add(drone.id);
+          droneDestroyed = true;
+          break;
+        }
+      }
+      if (droneDestroyed) continue;
+
       if (drone.phase === 'outbound') {
         this.moveReconDroneToward(drone, drone.targetX, drone.targetY, dtSeconds);
         if (CommunicationSystem.getDistance(drone.x, drone.y, drone.targetX, drone.targetY) <= 2) {
@@ -1250,12 +1313,28 @@ export class MainScene extends Scene {
   }
 
   /**
-   * UIManager のブリーフィング開始ボタンから呼ばれる。
+   * タイトル/カスタマイズ画面の出撃ボタンから呼び出す。
+   * 指定ミッションの編成を適用し、Phaser シミュレーションを開始する。
+   *
+   * @param missionId 選択中のミッション ID
+   * @param customFormation 編成のオーバーライド（Customize Ship 確定時のユーザー編成）。
+   *                        省略時は MissionCatalog の recommendedFormation を使う。
    */
-  public endBriefing(): void {
-    this.isBriefingActive = false;
-    console.log('Mission Started');
+  public startMission(missionId: MissionId, customFormation?: FormationEntry[]): void {
+    const def = MISSION_CATALOG[missionId];
+    if (!def) {
+      console.warn('Unknown mission id:', missionId);
+      return;
+    }
+    this.currentMissionId = missionId;
+    const formation = customFormation && customFormation.length > 0
+      ? customFormation
+      : def.recommendedFormation;
+    this.applyFormation(formation);
+    this._appPhase = 'playing';
+    console.log(`Mission Started: ${def.title}`);
   }
+
 
   /**
    * MeteorSystem 等から全ユニット消滅時に呼ばれる敗北遷移。
@@ -1439,6 +1518,10 @@ export class MainScene extends Scene {
 
           // 通信・武器ステータスはランダム劣化
           ship.combatEquipment.comm = randomizeStatus(ship.combatEquipment.comm);
+          ship.combatEquipment.tcpIp = randomizeStatus(ship.combatEquipment.tcpIp);
+          ship.combatEquipment.legacy = randomizeStatus(ship.combatEquipment.legacy);
+          ship.combatEquipment.multiplex = randomizeStatus(ship.combatEquipment.multiplex);
+          ship.combatEquipment.optical = randomizeStatus(ship.combatEquipment.optical);
           ship.combatEquipment.weapon = randomizeStatus(ship.combatEquipment.weapon);
         }
 

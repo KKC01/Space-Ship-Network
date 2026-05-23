@@ -16,13 +16,18 @@ export type EquipmentLevel = 'GOOD' | 'POOR' | 'UNABLE';
 
 // ユニット種別。issue #5 で導入。
 //   Legacy Destroyer / Destroyer / Legacy Frigate / Frigate / Repair Ship
+//   + Light Carrier / Carrier / Cruiser（初期画面 Customize Ship 導入時に追加）
 // 既存の HQ Ship は Legacy Destroyer として扱う。
+// 新規 3 種は装備・挙動とも Destroyer 級と同一として扱う（カタログ上のサイズ/コストのみ差分）。
 export type UnitType =
   | 'Legacy Destroyer'
   | 'Destroyer'
   | 'Legacy Frigate'
   | 'Frigate'
-  | 'Repair Ship';
+  | 'Repair Ship'
+  | 'Light Carrier'
+  | 'Carrier'
+  | 'Cruiser';
 
 // Repair Ship との横付け修理フェーズ
 //   approaching: 互いに接近中、横付け前
@@ -101,6 +106,11 @@ export class Spaceship {
     armor: 'GOOD' as EquipmentLevel,
     comm: 'GOOD' as EquipmentLevel,
     weapon: 'GOOD' as EquipmentLevel,
+    // 通信系の個別ステータス（被害対処タブに表示）
+    tcpIp: 'GOOD' as EquipmentLevel,      // 星間通信
+    legacy: 'GOOD' as EquipmentLevel,     // レガシー星間通信
+    multiplex: 'GOOD' as EquipmentLevel,  // 多重通信
+    optical: 'GOOD' as EquipmentLevel,    // 光通信
   };
 
   // 攻撃関連（隕石戦闘用）
