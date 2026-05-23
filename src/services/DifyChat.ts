@@ -1,7 +1,5 @@
-// Dify Chat Messages API クライアント（クラウド版）
-// セキュリティ: APIキーはログ・エラーメッセージ・例外に絶対に含めない
-
-const DIFY_BASE_URL = 'https://api.dify.ai/v1';
+// Dify Chat Messages API クライアント（サーバーサイドプロキシ経由）
+// APIキーはサーバー側でのみ管理される
 
 export interface DifyChatOptions {
   query: string;
@@ -39,24 +37,16 @@ export class DifyConfigError extends Error {
 }
 
 export class DifyChat {
-  private readonly apiKey: string;
   private readonly userId: string;
 
   constructor() {
-    // import.meta.env 経由でのみ取得。値そのものはどこにもログ出力しない
-    const key = import.meta.env.VITE_DIFY_API_KEY;
-    if (!key || typeof key !== 'string' || key.length === 0) {
-      throw new DifyConfigError('Dify API キーが設定されていません');
-    }
-    this.apiKey = key;
     // セッションごとに一意なユーザーIDを生成（Dify 側で会話を一意に識別するため）
     this.userId = crypto.randomUUID();
   }
 
-  /** APIキーが設定されているか確認（値は返さない） */
+  /** APIキーはサーバーサイドで管理されるため、クライアント側では常に有効と見なす */
   static isConfigured(): boolean {
-    const key = import.meta.env.VITE_DIFY_API_KEY;
-    return typeof key === 'string' && key.length > 0;
+    return true;
   }
 
   async sendMessage(options: DifyChatOptions): Promise<DifyChatResult> {
@@ -74,17 +64,14 @@ export class DifyChat {
 
     let response: Response;
     try {
-      response = await fetch(`${DIFY_BASE_URL}/chat-messages`, {
+      response = await fetch('/api/dify-chat', {
         method: 'POST',
         headers: {
-          // APIキーは Authorization ヘッダー経由でのみ送信。コンソール出力しない
-          Authorization: `Bearer ${this.apiKey}`,
           'Content-Type': 'application/json',
         },
         body: JSON.stringify(body),
       });
     } catch {
-      // ネットワーク層エラー。元の例外をそのまま伝播させない（万一URLにキーが乗っていた場合の漏洩防止）
       throw new DifyNetworkError('ネットワーク接続に失敗しました');
     }
 
