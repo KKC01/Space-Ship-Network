@@ -42,7 +42,7 @@ load_state() {
   else
     LAST_COMMENT_ID=""
     LAST_SCREEN_HASH=""
-    LAST_CHANGE_TIME=0
+    LAST_CHANGE_TIME=$(date +%s)
     NOTIFIED_HASH=""
   fi
 }
