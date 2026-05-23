@@ -61,8 +61,8 @@ save_state() {
 send_to_claude() {
   local body="$1"
   if [ "$body" = "#approve" ]; then
-    tmux send-keys -t "$SESSION" "y" Enter
-    log "→ tmux: approved (y)"
+    tmux send-keys -t "$SESSION" "1" Enter
+    log "→ tmux: approved (1)"
   elif [ "$body" = "#reject" ]; then
     tmux send-keys -t "$SESSION" "n" Enter
     log "→ tmux: rejected (n)"
@@ -147,7 +147,7 @@ EOF
 # === 検知パターン ===
 # 「処理が止まる」状態のキーワード
 is_waiting_for_input() {
-  echo "$1" | grep -qE "(Do you want|❯|y/n|y/N|Y/n|Allow|Approve|Continue\?|Proceed\?|Press |❯ [0-9])"
+  echo "$1" | grep -qE "(Do you want|y/n|y/N|Y/n|Allow|Approve|Continue\?|Proceed\?|Press |❯ [0-9])"
 }
 
 # === メインループ ===
