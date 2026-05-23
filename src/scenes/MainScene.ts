@@ -1332,6 +1332,7 @@ export class MainScene extends Scene {
       : def.recommendedFormation;
     this.applyFormation(formation);
     this._appPhase = 'playing';
+    this.events.emit('appPhaseChange', 'playing');
     console.log(`Mission Started: ${def.title}`);
   }
 

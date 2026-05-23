@@ -3,12 +3,19 @@ import { MainScene } from './scenes/MainScene';
 import { ChatWidget } from './components/ChatWidget';
 import { TitleScreen } from './ui/TitleScreen';
 
-if (/Android|iPhone|iPad/i.test(navigator.userAgent)) {
-  const requestFS = () => {
-    const el = document.documentElement;
-    if (el.requestFullscreen) el.requestFullscreen().catch(() => {});
-    else if ((el as any).webkitRequestFullscreen) (el as any).webkitRequestFullscreen();
-  };
+// モバイル fullscreen 要求（複数回トライで確実性向上）
+const isMobile = /Android|iPhone|iPad/i.test(navigator.userAgent);
+
+const requestFS = () => {
+  const el = document.documentElement;
+  const fsRequest = el.requestFullscreen || (el as any).webkitRequestFullscreen;
+  if (fsRequest) {
+    fsRequest.call(el).catch(() => {});
+  }
+};
+
+if (isMobile) {
+  // ポインタダウン時に fullscreen 要求
   document.addEventListener('pointerdown', requestFS, { once: true });
 }
 
@@ -62,6 +69,18 @@ window.addEventListener('load', () => {
   game.events.once('ready', () => {
     const mainScene = game.scene.getScene('MainScene') as MainScene;
     mainScene.events.once('create', () => {
+      // scene 初期化完了後に fullscreen 要求を複数回試行
+      if (isMobile) {
+        requestFS();
+        // 200ms 後に再度試行（初回失敗時のリトライ）
+        setTimeout(() => requestFS(), 200);
+        // ゲーム開始時（出撃時）にも再度試行
+        mainScene.events.once('appPhaseChange', () => {
+          if ((mainScene as any)._appPhase === 'playing') {
+            setTimeout(() => requestFS(), 300);
+          }
+        });
+      }
       new TitleScreen(mainScene).init();
     });
   });
