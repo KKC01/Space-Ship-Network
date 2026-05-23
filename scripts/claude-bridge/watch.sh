@@ -60,7 +60,7 @@ save_state() {
 # === tmux 操作 ===
 send_to_claude() {
   local body="$1"
-  if [ "$body" = "#approve" ]; then
+  if [ "$body" = "#approve" ] || [ "$body" = "y" ]; then
     tmux send-keys -t "$SESSION" "1" Enter
     log "→ tmux: approved (1)"
   elif [ "$body" = "#reject" ]; then
@@ -115,7 +115,7 @@ $safe_tail
 \`\`\`
 
 **返信方法:**
-- \`#approve\` で承認 (y を送信)
+- \`#approve\` または \`y\` で承認 (1 を送信)
 - \`#reject\` で拒否 (n を送信)
 - その他のテキストで自由入力
 EOF
