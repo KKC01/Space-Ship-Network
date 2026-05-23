@@ -1,0 +1,17 @@
+name : test
+
+on :
+  schedule:
+    -cron: '0 0,16 * * *'
+  workflow_dispatch:
+  push:
+    branchs:
+      - main
+
+jobs:
+  build: 
+    runs-on: ubuntu-latest
+    steps:
+      - name: echo msg
+        run : echo "welcome to Github actions!!"
+      - uses : actions/checkout@KKC01
