@@ -14,4 +14,4 @@ jobs:
     steps:
       - name: echo msg
         run : echo "welcome to Github actions!!"
-      - uses : actions/checkout@KKC01
+      - uses : actions/checkout@v1
