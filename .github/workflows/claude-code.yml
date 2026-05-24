@@ -24,10 +24,17 @@ jobs:
           branch_name_template: "Claude-Code-API"
       - name: Create PR
         run: |
-          if gh pr list --repo "${{ github.repository }}" --head "Claude-Code-API" --json number --jq '.[0].number' | grep -q '[0-9]'; then
+          git fetch
+          BRANCH=$(git branch -r --sort=-committerdate | grep -v 'HEAD\|origin/main' | head -1 | sed 's/.*origin\///' | tr -d ' ')
+          echo "Branch: $BRANCH"
+          if [ -z "$BRANCH" ] || [ "$BRANCH" = "main" ]; then
+            echo "No branch to create PR for"
+            exit 0
+          fi
+          if gh pr list --repo "${{ github.repository }}" --head "$BRANCH" --json number --jq '.[0].number' | grep -q '[0-9]'; then
             echo "PR already exists"
           else
-            gh pr create --repo "${{ github.repository }}" --base main --head Claude-Code-API --fill || true
+            gh pr create --repo "${{ github.repository }}" --base main --head "$BRANCH" --fill || true
           fi
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
