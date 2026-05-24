@@ -50,6 +50,17 @@
           }
         ]
       }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "echo '[handoff] セッション終了前に /mnt/obsidian/_handoff/current-session.md を更新しましたか？'",
+            "statusMessage": "handoff チェック"
+          }
+        ]
+      }
     ]
   },
   "enabledPlugins": {

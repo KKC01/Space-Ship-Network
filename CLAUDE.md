@@ -1,5 +1,20 @@
 # Space-Ship-Network プロジェクト指示
 
+## セッション開始時の必須手順
+
+新しい会話が始まったら、最初のメッセージ処理前に必ず以下を読む:
+
+1. `/mnt/obsidian/_handoff/current-session.md` — 前回の作業状態・次にやること
+2. `/mnt/obsidian/Knowledge/mistakes.md` — ミス再発防止
+
+セッション終了前（作業完了後）に `current-session.md` を更新すること。
+
+**作業が一区切りついたら毎回**、以下を `/mnt/obsidian/_handoff/current-session.md` に書き込む:
+- 今何をやったか
+- 未解決の問題
+- 次のセッションで最初にやること
+- 重要な決定事項
+
 ## サブエージェント運用ルール
 
 このプロジェクトには `.claude/agents/` に専用エージェントが定義されている。
