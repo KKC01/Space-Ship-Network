@@ -19,6 +19,16 @@ for cmd in tmux gh jq md5sum; do
   fi
 done
 
+# === watch.sh を origin/main から自動更新 ===
+REPO_DIR="$(cd "$SCRIPT_DIR/../.." && pwd)"
+if git -C "$REPO_DIR" fetch origin 2>/dev/null; then
+  git -C "$REPO_DIR" checkout origin/main -- scripts/claude-bridge/watch.sh 2>/dev/null \
+    && echo "✅ watch.sh を origin/main から更新しました" \
+    || echo "ℹ️  watch.sh の更新をスキップ"
+else
+  echo "ℹ️  git fetch 失敗 — ローカルの watch.sh を使用"
+fi
+
 # === gh 認証確認 ===
 if ! gh auth status >/dev/null 2>&1; then
   echo "✗ gh が認証されていません。"
