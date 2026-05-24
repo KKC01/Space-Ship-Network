@@ -22,13 +22,8 @@ body {
 }
 
 #game-container {
-  width: 100vw;
-  height: 100dvh;      /* 新しいブラウザ向け（ダイナミックビューポート対応） */
-  height: 100vh;       /* フォールバック */
-  height: 100%;        /* 究極のフォールバック */
   position: fixed;
-  top: 0;
-  left: 0;
+  inset: 0;
   z-index: 1;
 }
 
@@ -458,6 +453,7 @@ body:has(#meteor-modal:not(.hidden)) #scale-bar-container {
   bottom: 0;
   left: 0;
   pointer-events: auto;
+  z-index: 1100;
 }
 
 /* トグルボタン（常時表示） */
@@ -1345,18 +1341,40 @@ body:has(#meteor-modal:not(.hidden)) #scale-bar-container {
     display: none;
   }
 
+  .title-logo {
+    padding: 0 16px 12px;
+    margin-bottom: 8px;
+  }
+
   .title-main {
-    padding: 24px 20px;
+    padding: 16px;
+    gap: 16px;
+    justify-content: flex-start;
+  }
+
+  .title-mission-title {
+    font-size: 26px;
   }
 
   .title-body {
-    grid-template-columns: 1fr;
+    grid-template-columns: 100px 1fr;
+    gap: 14px;
+    flex: 0 1 auto;
   }
 
   .navigator-stack {
-    width: 100%;
-    max-width: 280px;
-    margin: 0 auto;
+    width: 100px;
+    aspect-ratio: 3 / 4;
+  }
+
+  .navigator-lines,
+  .navigator-overlay {
+    display: none;
+  }
+
+  .deploy-btn {
+    padding: 16px 40px;
+    font-size: 18px;
   }
 
   .customize-main {
