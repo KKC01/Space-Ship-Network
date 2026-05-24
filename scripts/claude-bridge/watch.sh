@@ -41,11 +41,15 @@ load_state() {
     LAST_SCREEN_HASH=$(jq -r '.last_screen_hash // ""' "$STATE_FILE")
     LAST_CHANGE_TIME=$(jq -r '.last_change_time // 0' "$STATE_FILE")
     NOTIFIED_HASH=$(jq -r '.notified_hash // ""' "$STATE_FILE")
+    LAST_ISSUE=$(jq -r '.last_issue // ""' "$STATE_FILE")
+    ISSUE_BODY_SENT=$(jq -r '.issue_body_sent // "false"' "$STATE_FILE")
   else
     LAST_COMMENT_ID=""
     LAST_SCREEN_HASH=""
     LAST_CHANGE_TIME=$(date +%s)
     NOTIFIED_HASH=""
+    LAST_ISSUE=""
+    ISSUE_BODY_SENT="false"
   fi
 }
 
@@ -55,7 +59,9 @@ save_state() {
     --arg sh "$LAST_SCREEN_HASH" \
     --argjson ct "$LAST_CHANGE_TIME" \
     --arg nh "$NOTIFIED_HASH" \
-    '{last_comment_id: $cid, last_screen_hash: $sh, last_change_time: $ct, notified_hash: $nh}' \
+    --arg li "$LAST_ISSUE" \
+    --arg ibs "$ISSUE_BODY_SENT" \
+    '{last_comment_id: $cid, last_screen_hash: $sh, last_change_time: $ct, notified_hash: $nh, last_issue: $li, issue_body_sent: $ibs}' \
     > "$STATE_FILE"
 }
 
@@ -216,22 +222,43 @@ main() {
     # --- 入力監視: GitHub → Claude ---
     ISSUE=$(get_issue || echo "")
     if [ -n "$ISSUE" ]; then
+      # Issue が切り替わったら本文送信フラグをリセット
+      if [ "$ISSUE" != "$LAST_ISSUE" ]; then
+        LAST_ISSUE="$ISSUE"
+        ISSUE_BODY_SENT="false"
+        save_state
+      fi
+
+      # Issue 本文を初回のみ送信
+      if [ "$ISSUE_BODY_SENT" = "false" ]; then
+        ISSUE_BODY=$(gh issue view "$ISSUE" --repo "$REPO" --json body --jq '.body // ""' 2>/dev/null | sanitize_mentions)
+        if [ -n "$ISSUE_BODY" ]; then
+          log "→ issue body: sending (${#ISSUE_BODY} chars)"
+          send_to_claude "$ISSUE_BODY"
+          LAST_CHANGE_TIME=$(date +%s)
+          NOTIFIED_HASH=""
+        fi
+        ISSUE_BODY_SENT="true"
+        # 既存コメントを baseline として記録（再起動時の再送信防止）
+        BASELINE=$(get_latest_comment "$ISSUE" | jq -r '.id // ""')
+        if [ -n "$BASELINE" ]; then
+          LAST_COMMENT_ID="$BASELINE"
+          log "→ baseline comment: $BASELINE (skipped)"
+        fi
+        save_state
+      fi
+
       COMMENT_JSON=$(get_latest_comment "$ISSUE" || echo "")
       if [ -n "$COMMENT_JSON" ] && [ "$COMMENT_JSON" != "null" ]; then
         COMMENT_ID=$(echo "$COMMENT_JSON" | jq -r '.id // ""')
         BODY=$(echo "$COMMENT_JSON" | jq -r '.body // ""')
 
         if [ -n "$COMMENT_ID" ] && [ "$COMMENT_ID" != "$LAST_COMMENT_ID" ]; then
-          # 初回起動時 (LAST_COMMENT_ID 空) は反映せず、最新を記録するだけ
-          if [ -z "$LAST_COMMENT_ID" ]; then
-            log "→ baseline comment: $COMMENT_ID (skipped)"
-          else
-            log "→ new comment: $COMMENT_ID"
-            send_to_claude "$BODY"
-            # 送信後はタイマーリセット
-            LAST_CHANGE_TIME=$(date +%s)
-            NOTIFIED_HASH=""
-          fi
+          log "→ new comment: $COMMENT_ID"
+          send_to_claude "$BODY"
+          # 送信後はタイマーリセット
+          LAST_CHANGE_TIME=$(date +%s)
+          NOTIFIED_HASH=""
           LAST_COMMENT_ID="$COMMENT_ID"
           save_state
         fi
