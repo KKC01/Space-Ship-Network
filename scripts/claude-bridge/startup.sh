@@ -36,22 +36,22 @@ if ! gh auth status >/dev/null 2>&1; then
   exit 1
 fi
 
+# === 既存セッションを停止 ===
+for s in "$SESSION_WATCH" "$SESSION_CLAUDE"; do
+  if tmux has-session -t "$s" 2>/dev/null; then
+    tmux kill-session -t "$s"
+    echo "✅ killed: $s"
+  fi
+done
+
 # === Claude セッション (受け皿) ===
-if tmux has-session -t "$SESSION_CLAUDE" 2>/dev/null; then
-  echo "ℹ️  tmux session '$SESSION_CLAUDE' は既に存在します"
-else
-  tmux new-session -d -s "$SESSION_CLAUDE"
-  echo "✅ Created tmux session: $SESSION_CLAUDE"
-fi
+tmux new-session -d -s "$SESSION_CLAUDE"
+echo "✅ Created tmux session: $SESSION_CLAUDE"
 
 # === Watch セッション + watch.sh 起動 ===
-if tmux has-session -t "$SESSION_WATCH" 2>/dev/null; then
-  echo "ℹ️  tmux session '$SESSION_WATCH' は既に存在します"
-else
-  tmux new-session -d -s "$SESSION_WATCH"
-  tmux send-keys -t "$SESSION_WATCH" "bash $SCRIPT_DIR/watch.sh" Enter
-  echo "✅ Started watch.sh in session: $SESSION_WATCH"
-fi
+tmux new-session -d -s "$SESSION_WATCH"
+tmux send-keys -t "$SESSION_WATCH" "bash $SCRIPT_DIR/watch.sh" Enter
+echo "✅ Started watch.sh in session: $SESSION_WATCH"
 
 echo ""
 echo "=== tmux sessions ==="
