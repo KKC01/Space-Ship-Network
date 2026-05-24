@@ -146,18 +146,22 @@ post_completion() {
     timestamp=$(date '+%Y-%m-%d %H:%M')
 
     # ブランチ作成・コミット・プッシュ
-    git -C "$REPO_DIR" checkout -B "$PR_BRANCH" 2>/dev/null
+    git -C "$REPO_DIR" checkout -B "$PR_BRANCH" >> "$LOG_FILE" 2>&1
     git -C "$REPO_DIR" add -A
-    git -C "$REPO_DIR" commit -m "Claude Code (Desktop): $timestamp" 2>/dev/null
-    git -C "$REPO_DIR" push -f origin "$PR_BRANCH" 2>/dev/null
+    if ! git -C "$REPO_DIR" commit -m "Claude Code (Desktop): $timestamp" >> "$LOG_FILE" 2>&1; then
+      log "⚠️ git commit failed — skipping PR creation"
+      has_changes=false
+    else
+      git -C "$REPO_DIR" push -f origin "$PR_BRANCH" >> "$LOG_FILE" 2>&1
 
-    # 既存 PR 確認 → なければ作成
-    pr_url=$(gh pr list --repo "$REPO" --head "$PR_BRANCH" --json url --jq '.[0].url // ""' 2>/dev/null)
-    if [ -z "$pr_url" ]; then
-      pr_url=$(gh pr create --repo "$REPO" \
-        --base main --head "$PR_BRANCH" \
-        --title "Claude Code (Desktop): $timestamp" \
-        --body "スマホ経由の Claude Code による変更" 2>/dev/null | tail -1)
+      # 既存 PR 確認 → なければ作成
+      pr_url=$(gh pr list --repo "$REPO" --head "$PR_BRANCH" --json url --jq '.[0].url // ""' 2>/dev/null)
+      if [ -z "$pr_url" ]; then
+        pr_url=$(gh pr create --repo "$REPO" \
+          --base main --head "$PR_BRANCH" \
+          --title "Claude Code (Desktop): $timestamp" \
+          --body "スマホ経由の Claude Code による変更" 2>>"$LOG_FILE" | tail -1)
+      fi
     fi
 
     body=$(cat <<EOF
