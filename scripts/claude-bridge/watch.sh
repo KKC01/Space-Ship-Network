@@ -13,6 +13,8 @@ SESSION="${CLAUDE_BRIDGE_SESSION:-claude}"
 POLL_INTERVAL="${CLAUDE_BRIDGE_POLL_INTERVAL:-30}"
 IDLE_THRESHOLD="${CLAUDE_BRIDGE_IDLE_THRESHOLD:-45}"
 STATE_DIR="${CLAUDE_BRIDGE_STATE_DIR:-$HOME/.local/share/claude-bridge}"
+REPO_DIR="${CLAUDE_BRIDGE_REPO_DIR:-$HOME/Space-Ship-Network}"
+PR_BRANCH="${CLAUDE_BRIDGE_PR_BRANCH:-Claude-Code-Desktop}"
 
 LOG_FILE="$STATE_DIR/watch.log"
 STATE_FILE="$STATE_DIR/state.json"
@@ -130,21 +132,59 @@ EOF
 post_completion() {
   local issue="$1"
   local screen_tail="$2"
-  local safe_tail
+  local safe_tail body
   safe_tail=$(echo "$screen_tail" | sanitize_mentions)
-  local body
-  body=$(cat <<EOF
-## ✅ 実行完了 / 待機中
+
+  # git 変更確認
+  local has_changes=false
+  if git -C "$REPO_DIR" status --porcelain 2>/dev/null | grep -q .; then
+    has_changes=true
+  fi
+
+  if $has_changes; then
+    local timestamp pr_url
+    timestamp=$(date '+%Y-%m-%d %H:%M')
+
+    # ブランチ作成・コミット・プッシュ
+    git -C "$REPO_DIR" checkout -B "$PR_BRANCH" 2>/dev/null
+    git -C "$REPO_DIR" add -A
+    git -C "$REPO_DIR" commit -m "Claude Code (Desktop): $timestamp" 2>/dev/null
+    git -C "$REPO_DIR" push -f origin "$PR_BRANCH" 2>/dev/null
+
+    # 既存 PR 確認 → なければ作成
+    pr_url=$(gh pr list --repo "$REPO" --head "$PR_BRANCH" --json url --jq '.[0].url // ""' 2>/dev/null)
+    if [ -z "$pr_url" ]; then
+      pr_url=$(gh pr create --repo "$REPO" \
+        --base main --head "$PR_BRANCH" \
+        --title "Claude Code (Desktop): $timestamp" \
+        --body "スマホ経由の Claude Code による変更" 2>/dev/null | tail -1)
+    fi
+
+    body=$(cat <<EOF
+## ✅ 実行完了
 
 \`\`\`
 $safe_tail
 \`\`\`
 
-次の指示を投稿してください。
+PR を作成しました: $pr_url
+マージで変更が確定します。
 EOF
-  )
+    )
+    log "← Issue: posted completion with PR ($pr_url)"
+  else
+    body=$(cat <<EOF
+## ✅ 実行完了（変更なし）
+
+\`\`\`
+$safe_tail
+\`\`\`
+EOF
+    )
+    log "← Issue: posted completion (no changes)"
+  fi
+
   gh issue comment "$issue" --repo "$REPO" --body "$body" >/dev/null
-  log "← Issue: posted completion"
   # 自分の投稿を次のポーリングでスキップするため ID を更新
   LAST_COMMENT_ID=$(get_latest_comment "$issue" | jq -r '.id // ""')
   save_state
