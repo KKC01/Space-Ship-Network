@@ -22,3 +22,12 @@ jobs:
           anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
           label_trigger: "claude API"
           branch_name_template: "Claude-Code-API"
+      - name: Create PR
+        run: |
+          if gh pr list --repo "${{ github.repository }}" --head "Claude-Code-API" --json number --jq '.[0].number' | grep -q '[0-9]'; then
+            echo "PR already exists"
+          else
+            gh pr create --repo "${{ github.repository }}" --base main --head Claude-Code-API --fill || true
+          fi
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
