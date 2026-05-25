@@ -163,10 +163,10 @@ export class TitleScreen {
     deployBtn.setAttribute('data-testid', 'deploy-btn');
     deployBtn.textContent = 'DEPLOY';
     deployBtn.addEventListener('click', () => {
-      this.hide();
-      // 動的 import で循環参照を回避
+      // 動的 import で循環参照を回避。show() 後に hide() してゲーム画面が一瞬見えるのを防ぐ
       import('./CustomizeShipScreen').then(({ CustomizeShipScreen }) => {
         new CustomizeShipScreen(this.scene, this.selectedMissionId, this).show();
+        this.hide();
       });
     });
     this.mainRightEl.appendChild(deployBtn);

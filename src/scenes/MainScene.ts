@@ -42,6 +42,8 @@ export class MainScene extends Scene {
   private linkGraphics!: Phaser.GameObjects.Graphics;
   private clutterGraphics!: Phaser.GameObjects.Graphics;
   private interferenceGraphics!: Phaser.GameObjects.Graphics;
+  private fogRT!: Phaser.GameObjects.RenderTexture;
+  private fogEraseGfx!: Phaser.GameObjects.Graphics;
 
   public textLabels: Map<string, Phaser.GameObjects.Text> = new Map();
 
@@ -111,6 +113,17 @@ export class MainScene extends Scene {
     this.interferenceGraphics = this.add.graphics().setDepth(1);
     this.clutterGraphics = this.add.graphics().setDepth(2);
     this.linkGraphics = this.add.graphics().setDepth(3);
+
+    // 索敵範囲外の霧レイヤー（画面固定・depth 9 でゲームオブジェクト上に重ねる）
+    const { width, height } = this.scale;
+    this.fogRT = this.add.renderTexture(0, 0, width, height)
+      .setScrollFactor(0)
+      .setDepth(9);
+    this.fogEraseGfx = this.make.graphics({ x: 0, y: 0 });
+
+    this.scale.on('resize', (gameSize: Phaser.Structs.Size) => {
+      this.fogRT.setSize(gameSize.width, gameSize.height);
+    });
 
     // サブシステム初期化（DOM・Graphics は各システム内で生成）
     this.meteorSystem = new MeteorSystem(this);
@@ -1232,6 +1245,40 @@ export class MainScene extends Scene {
 
     // 6. Draw Meteors: MeteorSystem に委譲
     this.meteorSystem.draw(time);
+
+    // 7. 索敵範囲外の霧オーバーレイ（プレイ中のみ表示）
+    this.drawFog();
+  }
+
+  private drawFog(): void {
+    if (this._appPhase !== 'playing') {
+      this.fogRT.setVisible(false);
+      return;
+    }
+    this.fogRT.setVisible(true);
+    this.fogRT.clear();
+    // 画面全体を暗いグレーで塗りつぶす
+    this.fogRT.fill(0x000000, 0.55);
+
+    const cam = this.cameras.main;
+    this.fogEraseGfx.clear();
+    this.fogEraseGfx.fillStyle(0xffffff, 1);
+
+    // 各艦の探知圏を穴として抜く（ワールド座標→スクリーン座標）
+    for (const ship of this.spaceships.values()) {
+      const sx = (ship.x - cam.scrollX) * cam.zoom;
+      const sy = (ship.y - cam.scrollY) * cam.zoom;
+      this.fogEraseGfx.fillCircle(sx, sy, ship.DETECTION_RANGE * cam.zoom);
+    }
+
+    // 偵察ドローンの探知圏も抜く
+    for (const drone of this.reconDrones) {
+      const sx = (drone.x - cam.scrollX) * cam.zoom;
+      const sy = (drone.y - cam.scrollY) * cam.zoom;
+      this.fogEraseGfx.fillCircle(sx, sy, this.RECON_DRONE_DETECTION_RANGE * cam.zoom);
+    }
+
+    this.fogRT.erase(this.fogEraseGfx);
   }
 
   private drawReconDrones(time: number): void {

@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "vite --host",
-    "server": "node server.js",
+    "server": "node --env-file=.env server.js",
     "build": "tsc && vite build",
     "preview": "vite preview"
   },

@@ -124,6 +124,22 @@ export class ChatWidget {
     const closeBtn = this.container.querySelector('.chat-close-btn') as HTMLButtonElement;
     closeBtn.addEventListener('click', () => this.close());
 
+    // 下フリックで閉じる（ヘッダー部分をドラッグ）
+    const header = this.container.querySelector('.chat-operator-area') as HTMLElement;
+    let startY = 0;
+    let isDragging = false;
+
+    const onStart = (y: number) => { startY = y; isDragging = true; };
+    const onEnd = (y: number) => {
+      if (isDragging && y - startY > 80) this.close();
+      isDragging = false;
+    };
+
+    header.addEventListener('touchstart', (e) => onStart(e.touches[0].clientY), { passive: true });
+    header.addEventListener('touchend',   (e) => onEnd(e.changedTouches[0].clientY), { passive: true });
+    header.addEventListener('mousedown',  (e) => onStart(e.clientY));
+    header.addEventListener('mouseup',    (e) => onEnd(e.clientY));
+
     this.sendBtn.addEventListener('click', () => this.sendMessage());
 
     this.input.addEventListener('keydown', (e: KeyboardEvent) => {

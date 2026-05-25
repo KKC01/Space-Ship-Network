@@ -266,6 +266,7 @@ export class MeteorSystem {
     else if (size === 'TINY') scale = 0.1 / 10;
     sprite.setScale(scale);
     sprite.setAlpha(0.55);
+    sprite.setBlendMode(Phaser.BlendModes.MULTIPLY);
     sprite.setDepth(4);
     sprite.setVisible(false);
     this.meteorSprites.set(meteorId, sprite);

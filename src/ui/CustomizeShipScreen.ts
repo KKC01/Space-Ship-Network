@@ -1,5 +1,5 @@
 import { MISSION_CATALOG, type MissionId, type FormationEntry } from '../systems/MissionCatalog';
-import { UNIT_CATALOG, getUnitsBySize, type UnitSpec } from '../systems/UnitCatalog';
+import { UNIT_CATALOG, getAllUnitsOrdered, type UnitSpec } from '../systems/UnitCatalog';
 import type { UnitType } from '../models/Spaceship';
 import type { MainScene } from '../scenes/MainScene';
 import type { TitleScreen } from './TitleScreen';
@@ -117,29 +117,15 @@ export class CustomizeShipScreen {
     leftCol.appendChild(missionInfo);
     main.appendChild(leftCol);
 
-    // 中央カラム: ユニットカード（サイズ別3サブカラム）
+    // 中央カラム: ユニットカード（表示順序固定フラットリスト）
     const midCol = document.createElement('div');
     midCol.className = 'customize-col customize-col--mid';
-
-    const sizes: Array<'small' | 'medium' | 'large'> = ['small', 'medium', 'large'];
-    const sizeLabels: Record<string, string> = { small: 'SMALL', medium: 'MEDIUM', large: 'LARGE' };
 
     const unitGrid = document.createElement('div');
     unitGrid.className = 'unit-size-grid';
 
-    for (const size of sizes) {
-      const col = document.createElement('div');
-      col.className = 'unit-size-col';
-
-      const colLabel = document.createElement('div');
-      colLabel.className = 'unit-size-label';
-      colLabel.textContent = sizeLabels[size];
-      col.appendChild(colLabel);
-
-      for (const spec of getUnitsBySize(size)) {
-        col.appendChild(this.buildUnitCard(spec));
-      }
-      unitGrid.appendChild(col);
+    for (const spec of getAllUnitsOrdered()) {
+      unitGrid.appendChild(this.buildUnitCard(spec));
     }
     midCol.appendChild(unitGrid);
     main.appendChild(midCol);
@@ -222,10 +208,13 @@ export class CustomizeShipScreen {
     name.textContent = spec.unitType;
     card.appendChild(name);
 
-    const role = document.createElement('div');
-    role.className = 'unit-card__role';
-    role.textContent = spec.role;
-    card.appendChild(role);
+    const stats = document.createElement('div');
+    stats.className = 'unit-card__stats';
+    stats.innerHTML =
+      `<span class="unit-card__stat-label">攻撃</span><span class="unit-card__stat-value">${spec.attack}</span>` +
+      `<span class="unit-card__stat-label">通信</span><span class="unit-card__stat-value">${spec.comms}</span>` +
+      `<span class="unit-card__stat-label">HP</span><span class="unit-card__stat-value">${spec.hp}</span>`;
+    card.appendChild(stats);
 
     const cost = document.createElement('div');
     cost.className = 'unit-card__cost';

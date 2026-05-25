@@ -1172,6 +1172,7 @@ body:has(#meteor-modal:not(.hidden)) #scale-bar-container {
   height: 100px;
   object-fit: contain;
   opacity: 0.8;
+  mix-blend-mode: multiply;
 }
 
 .unit-card__name {
@@ -1181,9 +1182,22 @@ body:has(#meteor-modal:not(.hidden)) #scale-bar-container {
   line-height: 1.2;
 }
 
-.unit-card__role {
-  font-size: 10px;
+.unit-card__stats {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 2px 6px;
+  margin: 2px 0;
+}
+
+.unit-card__stat-label {
+  font-size: 9px;
   color: #64748b;
+  white-space: nowrap;
+}
+
+.unit-card__stat-value {
+  font-size: 9px;
+  color: #94a3b8;
 }
 
 .unit-card__cost {

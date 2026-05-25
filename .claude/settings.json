@@ -45,7 +45,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "bash /home/kenc/Space-Ship-Network/.claude/hooks/block-sensitive-files.sh",
+            "command": "bash /workspaces/Space-Ship-Network/.claude/hooks/block-sensitive-files.sh",
             "statusMessage": "機密ファイルチェック中..."
           }
         ]
