@@ -221,7 +221,7 @@ export class PlanetSystem {
       // Phaser スプライトとして配置（クリック検出用に planetId を保存）
       const sprite = this.scene.add.image(candidate.x, candidate.y, 'planet');
       sprite.setScale(0.5);
-      sprite.setDepth(2);
+      sprite.setDepth(10);
       sprite.setData('planetId', spec.id);
       this.planetSprites.push(sprite);
     }

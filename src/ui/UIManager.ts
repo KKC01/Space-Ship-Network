@@ -134,6 +134,7 @@ export class UIManager {
      'legacy-toggle-btn',
      'multiplex-group-btn', 'multiplex-group-content',
      'optical-group-btn', 'optical-group-content',
+     'transfer-group-btn', 'transfer-group-content',
      'toggle-status-btn'
     ].forEach(id => {
       const el = document.getElementById(id);
@@ -389,6 +390,19 @@ export class UIManager {
     setup('multiplex-group-btn', 'multiplex-group-content');
     setup('optical-group-btn', 'optical-group-content');
     setup('damage-group-btn', 'damage-group-content');
+    setup('transfer-group-btn', 'transfer-group-content');
+
+    // 矢印ボタンのトグル: right → left → both → right
+    const directionCycle: Record<string, string> = { right: 'left', left: 'both', both: 'right' };
+    const directionLabel: Record<string, string> = { right: '▶', left: '◀', both: '◀▶' };
+    document.querySelectorAll<HTMLButtonElement>('.transfer-arrow-btn').forEach(btn => {
+      btn.onclick = () => {
+        const current = btn.dataset.direction ?? 'right';
+        const next = directionCycle[current] ?? 'right';
+        btn.dataset.direction = next;
+        btn.textContent = directionLabel[next];
+      };
+    });
   }
 
   private setupMissionPanelToggle(): void {
