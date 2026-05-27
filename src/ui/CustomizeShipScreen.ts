@@ -95,44 +95,13 @@ export class CustomizeShipScreen {
 
     const headerTitle = document.createElement('span');
     headerTitle.className = 'customize-header__title';
-    headerTitle.textContent = `CUSTOMIZE SHIP — ${def.shortLabel}`;
+    headerTitle.textContent = `Customize FLEET — ${def.title}`;
     header.appendChild(headerTitle);
     el.appendChild(header);
 
-    // ====== 3カラムメイン ======
-    const main = document.createElement('div');
-    main.className = 'customize-main';
-
-    // 左カラム: ミッション情報
-    const leftCol = document.createElement('div');
-    leftCol.className = 'customize-col customize-col--left';
-
-    const missionInfo = document.createElement('div');
-    missionInfo.className = 'customize-mission-info glass-panel';
-    missionInfo.innerHTML = `
-      <div class="customize-mission-title">${def.title}</div>
-      <div class="customize-mission-desc">${def.description}</div>
-      <div class="customize-mission-budget">予算: ${def.budget}</div>
-    `;
-    leftCol.appendChild(missionInfo);
-    main.appendChild(leftCol);
-
-    // 中央カラム: ユニットカード（表示順序固定フラットリスト）
-    const midCol = document.createElement('div');
-    midCol.className = 'customize-col customize-col--mid';
-
-    const unitGrid = document.createElement('div');
-    unitGrid.className = 'unit-size-grid';
-
-    for (const spec of getAllUnitsOrdered()) {
-      unitGrid.appendChild(this.buildUnitCard(spec));
-    }
-    midCol.appendChild(unitGrid);
-    main.appendChild(midCol);
-
-    // 右カラム: 編成リスト + 予算バー + 出撃ボタン
-    const rightCol = document.createElement('div');
-    rightCol.className = 'customize-col customize-col--right';
+    // ====== トップバー: BUDGET / FORMATION（旧右カラムから上部に移動） ======
+    const topbar = document.createElement('div');
+    topbar.className = 'customize-topbar';
 
     // 予算バー
     const budgetSection = document.createElement('div');
@@ -157,27 +126,47 @@ export class CustomizeShipScreen {
     budgetSection.appendChild(budgetLabel);
     budgetSection.appendChild(this.budgetRemainingEl);
     budgetSection.appendChild(budgetBarWrap);
-    rightCol.appendChild(budgetSection);
+    topbar.appendChild(budgetSection);
 
     // 編成リスト
+    const formationSection = document.createElement('div');
+    formationSection.className = 'customize-formation-section';
+
     const formLabel = document.createElement('div');
     formLabel.className = 'formation-label';
     formLabel.textContent = 'FORMATION';
-    rightCol.appendChild(formLabel);
+    formationSection.appendChild(formLabel);
 
     this.formationListEl = document.createElement('ul');
     this.formationListEl.className = 'formation-list';
-    rightCol.appendChild(this.formationListEl);
+    formationSection.appendChild(this.formationListEl);
 
     // 警告テキスト
     this.warningEl = document.createElement('div');
     this.warningEl.className = 'customize-warning';
     this.warningEl.style.display = 'none';
-    rightCol.appendChild(this.warningEl);
+    formationSection.appendChild(this.warningEl);
 
-    // 出撃ボタン
+    topbar.appendChild(formationSection);
+
+    el.appendChild(topbar);
+
+    // ====== メイン（ユニットカード一覧） ======
+    const main = document.createElement('div');
+    main.className = 'customize-main';
+
+    const unitGrid = document.createElement('div');
+    unitGrid.className = 'unit-size-grid';
+    for (const spec of getAllUnitsOrdered()) {
+      unitGrid.appendChild(this.buildUnitCard(spec));
+    }
+    main.appendChild(unitGrid);
+
+    el.appendChild(main);
+
+    // 出撃ボタン（右下固定）
     this.confirmBtn = document.createElement('button');
-    this.confirmBtn.className = 'deploy-btn';
+    this.confirmBtn.className = 'deploy-btn customize-deploy-btn';
     this.confirmBtn.setAttribute('data-testid', 'confirm-deploy-btn');
     this.confirmBtn.textContent = 'DEPLOY';
     this.confirmBtn.addEventListener('click', () => {
@@ -185,10 +174,7 @@ export class CustomizeShipScreen {
       this.titleScreen.hide();
       this.scene.startMission(this.missionId, this.formation);
     });
-    rightCol.appendChild(this.confirmBtn);
-
-    main.appendChild(rightCol);
-    el.appendChild(main);
+    el.appendChild(this.confirmBtn);
 
     this.refreshFormation();
   }
@@ -295,9 +281,10 @@ export class CustomizeShipScreen {
     }
 
     if (this.budgetRemainingEl) {
+      // 表示形式: 「260 / 300：残40」 / 超過時: 「310 / 300：超過10」
       this.budgetRemainingEl.textContent = isOver
-        ? `超過: ${-remaining}`
-        : `残: ${remaining}`;
+        ? `${cost} / ${def.budget}：超過${-remaining}`
+        : `${cost} / ${def.budget}：残${remaining}`;
       this.budgetRemainingEl.style.color = isOver ? '#f87171' : '#4ade80';
     }
 

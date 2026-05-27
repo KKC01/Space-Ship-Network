@@ -10,5 +10,7 @@ export default defineConfig({
         changeOrigin: true,
       },
     },
+    // WSL/Docker 環境では inotify が効かないことがあるので polling を強制
+    watch: { usePolling: true, interval: 300 },
   },
 });

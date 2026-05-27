@@ -11,7 +11,7 @@ import type { MainScene } from '../scenes/MainScene';
 
 /**
  * UI/モーダル全般のマネージャ。
- * - GameOver パネル / Unit モーダル / 各種コントロール / スケールバー / 経過時間 / アコーディオン
+ * - GameOver パネル / Unit モーダル / 各種コントロール / スケールバー / アコーディオン
  * - DOM 取得・イベントハンドラ登録・状態更新を一元化
  *
  * Planet/Meteor モーダルは PlanetSystem / MeteorSystem 内で管理。
@@ -53,7 +53,6 @@ export class UIManager {
   private domTcpIpToggleBtn: HTMLButtonElement | null = null;
 
   private domToggleStatusBtn: HTMLElement | null = null;
-  private domTimeDisplay: HTMLElement | null = null;
   private domScaleBarLine: HTMLElement | null = null;
   private domScaleBarText: HTMLElement | null = null;
 
@@ -187,18 +186,6 @@ export class UIManager {
     }
     this.updateModalData();
     this.applyModeToUnitModal();
-  }
-
-  /**
-   * 経過時間表示の更新（draw 中に小数1桁、update 末尾に整数秒）。
-   */
-  updateTimeDisplay(timeElapsedMs: number, decimals: 0 | 1 = 0): void {
-    if (!this.domTimeDisplay) return;
-    if (decimals === 1) {
-      this.domTimeDisplay.textContent = (timeElapsedMs / 1000).toFixed(1);
-    } else {
-      this.domTimeDisplay.textContent = Math.floor(timeElapsedMs / 1000).toString();
-    }
   }
 
   /**
@@ -358,7 +345,6 @@ export class UIManager {
 
   private bindStatusToggle(): void {
     this.domToggleStatusBtn = document.getElementById('toggle-status-btn');
-    this.domTimeDisplay = document.getElementById('time-display');
     if (this.domToggleStatusBtn) {
       this.domToggleStatusBtn.onclick = () => {
         if (!this.domRgrContainer) return;

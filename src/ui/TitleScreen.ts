@@ -33,7 +33,6 @@ export class TitleScreen {
     logo.className = 'title-logo';
     logo.innerHTML = `
       <div class="title-logo__main">SPACE-SHIP-NETWORK</div>
-      <div class="title-logo__sub">U.S.C. SECURE LINK</div>
     `;
     sidebar.appendChild(logo);
 
@@ -58,13 +57,6 @@ export class TitleScreen {
     }
 
     sidebar.appendChild(missionList);
-
-    // カスタマイズ誘導ラベル（視覚誘導のみ、クリック不可）
-    const customizeHint = document.createElement('div');
-    customizeHint.className = 'mission-item disabled';
-    customizeHint.style.marginTop = 'auto';
-    customizeHint.textContent = 'Customize Ship';
-    sidebar.appendChild(customizeHint);
 
     el.appendChild(sidebar);
 
@@ -96,29 +88,23 @@ export class TitleScreen {
     const def = MISSION_CATALOG[this.selectedMissionId];
     this.mainRightEl.innerHTML = '';
 
-    // タイトル
+    // タイトル + BUDGET を横並びに
+    const head = document.createElement('div');
+    head.className = 'title-mission-head';
+
     const titleEl = document.createElement('h2');
     titleEl.className = 'title-mission-title';
     titleEl.setAttribute('data-testid', 'mission-title');
     titleEl.textContent = def.title;
-    this.mainRightEl.appendChild(titleEl);
-
-    // ピル群
-    const pills = document.createElement('div');
-    pills.className = 'title-pills';
 
     const budgetPill = document.createElement('span');
     budgetPill.className = 'title-pill title-pill--accent';
     budgetPill.setAttribute('data-testid', 'mission-budget');
     budgetPill.textContent = `BUDGET: ${def.budget}`;
 
-    const labelPill = document.createElement('span');
-    labelPill.className = 'title-pill';
-    labelPill.textContent = def.shortLabel;
-
-    pills.appendChild(budgetPill);
-    pills.appendChild(labelPill);
-    this.mainRightEl.appendChild(pills);
+    head.appendChild(titleEl);
+    head.appendChild(budgetPill);
+    this.mainRightEl.appendChild(head);
 
     // ボディ: ナビキャラ + ブリーフィング
     const body = document.createElement('div');

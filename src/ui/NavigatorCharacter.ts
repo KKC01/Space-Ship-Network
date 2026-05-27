@@ -1,13 +1,20 @@
 // キャラクター画像を動的に切り替えるナビゲーターコンポーネント。
 // import.meta.glob でアセットを一括バンドルし、ファイル名→URL マップから引く。
-const AI_02_IMAGES = import.meta.glob('../assets/character/AI_02/*.png', { eager: true, as: 'url' }) as Record<string, string>;
+const AI_IMAGES = import.meta.glob('../assets/character/AI_*/*.png', { eager: true, query: '?url', import: 'default' }) as Record<string, string>;
 
-// "operator_AI_02.png" のようなファイル名から URL を返す
+// 入力例:
+//   "operator_AI_02.png"        → 既定（AI_02 フォルダ）から検索
+//   "AI_01/operator_AI_02.png"  → 指定フォルダから取得
 function resolveCharacterUrl(filename: string): string | null {
-  for (const [path, url] of Object.entries(AI_02_IMAGES)) {
-    if (path.endsWith('/' + filename)) return url;
+  const hasFolder = filename.includes('/');
+  for (const [path, url] of Object.entries(AI_IMAGES)) {
+    if (hasFolder) {
+      if (path.endsWith('/' + filename)) return url;
+    } else {
+      // フォルダ未指定なら AI_02 を優先（後方互換）
+      if (path.endsWith('/AI_02/' + filename)) return url;
+    }
   }
-  // AI_01 フォルダもフォールバックとして検索
   return null;
 }
 

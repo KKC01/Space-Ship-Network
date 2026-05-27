@@ -22,19 +22,23 @@
     }
     .accordion-content.open {
       max-height: 500px;
-      padding: 6px;
-      margin-bottom: 6px;
+      padding: 4px 6px;
+      margin-bottom: 4px;
+      font-size: 11px;
+      line-height: 1.35;
     }
     .accordion-btn {
       width: 100%;
       text-align: left;
-      padding: 7px 9px;
+      padding: 4px 8px;
       background: rgba(255,255,255,0.05);
       border: 1px solid rgba(255,255,255,0.1);
       color: #fff;
       cursor: pointer;
       font-family: inherit;
-      font-weight: 600;
+      font-size: 11px;
+      font-weight: 700;
+      margin-bottom: 2px;
       display: flex;
       justify-content: space-between;
       align-items: center;
@@ -82,14 +86,15 @@
     .comm-toggle-btn {
       width: 100%;
       text-align: left;
-      padding: 7px 9px;
+      padding: 4px 8px;
       background: rgba(255,255,255,0.05);
       border: 1px solid rgba(255,255,255,0.1);
       color: #94a3b8;
       cursor: pointer;
       font-family: inherit;
-      font-weight: 600;
-      margin-bottom: 4px;
+      font-size: 11px;
+      font-weight: 700;
+      margin-bottom: 2px;
       display: flex;
       justify-content: space-between;
       align-items: center;
@@ -133,10 +138,6 @@
       </div>
 
     <div class="hud-panel glass-panel">
-      <div class="hud-item" style="font-size:9px; opacity:0.5; line-height:1.2;">
-        <span class="hud-label" style="font-size:8px;">経過時間</span>
-        <span class="hud-value" id="time-display" style="font-size:10px;">0.0</span>
-      </div>
       <div class="mode-viz-stack">
         <button id="toggle-mode-btn" class="mode-toggle-btn">モード：通信管制</button>
         <button id="viz-cycle-btn" class="viz-cycle-btn">サークル表示</button>
@@ -398,9 +399,9 @@
     <div id="chat-widget-root"></div>
 
     <div id="scale-bar-container" class="glass-panel"
-      style="position: absolute; bottom: 20px; left: 50%; transform: translateX(-50%); pointer-events: none; padding: 6px 12px;">
+      style="position: absolute; bottom: 12px; right: 16px; pointer-events: none; padding: 3px 8px; opacity: 0.5;">
       <div id="scale-bar-text"
-        style="text-align: center; font-size: 14px; margin-bottom: 2px; color: #9ca3af; font-weight: 600; letter-spacing: 1px;">
+        style="text-align: center; font-size: 10px; margin-bottom: 1px; color: #9ca3af; font-weight: 500; letter-spacing: 0.5px;">
         100 km</div>
       <div id="scale-bar-line"></div>
     </div>

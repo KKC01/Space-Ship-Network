@@ -617,7 +617,6 @@ export class MainScene extends Scene {
       }
     }
 
-    this.uiManager.updateTimeDisplay(this.timeElapsedMs, 1);
     this.uiManager.updateScaleBar(this.cameras.main.zoom);
 
     this.draw(time);
@@ -627,9 +626,6 @@ export class MainScene extends Scene {
 
     // ミッション判定と gameState 公開
     this.missionManager.update();
-
-    // 経過時間表示の更新（整数秒）
-    this.uiManager.updateTimeDisplay(this.timeElapsedMs, 0);
   }
 
   private updateReconDrones(delta: number): void {
@@ -1380,6 +1376,8 @@ export class MainScene extends Scene {
     this.applyFormation(formation);
     this._appPhase = 'playing';
     this.events.emit('appPhaseChange', 'playing');
+    // TUTORIALだけオペレーター画像を AI_01 系に切り替え（他は ChatWidget 既定の AI_02）
+    window.__chatWidget?.setMission(missionId);
     console.log(`Mission Started: ${def.title}`);
   }
 

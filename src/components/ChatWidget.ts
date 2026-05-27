@@ -1,5 +1,6 @@
 import operatorImg from '../assets/character/AI_02/operator_AI_01.png';
 import operatorMiniImg from '../assets/character/AI_02/operator_AI_00_0.png';
+import tutorialOperatorImg from '../assets/character/AI_01/operator_AI_01.png';
 import { DifyChat, DifyApiError, DifyNetworkError, DifyConfigError } from '../services/DifyChat';
 
 interface ChatMessage {
@@ -116,6 +117,16 @@ export class ChatWidget {
 
     const portraitMini = document.getElementById('operator-portrait-mini') as HTMLImageElement | null;
     if (portraitMini) portraitMini.src = operatorMiniImg;
+  }
+
+  /** ミッションIDに応じてオペレーター画像を切り替える（TUTORIALのみ AI_01/operator_AI_01.png） */
+  setMission(missionId: string): void {
+    const useTutorialImage = missionId === 'tutorial';
+    const portraitSrc = useTutorialImage ? tutorialOperatorImg : operatorImg;
+    const miniSrc = useTutorialImage ? tutorialOperatorImg : operatorMiniImg;
+    if (this.portrait) this.portrait.src = portraitSrc;
+    const portraitMini = document.getElementById('operator-portrait-mini') as HTMLImageElement | null;
+    if (portraitMini) portraitMini.src = miniSrc;
   }
 
   private bindEvents(): void {
