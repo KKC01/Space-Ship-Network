@@ -1260,17 +1260,19 @@ export class MainScene extends Scene {
     this.fogEraseGfx.clear();
     this.fogEraseGfx.fillStyle(0xffffff, 1);
 
-    // 各艦の探知圏を穴として抜く（ワールド座標→スクリーン座標）
+    // 各艦の探知圏を穴として抜く（worldView.x/y が実際の描画左上端）
+    const wvx = cam.worldView.x;
+    const wvy = cam.worldView.y;
     for (const ship of this.spaceships.values()) {
-      const sx = (ship.x - cam.scrollX) * cam.zoom;
-      const sy = (ship.y - cam.scrollY) * cam.zoom;
+      const sx = (ship.x - wvx) * cam.zoom;
+      const sy = (ship.y - wvy) * cam.zoom;
       this.fogEraseGfx.fillCircle(sx, sy, ship.DETECTION_RANGE * cam.zoom);
     }
 
     // 偵察ドローンの探知圏も抜く
     for (const drone of this.reconDrones) {
-      const sx = (drone.x - cam.scrollX) * cam.zoom;
-      const sy = (drone.y - cam.scrollY) * cam.zoom;
+      const sx = (drone.x - wvx) * cam.zoom;
+      const sy = (drone.y - wvy) * cam.zoom;
       this.fogEraseGfx.fillCircle(sx, sy, this.RECON_DRONE_DETECTION_RANGE * cam.zoom);
     }
 
@@ -1374,6 +1376,18 @@ export class MainScene extends Scene {
       ? customFormation
       : def.recommendedFormation;
     this.applyFormation(formation);
+
+    // 編成の重心にカメラをセンタリング（追加 ship が画面外に出るのを防ぐ）
+    {
+      const cx = this.sys.game.canvas.width / 2;
+      const cy = this.sys.game.canvas.height / 2;
+      const SPAWN_OFFSET_X = -3200;
+      const SPAWN_OFFSET_Y = -3200;
+      const avgDx = formation.reduce((s, f) => s + f.dx, 0) / formation.length;
+      const avgDy = formation.reduce((s, f) => s + f.dy, 0) / formation.length;
+      this.cameras.main.centerOn(cx + SPAWN_OFFSET_X + avgDx, cy + SPAWN_OFFSET_Y + avgDy);
+    }
+
     this._appPhase = 'playing';
     this.events.emit('appPhaseChange', 'playing');
     // TUTORIALだけオペレーター画像を AI_01 系に切り替え（他は ChatWidget 既定の AI_02）

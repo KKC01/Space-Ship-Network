@@ -153,12 +153,14 @@ body {
 }
 
 .hud-panel {
+  position: absolute;
+  top: 20px;
+  right: 20px;
   display: flex;
   gap: 14px;
   align-items: center;
   pointer-events: auto;
   padding: 8px 14px;
-  align-self: flex-start;
 }
 
 .mode-viz-stack {
@@ -307,9 +309,21 @@ body {
   box-shadow: 0 2px 10px rgba(56, 189, 248, 0.3);
 }
 
+/* モーダル表示中はスケールバーを非表示 */
 body:has(#unit-modal:not(.hidden)) #scale-bar-container,
 body:has(#planet-modal:not(.hidden)) #scale-bar-container,
 body:has(#meteor-modal:not(.hidden)) #scale-bar-container {
+  display: none !important;
+}
+
+/* モーダル表示中は CHAT ボタンを右上に移動（fixed でビューポート基準） */
+body:has(#unit-modal:not(.hidden)) #chat-toggle-btn,
+body:has(#planet-modal:not(.hidden)) #chat-toggle-btn,
+body:has(#meteor-modal:not(.hidden)) #chat-toggle-btn {
+  position: fixed !important;
+  bottom: auto !important;
+  left: auto !important;
+  top: 70px !important;
   right: 360px !important;
 }
 
@@ -395,9 +409,18 @@ body:has(#meteor-modal:not(.hidden)) #scale-bar-container {
   body:has(#unit-modal:not(.hidden)) #scale-bar-container,
   body:has(#planet-modal:not(.hidden)) #scale-bar-container,
   body:has(#meteor-modal:not(.hidden)) #scale-bar-container {
+    display: none !important;
+  }
+
+  /* モバイル: モーダル表示中は CHAT を右上に移動（fixed でビューポート基準） */
+  body:has(#unit-modal:not(.hidden)) #chat-toggle-btn,
+  body:has(#planet-modal:not(.hidden)) #chat-toggle-btn,
+  body:has(#meteor-modal:not(.hidden)) #chat-toggle-btn {
+    position: fixed !important;
+    bottom: auto !important;
+    left: auto !important;
     top: max(10px, env(safe-area-inset-top)) !important;
     right: max(10px, env(safe-area-inset-right)) !important;
-    bottom: auto !important;
   }
 
   #scale-bar-text {

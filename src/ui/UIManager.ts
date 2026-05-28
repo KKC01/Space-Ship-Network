@@ -29,7 +29,7 @@ export class UIManager {
   private domUnitTitle: HTMLElement | null = null;
   private domUnitType: HTMLElement | null = null;
   private domUnitLevel: HTMLElement | null = null;
-  private unitModalSwipeStart: { x: number; y: number; time: number } | null = null;
+  private unitModalSwipeStart: { x: number; y: number; time: number; scrollTop: number } | null = null;
   private domShortEnable: HTMLInputElement | null = null;
   private domShortFreq: HTMLSelectElement | null = null;
   private domLongEnable: HTMLInputElement | null = null;
@@ -255,7 +255,12 @@ export class UIManager {
     if (!this.domUnitModal) return;
 
     this.domUnitModal.addEventListener('pointerdown', (e: PointerEvent) => {
-      this.unitModalSwipeStart = { x: e.clientX, y: e.clientY, time: Date.now() };
+      this.unitModalSwipeStart = {
+        x: e.clientX,
+        y: e.clientY,
+        time: Date.now(),
+        scrollTop: this.domUnitModal!.scrollTop,
+      };
     });
 
     this.domUnitModal.addEventListener('pointerup', (e: PointerEvent) => {
@@ -263,10 +268,11 @@ export class UIManager {
       const dx = e.clientX - this.unitModalSwipeStart.x;
       const dy = e.clientY - this.unitModalSwipeStart.y;
       const elapsed = Date.now() - this.unitModalSwipeStart.time;
+      const startScrollTop = this.unitModalSwipeStart.scrollTop;
       this.unitModalSwipeStart = null;
 
-      // 下方向の明確なフリックだけを閉じる操作として扱う。
-      if (dy > 70 && Math.abs(dy) > Math.abs(dx) * 1.4 && elapsed < 700) {
+      // スクロール位置が先頭のときのみ下フリックを閉じる操作として扱う
+      if (startScrollTop <= 5 && dy > 60 && Math.abs(dy) > Math.abs(dx) * 1.4 && elapsed < 700) {
         this.closeUnitModal();
       }
     });
