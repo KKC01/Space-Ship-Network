@@ -160,10 +160,10 @@
           <span class="mission-chevron">▼</span>
         </button>
         <div id="mission-body" class="mission-body">
-          <div class="operator-log-header">
+          <div style="display: flex; gap: 8px; align-items: flex-start; padding: 6px 12px 4px;">
             <img id="operator-portrait-mini" src="" alt="Operator AI" class="operator-portrait-mini">
-          </div>
-          <div id="mission-log" class="mission-log">
+            <div id="mission-log" class="mission-log" style="padding: 0; flex: 1;">
+            </div>
           </div>
         </div>
       </div>
@@ -287,41 +287,6 @@
         </div>
       </div>
 
-      <!-- 転送設定アコーディオン（通信管制モードのみ表示） -->
-      <button id="transfer-group-btn" class="accordion-btn" style="margin-top: 6px;">転送設定</button>
-      <div id="transfer-group-content" class="accordion-content">
-        <div class="transfer-row" data-pair="tcp-legacy">
-          <span class="transfer-label">星間通信</span>
-          <button class="transfer-arrow-btn" data-pair="tcp-legacy" data-direction="right">▶</button>
-          <span class="transfer-label">レガシー星間通信</span>
-        </div>
-        <div class="transfer-row" data-pair="tcp-mux">
-          <span class="transfer-label">星間通信</span>
-          <button class="transfer-arrow-btn" data-pair="tcp-mux" data-direction="right">▶</button>
-          <span class="transfer-label">多重通信</span>
-        </div>
-        <div class="transfer-row" data-pair="tcp-optical">
-          <span class="transfer-label">星間通信</span>
-          <button class="transfer-arrow-btn" data-pair="tcp-optical" data-direction="both">◀▶</button>
-          <span class="transfer-label">光通信</span>
-        </div>
-        <div class="transfer-row" data-pair="optical-legacy">
-          <span class="transfer-label">光通信</span>
-          <button class="transfer-arrow-btn" data-pair="optical-legacy" data-direction="left">◀</button>
-          <span class="transfer-label">レガシー星間通信</span>
-        </div>
-        <div class="transfer-row" data-pair="mux-legacy">
-          <span class="transfer-label">多重通信</span>
-          <button class="transfer-arrow-btn" data-pair="mux-legacy" data-direction="right">▶</button>
-          <span class="transfer-label">レガシー星間通信</span>
-        </div>
-        <div class="transfer-row" data-pair="mux-optical">
-          <span class="transfer-label">多重通信</span>
-          <button class="transfer-arrow-btn" data-pair="mux-optical" data-direction="right">▶</button>
-          <span class="transfer-label">光通信</span>
-        </div>
-      </div>
-
       <!-- 戦闘アクションボタン（戦闘指揮モードのみ表示） -->
       <div id="action-btn-container" class="hidden" style="margin-top: 6px;">
         <button id="action-cycle-btn" style="width: 100%; font-size: 13px; padding: 7px; background: rgba(239,68,68,0.2); border: 1px solid rgba(239,68,68,0.5); color: #f87171; cursor: pointer; font-family: Rajdhani, sans-serif; font-weight: bold; letter-spacing: 1px;">攻撃</button>
@@ -395,13 +360,47 @@
         </button>
       </div>
 
-      <div style="display: flex; gap: 6px; margin-top: 8px;">
-        <button id="toggle-status-btn" style="flex: 1; font-size: 11px; padding: 5px; background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); color: #94a3b8; cursor: pointer;">通信状況 ▼</button>
-        <button id="noise-monitor-btn" style="flex: 1; font-size: 11px; padding: 5px; background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); color: #94a3b8; cursor: pointer;">背景雑音 ▼</button>
-      </div>
-      <div id="rgr-container" style="margin-top: 8px;" class="hidden">
+      <button id="toggle-status-btn" style="width: 100%; margin-top: 8px; font-size: 11px; padding: 5px; background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); color: #94a3b8; cursor: pointer; text-align: left;">通信状況 ▼</button>
+      <div id="rgr-container" style="margin-top: 4px;" class="hidden">
         <div id="rgr-list" style="font-size: 11px; max-height: 150px; overflow-y: auto;"></div>
       </div>
+
+      <!-- 転送設定アコーディオン（通信管制モードのみ表示・通信状況と背景雑音の間） -->
+      <button id="transfer-group-btn" class="accordion-btn" style="margin-top: 6px;">転送設定</button>
+      <div id="transfer-group-content" class="accordion-content">
+        <div class="transfer-row" data-pair="tcp-legacy">
+          <span class="transfer-label">星間通信</span>
+          <button class="transfer-arrow-btn" data-pair="tcp-legacy" data-direction="right">▶</button>
+          <span class="transfer-label">レガシー星間通信</span>
+        </div>
+        <div class="transfer-row" data-pair="tcp-mux">
+          <span class="transfer-label">星間通信</span>
+          <button class="transfer-arrow-btn" data-pair="tcp-mux" data-direction="right">▶</button>
+          <span class="transfer-label">多重通信</span>
+        </div>
+        <div class="transfer-row" data-pair="tcp-optical">
+          <span class="transfer-label">星間通信</span>
+          <button class="transfer-arrow-btn" data-pair="tcp-optical" data-direction="both">◀▶</button>
+          <span class="transfer-label">光通信</span>
+        </div>
+        <div class="transfer-row" data-pair="optical-legacy">
+          <span class="transfer-label">光通信</span>
+          <button class="transfer-arrow-btn" data-pair="optical-legacy" data-direction="left">◀</button>
+          <span class="transfer-label">レガシー星間通信</span>
+        </div>
+        <div class="transfer-row" data-pair="mux-legacy">
+          <span class="transfer-label">多重通信</span>
+          <button class="transfer-arrow-btn" data-pair="mux-legacy" data-direction="right">▶</button>
+          <span class="transfer-label">レガシー星間通信</span>
+        </div>
+        <div class="transfer-row" data-pair="mux-optical">
+          <span class="transfer-label">多重通信</span>
+          <button class="transfer-arrow-btn" data-pair="mux-optical" data-direction="right">▶</button>
+          <span class="transfer-label">光通信</span>
+        </div>
+      </div>
+
+      <button id="noise-monitor-btn" style="width: 100%; margin-top: 6px; font-size: 11px; padding: 5px; background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); color: #94a3b8; cursor: pointer; text-align: left;">背景雑音 ▼</button>
       <div id="noise-monitor-video-container" style="margin-top: 8px; display: none;">
         <video id="noise-monitor-video" loop autoplay muted
           style="width: 100%; border: 1px solid rgba(255,255,255,0.1); cursor: pointer;">
