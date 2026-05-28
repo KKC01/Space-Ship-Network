@@ -327,6 +327,13 @@ body:has(#meteor-modal:not(.hidden)) #chat-toggle-btn {
   right: 360px !important;
 }
 
+/* モーダルを CHAT ボタンと同じ高さに揃える */
+body:has(#unit-modal:not(.hidden)) #unit-modal,
+body:has(#planet-modal:not(.hidden)) #planet-modal,
+body:has(#meteor-modal:not(.hidden)) #meteor-modal {
+  top: 70px !important;
+}
+
 
 @media (hover: none), (pointer: coarse), (max-width: 720px) {
   button,
