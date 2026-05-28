@@ -121,9 +121,11 @@ export class TitleScreen {
     const briefing = document.createElement('div');
     briefing.className = 'briefing-body';
 
-    const desc = document.createElement('p');
-    desc.textContent = def.description;
-    briefing.appendChild(desc);
+    if (def.description) {
+      const desc = document.createElement('p');
+      desc.textContent = def.description;
+      briefing.appendChild(desc);
+    }
 
     const briefText = document.createElement('p');
     briefText.style.marginTop = '12px';

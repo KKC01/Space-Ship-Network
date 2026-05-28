@@ -356,13 +356,10 @@ export class UIManager {
       this.domToggleStatusBtn.onclick = () => {
         if (!this.domRgrContainer) return;
         const isHidden = this.domRgrContainer.classList.contains('hidden');
+        this.closeAllExpandable();
         if (isHidden) {
-          this.closeNoiseMonitor();
           this.domRgrContainer.classList.remove('hidden');
           this.domToggleStatusBtn!.textContent = '通信状況 ▲';
-        } else {
-          this.domRgrContainer.classList.add('hidden');
-          this.domToggleStatusBtn!.textContent = '通信状況 ▼';
         }
       };
     }
@@ -382,21 +379,61 @@ export class UIManager {
     if (this.domToggleStatusBtn) this.domToggleStatusBtn.textContent = '通信状況 ▼';
   }
 
+  /** 多重通信・光通信・通信状況・転送設定・背景雑音を全て閉じる（排他開閉用） */
+  private closeAllExpandable(): void {
+    document.getElementById('multiplex-group-btn')?.classList.remove('open');
+    document.getElementById('multiplex-group-content')?.classList.remove('open');
+    document.getElementById('optical-group-btn')?.classList.remove('open');
+    document.getElementById('optical-group-content')?.classList.remove('open');
+    document.getElementById('transfer-group-content')?.classList.remove('open');
+    const tbtn = document.getElementById('transfer-group-btn');
+    if (tbtn) tbtn.textContent = '転送設定 ▼';
+    this.closeRgrContainer();
+    this.closeNoiseMonitor();
+  }
+
   private setupAccordions(): void {
-    const setup = (btnId: string, contentId: string) => {
+    // 排他開閉アコーディオン（多重通信・光通信）: 開く前に他の全展開要素を閉じる
+    const setupExclusive = (btnId: string, contentId: string) => {
       const btn = document.getElementById(btnId);
       const content = document.getElementById(contentId);
       if (btn && content) {
         btn.onclick = () => {
-          btn.classList.toggle('open');
-          content.classList.toggle('open');
+          const isOpen = content.classList.contains('open');
+          this.closeAllExpandable();
+          if (!isOpen) {
+            btn.classList.add('open');
+            content.classList.add('open');
+          }
         };
       }
     };
-    setup('multiplex-group-btn', 'multiplex-group-content');
-    setup('optical-group-btn', 'optical-group-content');
-    setup('damage-group-btn', 'damage-group-content');
-    setup('transfer-group-btn', 'transfer-group-content');
+    setupExclusive('multiplex-group-btn', 'multiplex-group-content');
+    setupExclusive('optical-group-btn', 'optical-group-content');
+
+    // 転送設定: アコーディオンクラス未使用・ボタンテキストで開閉表示（排他）
+    const transferBtn = document.getElementById('transfer-group-btn');
+    const transferContent = document.getElementById('transfer-group-content');
+    if (transferBtn && transferContent) {
+      transferBtn.onclick = () => {
+        const isOpen = transferContent.classList.contains('open');
+        this.closeAllExpandable();
+        if (!isOpen) {
+          transferContent.classList.add('open');
+          transferBtn.textContent = '転送設定 ▲';
+        }
+      };
+    }
+
+    // 被害対処は戦闘指揮モード専用のため排他対象外（従来通りトグル）
+    const dmgBtn = document.getElementById('damage-group-btn');
+    const dmgContent = document.getElementById('damage-group-content');
+    if (dmgBtn && dmgContent) {
+      dmgBtn.onclick = () => {
+        dmgBtn.classList.toggle('open');
+        dmgContent.classList.toggle('open');
+      };
+    }
 
     // 矢印ボタンのトグル: right → left → both → right
     const directionCycle: Record<string, string> = { right: 'left', left: 'both', both: 'right' };
@@ -622,10 +659,8 @@ export class UIManager {
     if (btn && cont && video) {
       btn.onclick = () => {
         const isVisible = cont.style.display === 'block';
-        if (isVisible) {
-          this.closeNoiseMonitor();
-        } else {
-          this.closeRgrContainer();
+        this.closeAllExpandable();
+        if (!isVisible) {
           const cfg = NOISE_MONITOR_CONFIG['none'];
           video.src = cfg.src;
           cont.style.display = 'block';

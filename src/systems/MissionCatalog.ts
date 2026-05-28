@@ -44,8 +44,8 @@ export const MISSION_CATALOG: Record<MissionId, MissionDef> = {
     title: 'Tutorial',
     shortLabel: 'TUTORIAL',
     budget: 300,
-    description: '基本操作の習得。短距離移動と通信ノードの確立を行う。',
-    briefingText: '基本操作の習熟・ネットワークの確立・浮遊隕石の迎撃・目標地点への到達を順に実施します。',
+    description: '',
+    briefingText: '基本操作の習熟・ネットワークの確立・浮遊隕石の迎撃・目標地点への到達を実施します。',
     navigatorLines: [
       'まず基本操作を習熟し、次の任務へ即応できる態勢を整えます。',
       'AIがサポートしますので、ご安心下さい。',

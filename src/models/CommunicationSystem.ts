@@ -15,7 +15,7 @@ export class CommunicationSystem {
   public static getLinkQuality(
     sender: Spaceship,
     receiver: Spaceship,
-    activeNodes: Spaceship[] = [],
+    _activeNodes: Spaceship[] = [],
     planets: { id?: string; x: number; y: number }[] = []
   ): { canConnect: boolean, dropRate: number } {
     const dist = this.getDistance(sender.x, sender.y, receiver.x, receiver.y);
@@ -35,16 +35,6 @@ export class CommunicationSystem {
        baseDropRate = Math.min(baseDropRate, shortRate);
     }
 
-    let collisionPenalty = 0;
-    if (activeNodes.length > 1) {
-       activeNodes.forEach(otherNode => {
-          if (otherNode.id !== sender.id) {
-             const nodeDist = this.getDistance(sender.x, sender.y, otherNode.x, otherNode.y);
-             if (nodeDist <= 750) collisionPenalty += 0.5;
-          }
-       });
-    }
-
     // 惑星による干渉ペナルティ（通信惑星は干渉源として扱わない）
     let interferencePenalty = 0;
     for (const planet of planets) {
@@ -57,7 +47,7 @@ export class CommunicationSystem {
       if (shortMatch && inShortRange) interferencePenalty += this.PLANET_INTERFERENCE_PENALTY;
     }
 
-    const finalDropRate = Math.min(1.0, baseDropRate + collisionPenalty + interferencePenalty);
+    const finalDropRate = Math.min(1.0, baseDropRate + interferencePenalty);
     return { canConnect: true, dropRate: finalDropRate };
   }
 
@@ -129,7 +119,7 @@ export class CommunicationSystem {
     return { canConnect: true, dropRate: finalDropRate };
   }
 
-  public static getOpticalMultiplexQuality(sender: Spaceship, receiver: Spaceship, activeNodes: Spaceship[] = []): { canConnect: boolean, dropRate: number } {
+  public static getOpticalMultiplexQuality(sender: Spaceship, receiver: Spaceship, _activeNodes: Spaceship[] = []): { canConnect: boolean, dropRate: number } {
     // 0. MUST be enabled on BOTH sides and MUST have a master selected
     if (!sender.isMultiplexEnabled || !receiver.isMultiplexEnabled) return { canConnect: false, dropRate: 1.0 };
     if (!sender.selectedMasterId || !receiver.selectedMasterId || sender.selectedMasterId !== receiver.selectedMasterId) return { canConnect: false, dropRate: 1.0 };
@@ -141,23 +131,8 @@ export class CommunicationSystem {
     // 2. Check encryption
     if (sender.multiplexCipher !== receiver.multiplexCipher) return { canConnect: false, dropRate: 1.0 };
 
-    // 3. Interference based on speed mode
-    let multiplier = 1.0;
-    if (sender.multiplexSpeed === 'medium') multiplier = 2.0;
-    if (sender.multiplexSpeed === 'high') multiplier = 4.0;
-
-    let collisionPenalty = 0;
-    if (activeNodes.length > 1) {
-      activeNodes.forEach(otherNode => {
-        if (otherNode.id !== sender.id) {
-          const nodeDist = this.getDistance(sender.x, sender.y, otherNode.x, otherNode.y);
-          if (nodeDist <= 300) collisionPenalty += 0.3 * multiplier;
-        }
-      });
-    }
-
     const baseDropRate = (dist / 200) * 0.1;
-    const finalDropRate = Math.min(1.0, baseDropRate + collisionPenalty);
+    const finalDropRate = Math.min(1.0, baseDropRate);
 
     return { canConnect: true, dropRate: finalDropRate };
   }

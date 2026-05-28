@@ -161,6 +161,7 @@ body {
   align-items: center;
   pointer-events: auto;
   padding: 8px 14px;
+  z-index: 20;
 }
 
 .mode-viz-stack {

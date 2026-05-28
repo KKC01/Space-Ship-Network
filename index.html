@@ -186,28 +186,19 @@
 
     <div id="unit-modal" class="glass-panel hidden"
       style="position: absolute; top: 20px; right: 20px; width: 320px; padding: 10px 12px; pointer-events: auto; max-height: 90vh; overflow-y: auto;">
-      <div id="unit-modal-close" style="position: absolute; top: 6px; right: 12px; cursor: pointer; font-size: 22px;">
-        &times;</div>
-      <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 8px; border-bottom: 1px solid rgba(255,255,255,0.2); padding-bottom: 4px;">
-        <img id="unit-ship-image" style="width: 64px; height: 64px; object-fit: contain; mix-blend-mode: screen;">
-        <div style="flex: 1;">
-          <h2 id="unit-title" style="margin: 0;">UNIT ID</h2>
-          <div style="font-size: 11px; color: #94a3b8; margin-top: 4px;">
-            <span class="hud-label">Type</span>
-            <span style="margin: 0 4px; color: #9ca3af;">:</span>
-            <span id="unit-type" style="color: #fff;">Legacy Destroyer</span>
-          </div>
-        </div>
-        <div style="display: flex; flex-direction: column; align-items: center;">
-          <span class="hud-label">LV</span>
-          <span id="unit-level" style="font-size: 14px; color: #fff;">1</span>
-        </div>
+      <!-- ヘッダー1行: 画像 名前 (Type) Lv. × -->
+      <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 6px; border-bottom: 1px solid rgba(255,255,255,0.2); padding-bottom: 4px;">
+        <img id="unit-ship-image" style="width: 64px; height: 64px; object-fit: contain; mix-blend-mode: screen; flex-shrink: 0;">
+        <span id="unit-title" style="font-weight: 700; font-size: 14px;">UNIT ID</span>
+        <span style="font-size: 11px; color: #94a3b8;">(Type: <span id="unit-type" style="color: #fff;">Legacy Destroyer</span>)</span>
+        <span style="margin-left: auto; font-size: 11px; color: #94a3b8; white-space: nowrap;">Lv.<span id="unit-level" style="color: #fff;">1</span></span>
+        <span id="unit-modal-close" style="cursor: pointer; font-size: 18px; color: #94a3b8; padding: 0 4px;">&times;</span>
       </div>
 
-      <!-- HP バー（モードに依らずヘッダー直下の同一位置で表示） -->
-      <div id="unit-hp-container" style="margin-bottom: 6px;">
-        <div class="hud-label">Unit Condition (HP)</div>
-        <div style="width: 100%; height: 6px; background: rgba(0,0,0,0.5); border-radius: 3px; margin-top: 5px; overflow: hidden;">
+      <!-- HP バー（1行表示） -->
+      <div id="unit-hp-container" style="display: flex; align-items: center; gap: 6px; margin-bottom: 6px;">
+        <span style="font-size: 11px; color: #94a3b8; white-space: nowrap;">HP :</span>
+        <div style="flex: 1; height: 6px; background: rgba(0,0,0,0.5); border-radius: 3px; overflow: hidden;">
           <div id="unit-hp-bar" style="width: 100%; height: 100%; background: #4ade80;"></div>
         </div>
       </div>
@@ -221,14 +212,19 @@
         </div>
       </div>
 
-      <!-- 星間通信 (TCP/IP) — 即時 ON/OFF トグル -->
-      <button id="tcpip-toggle-btn" class="comm-toggle-btn" data-enabled="false">星間通信</button>
+      <!-- 行1: 星間通信 / レガシー星間通信 ON/OFFトグル横並び -->
+      <div style="display: flex; gap: 4px; margin-bottom: 2px;">
+        <button id="tcpip-toggle-btn" class="comm-toggle-btn" data-enabled="false" style="flex: 1;">星間通信</button>
+        <button id="legacy-toggle-btn" class="comm-toggle-btn" data-enabled="false" style="flex: 1;">レガシー星間通信</button>
+      </div>
 
-      <!-- レガシー星間通信 — 即時 ON/OFF トグル -->
-      <button id="legacy-toggle-btn" class="comm-toggle-btn" data-enabled="false">レガシー星間通信</button>
+      <!-- 行2: 多重通信 / 光通信 アコーディオン横並び -->
+      <div style="display: flex; gap: 4px;">
+        <button id="multiplex-group-btn" class="accordion-btn" style="flex: 1; width: auto;">多重通信</button>
+        <button id="optical-group-btn" class="accordion-btn" style="flex: 1; width: auto;">光通信</button>
+      </div>
 
-      <!-- 多重通信グループ -->
-      <button id="multiplex-group-btn" class="accordion-btn">多重通信</button>
+      <!-- 多重通信グループ コンテンツ -->
       <div id="multiplex-group-content" class="accordion-content">
         <div class="comm-group">
           <label style="font-size: 11px;"><input type="checkbox" id="multiplex-enable"> 多重通信</label>
@@ -261,8 +257,7 @@
         </div>
       </div>
 
-      <!-- 光通信グループ -->
-      <button id="optical-group-btn" class="accordion-btn">光通信</button>
+      <!-- 光通信グループ コンテンツ -->
       <div id="optical-group-content" class="accordion-content">
         <div class="comm-group">
           <div style="display: flex; gap: 5px; align-items: center;">
@@ -360,13 +355,19 @@
         </button>
       </div>
 
-      <button id="toggle-status-btn" style="width: 100%; margin-top: 8px; font-size: 11px; padding: 5px; background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); color: #94a3b8; cursor: pointer; text-align: left;">通信状況 ▼</button>
+      <!-- 下部3ボタン横並び: 通信状況 / 転送設定 / 背景雑音（排他開閉） -->
+      <div style="display: flex; gap: 4px; margin-top: 8px;">
+        <button id="toggle-status-btn" style="flex: 1; font-size: 11px; padding: 5px; background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); color: #94a3b8; cursor: pointer;">通信状況 ▼</button>
+        <button id="transfer-group-btn" style="flex: 1; font-size: 11px; padding: 5px; background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); color: #94a3b8; cursor: pointer;">転送設定 ▼</button>
+        <button id="noise-monitor-btn" style="flex: 1; font-size: 11px; padding: 5px; background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); color: #94a3b8; cursor: pointer;">背景雑音 ▼</button>
+      </div>
+
+      <!-- 通信状況コンテンツ -->
       <div id="rgr-container" style="margin-top: 4px;" class="hidden">
         <div id="rgr-list" style="font-size: 11px; max-height: 150px; overflow-y: auto;"></div>
       </div>
 
-      <!-- 転送設定アコーディオン（通信管制モードのみ表示・通信状況と背景雑音の間） -->
-      <button id="transfer-group-btn" class="accordion-btn" style="margin-top: 6px;">転送設定</button>
+      <!-- 転送設定コンテンツ -->
       <div id="transfer-group-content" class="accordion-content">
         <div class="transfer-row" data-pair="tcp-legacy">
           <span class="transfer-label">星間通信</span>
@@ -400,7 +401,7 @@
         </div>
       </div>
 
-      <button id="noise-monitor-btn" style="width: 100%; margin-top: 6px; font-size: 11px; padding: 5px; background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); color: #94a3b8; cursor: pointer; text-align: left;">背景雑音 ▼</button>
+      <!-- 背景雑音コンテンツ -->
       <div id="noise-monitor-video-container" style="margin-top: 8px; display: none;">
         <video id="noise-monitor-video" loop autoplay muted
           style="width: 100%; border: 1px solid rgba(255,255,255,0.1); cursor: pointer;">
