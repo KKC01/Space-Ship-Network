@@ -135,11 +135,15 @@ export class UIManager {
      'multiplex-group-btn', 'multiplex-group-content',
      'optical-group-btn', 'optical-group-content',
      'transfer-group-btn', 'transfer-group-content',
-     'toggle-status-btn'
+     'toggle-status-btn',
+     'noise-monitor-btn',
+     'unit-data-container'
     ].forEach(id => {
       const el = document.getElementById(id);
       if (el) el.classList.toggle('hidden', isCombat);
     });
+    // 戦闘指揮モードでは背景雑音モニタを閉じる
+    if (isCombat) this.closeNoiseMonitor();
     // Repair Ship: 星間通信 / レガシー星間通信 / 多重通信は非表示・運用不可
     if (isRepair) {
       ['tcpip-toggle-btn',
@@ -360,6 +364,7 @@ export class UIManager {
         if (isHidden) {
           this.domRgrContainer.classList.remove('hidden');
           this.domToggleStatusBtn!.textContent = '通信状況 ▲';
+          this.domToggleStatusBtn!.classList.add('active');
         }
       };
     }
@@ -371,12 +376,15 @@ export class UIManager {
     const btn = document.getElementById('noise-monitor-btn');
     if (cont) cont.style.display = 'none';
     if (video) { video.pause(); video.src = ''; }
-    if (btn) btn.textContent = '背景雑音 ▼';
+    if (btn) { btn.textContent = '背景雑音 ▼'; btn.classList.remove('active'); }
   }
 
   private closeRgrContainer(): void {
     if (this.domRgrContainer) this.domRgrContainer.classList.add('hidden');
-    if (this.domToggleStatusBtn) this.domToggleStatusBtn.textContent = '通信状況 ▼';
+    if (this.domToggleStatusBtn) {
+      this.domToggleStatusBtn.textContent = '通信状況 ▼';
+      this.domToggleStatusBtn.classList.remove('active');
+    }
   }
 
   /** 多重通信・光通信・通信状況・転送設定・背景雑音を全て閉じる（排他開閉用） */
@@ -387,7 +395,7 @@ export class UIManager {
     document.getElementById('optical-group-content')?.classList.remove('open');
     document.getElementById('transfer-group-content')?.classList.remove('open');
     const tbtn = document.getElementById('transfer-group-btn');
-    if (tbtn) tbtn.textContent = '転送設定 ▼';
+    if (tbtn) { tbtn.textContent = '転送設定 ▼'; tbtn.classList.remove('active'); }
     this.closeRgrContainer();
     this.closeNoiseMonitor();
   }
@@ -421,6 +429,7 @@ export class UIManager {
         if (!isOpen) {
           transferContent.classList.add('open');
           transferBtn.textContent = '転送設定 ▲';
+          transferBtn.classList.add('active');
         }
       };
     }
@@ -551,8 +560,8 @@ export class UIManager {
     const actionCycleBtn = document.getElementById('action-cycle-btn');
     if (actionCycleBtn) {
       actionCycleBtn.onclick = () => {
-        const cycle: Array<'attack' | 'jamming' | 'warning'> = ['attack', 'jamming', 'warning'];
-        const labels: Record<string, string> = { attack: '攻撃', jamming: '妨害', warning: '警告' };
+        const cycle: Array<'attack' | 'warning'> = ['attack', 'warning'];
+        const labels: Record<string, string> = { attack: '攻撃', warning: '警告' };
         const next = cycle[(cycle.indexOf(this.scene.selectedAction) + 1) % cycle.length];
         this.scene.selectedAction = next;
         actionCycleBtn.textContent = labels[next];
@@ -564,6 +573,17 @@ export class UIManager {
       this.domReconDroneBtn.onclick = () => {
         this.scene.beginReconDroneTargeting();
         this.updateReconDroneButtonState();
+      };
+    }
+
+    // 緊急離脱ボタン: 横付け修理を解除し両艦を自由移動に戻す
+    const undockBtn = document.getElementById('emergency-undock-btn');
+    if (undockBtn) {
+      undockBtn.onclick = () => {
+        if (this.scene.selectedUnitId) {
+          this.scene.emergencyUndock(this.scene.selectedUnitId);
+          this.updateModalData();
+        }
       };
     }
   }
@@ -665,6 +685,7 @@ export class UIManager {
           video.src = cfg.src;
           cont.style.display = 'block';
           btn.textContent = '背景雑音 ▲';
+          btn.classList.add('active');
           window.__chatWidget?.pushSystemMessage(cfg.message);
         }
       };
@@ -749,6 +770,24 @@ export class UIManager {
       const pct = unit.hp / unit.maxHp;
       hpBar.style.width = `${pct * 100}%`;
       hpBar.style.background = pct < 0.3 ? '#ef4444' : '#4ade80';
+    }
+
+    // 未送信データバー（queue.length / 10 を割合とし段階配色）
+    const dataBar = document.getElementById('unit-data-bar');
+    if (dataBar) {
+      const dataPct = Math.min(1, unit.queue.length / 10);
+      dataBar.style.width = `${dataPct * 100}%`;
+      let color = '#38bdf8';            // <10%: 青
+      if (dataPct >= 0.8) color = '#a855f7';      // 80%以上: 紫
+      else if (dataPct >= 0.5) color = '#ef4444'; // 50〜80%: 赤
+      else if (dataPct >= 0.1) color = '#facc15'; // 10〜50%: 黄
+      dataBar.style.background = color;
+    }
+
+    // 緊急離脱ボタン: 横付け修理中（dockingPartnerId あり）のみ表示
+    const undockBtn = document.getElementById('emergency-undock-btn');
+    if (undockBtn) {
+      undockBtn.classList.toggle('hidden', !unit.dockingPartnerId);
     }
 
     // === 被害対処タブの描画 ===

@@ -112,8 +112,8 @@ body {
 }
 
 .operator-portrait-mini {
-  width: 28px;
-  height: 28px;
+  width: 36px;
+  height: 36px;
   border-radius: 50%;
   border: 1px solid rgba(56, 189, 248, 0.4);
   object-fit: cover;
@@ -292,13 +292,31 @@ body {
   background: linear-gradient(135deg, #10b981, #059669);
   color: white;
   border: none;
-  padding: 10px;
-  font-size: 14px;
+  padding: 6px;
+  font-size: 12px;
   font-weight: bold;
   border-radius: 6px;
   cursor: pointer;
   box-shadow: 0 4px 10px rgba(16, 185, 129, 0.3);
   pointer-events: auto;
+}
+
+/* unit-modal 内ボタン: 星間通信等を背景雑音と同じ縦サイズに統一（padding:5px font:11px） */
+#unit-modal .comm-toggle-btn,
+#unit-modal .accordion-btn {
+  padding: 5px 8px;
+  font-size: 11px;
+}
+
+/* unit-modal 内ボタンの開時強調表示 */
+#unit-modal .accordion-btn.open,
+#unit-modal .comm-toggle-btn.open,
+#unit-modal #toggle-status-btn.active,
+#unit-modal #transfer-group-btn.active,
+#unit-modal #noise-monitor-btn.active {
+  background: rgba(56, 189, 248, 0.18) !important;
+  border-color: rgba(56, 189, 248, 0.6) !important;
+  color: #7dd3fc !important;
 }
 
 #scale-bar-line {
@@ -317,17 +335,14 @@ body:has(#meteor-modal:not(.hidden)) #chat-toggle-btn {
   display: none !important;
 }
 
-/* モーダル表示中: スケールバーを右上に移動 */
+/* モーダル表示中: スケールバーを非表示 */
 body:has(#unit-modal:not(.hidden)) #scale-bar-container,
 body:has(#planet-modal:not(.hidden)) #scale-bar-container,
 body:has(#meteor-modal:not(.hidden)) #scale-bar-container {
-  position: fixed !important;
-  bottom: auto !important;
-  top: 20px !important;
-  right: 20px !important;
+  display: none !important;
 }
 
-/* モーダル表示中(デスクトップ): HUDパネルを左に移動・モーダルを全高に・スケール位置調整 */
+/* モーダル表示中(デスクトップ): HUDパネルを左に移動・モーダルは内容フィット高さ */
 @media (min-width: 721px) {
   body:has(#unit-modal:not(.hidden)) .hud-panel,
   body:has(#planet-modal:not(.hidden)) .hud-panel,
@@ -338,15 +353,8 @@ body:has(#meteor-modal:not(.hidden)) #scale-bar-container {
   body:has(#planet-modal:not(.hidden)) #planet-modal,
   body:has(#meteor-modal:not(.hidden)) #meteor-modal {
     top: 20px !important;
-    bottom: 20px !important;
-    max-height: none !important;
-  }
-  /* スケールをHUDパネルの下・モーダル左隣に配置 */
-  body:has(#unit-modal:not(.hidden)) #scale-bar-container,
-  body:has(#planet-modal:not(.hidden)) #scale-bar-container,
-  body:has(#meteor-modal:not(.hidden)) #scale-bar-container {
-    top: 120px !important;
-    right: 340px !important;
+    bottom: auto !important;
+    max-height: calc(100vh - 40px) !important;
   }
 }
 
@@ -377,9 +385,8 @@ body:has(#meteor-modal:not(.hidden)) #scale-bar-container {
     right: max(10px, env(safe-area-inset-right));
     gap: 6px;
     padding: 6px 10px;
-    align-items: center;
+    align-items: stretch;
     width: auto;
-    min-width: min(40vw, 150px);
   }
 
   .hud-label {
@@ -430,24 +437,18 @@ body:has(#meteor-modal:not(.hidden)) #scale-bar-container {
     padding: 7px 10px !important;
   }
 
-  /* モバイル: モーダル表示中は CHAT非表示・スケールをHUDの下に */
+  /* モバイル: モーダル表示中は CHAT非表示 */
   body:has(#unit-modal:not(.hidden)) #chat-toggle-btn,
   body:has(#planet-modal:not(.hidden)) #chat-toggle-btn,
   body:has(#meteor-modal:not(.hidden)) #chat-toggle-btn {
     display: none !important;
   }
 
-  body:has(#unit-modal:not(.hidden)) #scale-bar-container,
-  body:has(#planet-modal:not(.hidden)) #scale-bar-container,
-  body:has(#meteor-modal:not(.hidden)) #scale-bar-container {
-    top: 80px !important;
-    right: max(10px, env(safe-area-inset-right)) !important;
-  }
-
-  /* モバイル: モーダル内ボタンを詰める */
+  /* モバイル: モーダル内ボタンを詰める（背景雑音と同サイズに統一） */
   #unit-modal .accordion-btn,
   #unit-modal .comm-toggle-btn {
-    min-height: 36px !important;
+    min-height: 0 !important;
+    padding: 5px 8px !important;
   }
 
   #scale-bar-text {
@@ -521,13 +522,19 @@ body:has(#meteor-modal:not(.hidden)) #scale-bar-container {
   letter-spacing: 1.5px;
   border: 1px solid #38bdf8;
   border-radius: 24px;
-  background: linear-gradient(135deg, rgba(56, 189, 248, 0.15), rgba(56, 189, 248, 0.05));
+  background: linear-gradient(135deg, rgba(8, 20, 40, 0.95), rgba(8, 20, 40, 0.85));
   color: #38bdf8;
   cursor: pointer;
   transition: all 0.3s ease;
   text-shadow: 0 0 8px rgba(56, 189, 248, 0.5);
   box-shadow: 0 0 14px rgba(56, 189, 248, 0.15);
   z-index: 11;
+}
+
+/* Mission Failed 後など、無効化された CHAT ボタン */
+#chat-toggle-btn.chat-disabled {
+  pointer-events: none;
+  opacity: 0.4;
 }
 
 #chat-toggle-btn:hover {
@@ -973,8 +980,8 @@ body:has(#meteor-modal:not(.hidden)) #scale-bar-container {
 
 /* ---- ボディ (ナビキャラ + ブリーフィング) ---- */
 .title-body {
-  display: grid;
-  grid-template-columns: minmax(280px, 1fr) minmax(0, 1.4fr);
+  display: flex;
+  flex-direction: column;
   gap: 24px;
   align-items: start;
   flex: 1;
@@ -984,7 +991,7 @@ body:has(#meteor-modal:not(.hidden)) #scale-bar-container {
 .navigator-stack {
   position: relative;
   width: 100%;
-  max-width: 520px;
+  max-width: 1040px;
   aspect-ratio: 3 / 4;
   overflow: hidden;
   background: rgba(15, 23, 42, 0.85);
@@ -1118,7 +1125,7 @@ body:has(#meteor-modal:not(.hidden)) #scale-bar-container {
 }
 
 .customize-back-btn {
-  padding: 8px 16px;
+  padding: 4px 16px;
   font-family: 'Rajdhani', 'Noto Sans JP', sans-serif;
   font-size: 12px;
   font-weight: 700;
@@ -1239,7 +1246,8 @@ body:has(#meteor-modal:not(.hidden)) #scale-bar-container {
   grid-template-columns: 88px 1fr;
   grid-auto-rows: auto;
   align-items: start;
-  gap: 2px 10px;
+  /* 画像とテキストの間を1文字分（1em）空ける */
+  gap: 2px 1em;
   transition: border-color 0.15s;
 }
 
@@ -1249,7 +1257,7 @@ body:has(#meteor-modal:not(.hidden)) #scale-bar-container {
 
 .unit-card img {
   grid-column: 1;
-  grid-row: 1 / span 3;
+  grid-row: 2;
   width: 88px;
   height: 88px;
   object-fit: contain;
@@ -1257,10 +1265,20 @@ body:has(#meteor-modal:not(.hidden)) #scale-bar-container {
 }
 
 .unit-card__name {
+  grid-column: 2;
+  grid-row: 1;
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
   font-size: 12px;
   font-weight: 700;
   color: #e2e8f0;
   line-height: 1.2;
+}
+
+.unit-card__stats {
+  grid-column: 2;
 }
 
 .unit-card__stats {
@@ -1288,8 +1306,8 @@ body:has(#meteor-modal:not(.hidden)) #scale-bar-container {
 }
 
 .unit-card__add-btn {
-  grid-column: 1 / -1;
-  margin-top: 4px;
+  grid-column: 1;
+  grid-row: 1;
   padding: 6px;
   font-family: 'Rajdhani', 'Noto Sans JP', sans-serif;
   font-size: 11px;
@@ -1355,7 +1373,6 @@ body:has(#meteor-modal:not(.hidden)) #scale-bar-container {
 
 .formation-list {
   list-style: none;
-  flex: 1;
   overflow-y: auto;
   display: flex;
   flex-direction: column;
@@ -1453,13 +1470,12 @@ body:has(#meteor-modal:not(.hidden)) #scale-bar-container {
   }
 
   .title-body {
-    grid-template-columns: 100px 1fr;
     gap: 14px;
     flex: 0 1 auto;
   }
 
   .navigator-stack {
-    width: 100px;
+    width: 200px;
     aspect-ratio: 3 / 4;
   }
 

@@ -17,7 +17,13 @@ interface ChatWidgetState {
 }
 
 export class ChatWidget {
-  public disabled: boolean = false;
+  private _disabled: boolean = false;
+  public get disabled(): boolean { return this._disabled; }
+  public set disabled(v: boolean) {
+    this._disabled = v;
+    // ボタンを視覚的に無効化（押下不可）
+    this.toggleBtn?.classList.toggle('chat-disabled', v);
+  }
 
   private state: ChatWidgetState = {
     isOpen: false,
@@ -168,6 +174,7 @@ export class ChatWidget {
   }
 
   toggle(): void {
+    if (this._disabled) return;
     if (this.state.isOpen) {
       this.close();
     } else {

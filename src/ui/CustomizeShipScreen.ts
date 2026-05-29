@@ -77,8 +77,6 @@ export class CustomizeShipScreen {
     const el = this.overlay!;
     el.innerHTML = '';
 
-    const def = MISSION_CATALOG[this.missionId];
-
     // ====== ヘッダー（戻るボタン） ======
     const header = document.createElement('div');
     header.className = 'customize-header';
@@ -92,11 +90,6 @@ export class CustomizeShipScreen {
       this.titleScreen.show();
     });
     header.appendChild(backBtn);
-
-    const headerTitle = document.createElement('span');
-    headerTitle.className = 'customize-header__title';
-    headerTitle.textContent = `Customize FLEET — ${def.title}`;
-    header.appendChild(headerTitle);
     el.appendChild(header);
 
     // ====== トップバー: BUDGET / FORMATION（旧右カラムから上部に移動） ======
@@ -109,7 +102,7 @@ export class CustomizeShipScreen {
 
     const budgetLabel = document.createElement('div');
     budgetLabel.className = 'customize-budget-label';
-    budgetLabel.textContent = 'BUDGET';
+    budgetLabel.textContent = '予算';
 
     this.budgetRemainingEl = document.createElement('div');
     this.budgetRemainingEl.className = 'customize-budget-remaining';
@@ -191,7 +184,10 @@ export class CustomizeShipScreen {
 
     const name = document.createElement('div');
     name.className = 'unit-card__name';
-    name.textContent = spec.unitType;
+    // ユニット名（左）+ COST（右）を同じ行に
+    name.innerHTML =
+      `<span>${spec.unitType}</span>` +
+      `<span class="unit-card__cost">COST:${spec.cost}</span>`;
     card.appendChild(name);
 
     const stats = document.createElement('div');
@@ -201,11 +197,6 @@ export class CustomizeShipScreen {
       `<span class="unit-card__stat-label">通信</span><span class="unit-card__stat-value">${spec.comms}</span>` +
       `<span class="unit-card__stat-label">HP</span><span class="unit-card__stat-value">${spec.hp}</span>`;
     card.appendChild(stats);
-
-    const cost = document.createElement('div');
-    cost.className = 'unit-card__cost';
-    cost.textContent = `COST: ${spec.cost}`;
-    card.appendChild(cost);
 
     const addBtn = document.createElement('button');
     addBtn.className = 'unit-card__add-btn';

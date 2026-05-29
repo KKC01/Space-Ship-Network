@@ -66,7 +66,7 @@ export class MainScene extends Scene {
   public get isBriefingActive(): boolean { return this._appPhase !== 'playing'; }
   public get appPhase(): 'title' | 'customize' | 'playing' { return this._appPhase; }
   public systemDisplayMode: SystemDisplayMode = SystemDisplayMode.CONTROL;
-  public selectedAction: 'attack' | 'jamming' | 'warning' = 'attack';
+  public selectedAction: 'attack' | 'warning' = 'attack';
   public vizMode: 'dots' | 'circles' | 'quality' | 'range' = 'circles';
 
   // 惑星 / 隕石 / 通信 / ミッション / カメラ状態は各 System 内で管理
@@ -117,6 +117,7 @@ export class MainScene extends Scene {
     // 索敵範囲外の霧レイヤー（画面固定・depth 9 でゲームオブジェクト上に重ねる）
     const { width, height } = this.scale;
     this.fogRT = this.add.renderTexture(0, 0, width, height)
+      .setOrigin(0, 0)
       .setScrollFactor(0)
       .setDepth(9);
     this.fogEraseGfx = this.make.graphics({ x: 0, y: 0 });
@@ -773,6 +774,8 @@ export class MainScene extends Scene {
     const activeNodes = Array.from(this.spaceships.values()).filter(s => s.isNodeActive);
 
     // 2. Draw Units
+    // アイコン最小サイズ保証: ズームアウト時にアイコンが極小化しないよう k 倍率を掛ける
+    const k = Math.max(1, 1 / this.cameras.main.zoom);
     this.spaceships.forEach(ship => {
       const g = this.shipGraphics.get(ship.id);
       if (!g) return;
@@ -794,20 +797,20 @@ export class MainScene extends Scene {
       if (isSelected) {
         const pulse = (Math.sin(time / 500) + 1) / 2;
         g.lineStyle(2, primaryColor, 0.4 + pulse * 0.4);
-        g.strokeCircle(ship.x, ship.y, 25 + pulse * 10);
+        g.strokeCircle(ship.x, ship.y, (25 + pulse * 10) * k);
       }
 
       // Background Glow for Visibility
       g.fillStyle(primaryColor, 0.05);
-      g.fillCircle(ship.x, ship.y, isHQ ? 45 : 30);
+      g.fillCircle(ship.x, ship.y, (isHQ ? 45 : 30) * k);
       g.lineStyle(1, primaryColor, 0.1);
-      g.strokeCircle(ship.x, ship.y, isHQ ? 45 : 30);
+      g.strokeCircle(ship.x, ship.y, (isHQ ? 45 : 30) * k);
 
       if (isHQ) {
         // Special HQ Destroyer Shape
         g.lineStyle(2, accentColor, 1);
         g.fillStyle(primaryColor, 0.2);
-        const size = 20;
+        const size = 20 * k;
         
         const p1x = ship.x + size * 2.0 * Math.cos(angle);
         const p1y = ship.y + size * 2.0 * Math.sin(angle);
@@ -834,7 +837,7 @@ export class MainScene extends Scene {
         // Simple Tactical Triangle for Normal Ships
         g.lineStyle(2, accentColor, 1);
         if (ship.isNodeActive && isControl) g.fillStyle(primaryColor, 0.3);
-        const size = 12;
+        const size = 12 * k;
         const p1x = ship.x + size * 1.5 * Math.cos(angle);
         const p1y = ship.y + size * 1.5 * Math.sin(angle);
         const p2x = ship.x + size * Math.cos(angle + 2.6);
@@ -854,35 +857,35 @@ export class MainScene extends Scene {
       // Node core (always shows role but small)
       if (ship.isNodeActive) {
         g.fillStyle(0x38bdf8, isControl ? 1.0 : 0.4);
-        g.fillCircle(ship.x, ship.y, 3);
+        g.fillCircle(ship.x, ship.y, 3 * k);
       }
 
       // Selection Marker
       if (isSelected) {
         g.lineStyle(1, 0xfacc15, 0.4);
-        const s = isHQ ? 40 : 25;
+        const s = (isHQ ? 40 : 25) * k;
         g.strokeRect(ship.x - s/2, ship.y - s/2, s, s);
       }
 
       // HP Bar
       const hpPercent = ship.hp / ship.maxHp;
       g.fillStyle(0x000000, 0.5);
-      g.fillRect(ship.x - 20, ship.y - 35, 40, 4);
+      g.fillRect(ship.x - 20 * k, ship.y - 35 * k, 40 * k, 4 * k);
       g.fillStyle(hpPercent < 0.3 ? 0xef4444 : 0x4ade80, 0.8);
-      g.fillRect(ship.x - 20, ship.y - 35, 40 * hpPercent, 4);
-      
+      g.fillRect(ship.x - 20 * k, ship.y - 35 * k, 40 * k * hpPercent, 4 * k);
+
       // Data Bar (New)
       const dataPercent = Math.min(1.0, ship.queue.length / 10);
       g.fillStyle(0x000000, 0.5);
-      g.fillRect(ship.x - 20, ship.y - 30, 40, 4);
+      g.fillRect(ship.x - 20 * k, ship.y - 30 * k, 40 * k, 4 * k);
       g.fillStyle(0x38bdf8, 0.8);
-      g.fillRect(ship.x - 20, ship.y - 30, 40 * dataPercent, 4);
+      g.fillRect(ship.x - 20 * k, ship.y - 30 * k, 40 * k * dataPercent, 4 * k);
 
       // 被害発生中（対処中含む）のユニット赤パルス
       if (ship.damages.length > 0) {
         const dmgPulse = (Math.sin(time / 300) + 1) / 2;
         g.lineStyle(2, 0xef4444, 0.4 + dmgPulse * 0.4);
-        g.strokeCircle(ship.x, ship.y, isHQ ? 38 : 28);
+        g.strokeCircle(ship.x, ship.y, (isHQ ? 38 : 28) * k);
       }
 
       // Proximity Warning Check
@@ -898,12 +901,12 @@ export class MainScene extends Scene {
         // Red Pulse Glow
         const pulse = (Math.sin(time / 200) + 1) / 2;
         g.lineStyle(3, 0xef4444, 0.5 + pulse * 0.5);
-        g.strokeCircle(ship.x, ship.y, isHQ ? 50 : 35);
-        
+        g.strokeCircle(ship.x, ship.y, (isHQ ? 50 : 35) * k);
+
         if (!this.textLabels.has(warningLabelId)) {
-          this.textLabels.set(warningLabelId, this.add.text(ship.x, ship.y - 50, 'WARNING', { fontSize: '12px', color: '#ef4444', fontStyle: 'bold', fontFamily: 'Rajdhani' }).setOrigin(0.5).setDepth(20));
+          this.textLabels.set(warningLabelId, this.add.text(ship.x, ship.y - 50 * k, 'WARNING', { fontSize: '12px', color: '#ef4444', fontStyle: 'bold', fontFamily: 'Rajdhani' }).setOrigin(0.5).setDepth(20));
         } else {
-          this.textLabels.get(warningLabelId)?.setPosition(ship.x, ship.y - 50).setVisible(true);
+          this.textLabels.get(warningLabelId)?.setPosition(ship.x, ship.y - 50 * k).setVisible(true);
         }
       } else {
         this.textLabels.get(warningLabelId)?.setVisible(false);
@@ -1244,6 +1247,47 @@ export class MainScene extends Scene {
 
     // 7. 索敵範囲外の霧オーバーレイ（プレイ中のみ表示）
     this.drawFog();
+
+    // 8. ラベルの最小サイズ保証＋重なりデクラッター
+    this.applyLabelScaleAndDeclutter();
+  }
+
+  /**
+   * 画面内テキストラベルを最小サイズ保証（ズームアウトでも読める）し、
+   * 重なったラベルは優先度の低い方を非表示にする（デクラッター）。
+   */
+  private applyLabelScaleAndDeclutter(): void {
+    const cam = this.cameras.main;
+    const k = Math.max(1, 1 / cam.zoom);
+
+    // 表示中ラベルにスケールを適用しつつ、画面座標と優先度を収集
+    const visible: { label: Phaser.GameObjects.Text; sx: number; sy: number; priority: number }[] = [];
+    for (const [id, label] of this.textLabels) {
+      if (!label.visible) continue;
+      label.setScale(k);
+      const sx = (label.x - cam.worldView.x) * cam.zoom;
+      const sy = (label.y - cam.worldView.y) * cam.zoom;
+      // 優先度: 選択中 > HQ(L-Dest1) > その他
+      let priority = 0;
+      if (id === 'L-Dest1' || id.includes('L-Dest1')) priority = 1;
+      if (this.selectedUnitId && id.includes(this.selectedUnitId)) priority = 2;
+      visible.push({ label, sx, sy, priority });
+    }
+
+    // 重なり判定（画面距離 < 閾値）で優先度の低い方を隠す
+    const THRESHOLD = 28;
+    for (let i = 0; i < visible.length; i++) {
+      for (let j = i + 1; j < visible.length; j++) {
+        const a = visible[i];
+        const b = visible[j];
+        if (!a.label.visible || !b.label.visible) continue;
+        const dx = a.sx - b.sx;
+        const dy = a.sy - b.sy;
+        if (Math.sqrt(dx * dx + dy * dy) < THRESHOLD) {
+          (a.priority >= b.priority ? b : a).label.setVisible(false);
+        }
+      }
+    }
   }
 
   private drawFog(): void {
@@ -1502,6 +1546,15 @@ export class MainScene extends Scene {
   }
 
   /** Repair Ship との横付け / 接近状態を双方解除する */
+  /**
+   * 緊急離脱: 修理中ユニット（Repair Ship または修理対象）を選択して呼ぶと、
+   * 横付け修理を終了し両艦が自由移動できる状態に戻す。
+   */
+  public emergencyUndock(shipId: string): void {
+    const ship = this.spaceships.get(shipId);
+    if (ship && ship.dockingPartnerId) this.releaseDocking(ship);
+  }
+
   private releaseDocking(ship: Spaceship): void {
     const partner = ship.dockingPartnerId ? this.spaceships.get(ship.dockingPartnerId) : null;
     if (ship.isRepairShip()) {

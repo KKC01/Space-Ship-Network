@@ -45,10 +45,9 @@ export const MISSION_CATALOG: Record<MissionId, MissionDef> = {
     shortLabel: 'TUTORIAL',
     budget: 300,
     description: '',
-    briefingText: '基本操作の習熟・ネットワークの確立・浮遊隕石の迎撃・目標地点への到達を実施します。',
+    briefingText: '基本操作の習熟・ネットワークの確立・浮遊隕石の迎撃・目標地点への到達を目標とします。',
     navigatorLines: [
-      'まず基本操作を習熟し、次の任務へ即応できる態勢を整えます。',
-      'AIがサポートしますので、ご安心下さい。',
+      'Operator AIがサポートしますので、ご安心下さい。',
     ],
     navigatorImage: 'AI_01/operator_AI_02.png',
     recommendedFormation: TUTORIAL_FORMATION,

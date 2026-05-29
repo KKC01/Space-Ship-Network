@@ -160,7 +160,7 @@
           <span class="mission-chevron">▼</span>
         </button>
         <div id="mission-body" class="mission-body">
-          <div style="display: flex; gap: 8px; align-items: flex-start; padding: 6px 12px 4px;">
+          <div style="display: flex; gap: 8px; align-items: center; padding: 6px 12px 4px;">
             <img id="operator-portrait-mini" src="" alt="Operator AI" class="operator-portrait-mini">
             <div id="mission-log" class="mission-log" style="padding: 0; flex: 1;">
             </div>
@@ -202,6 +202,17 @@
           <div id="unit-hp-bar" style="width: 100%; height: 100%; background: #4ade80;"></div>
         </div>
       </div>
+
+      <!-- 未送信データバー（通信管制モードのみ表示） -->
+      <div id="unit-data-container" style="display: flex; align-items: center; gap: 6px; margin-bottom: 6px;">
+        <span style="font-size: 11px; color: #94a3b8; white-space: nowrap;">未送信 :</span>
+        <div style="flex: 1; height: 6px; background: rgba(0,0,0,0.5); border-radius: 3px; overflow: hidden;">
+          <div id="unit-data-bar" style="width: 0%; height: 100%; background: #38bdf8;"></div>
+        </div>
+      </div>
+
+      <!-- 緊急離脱ボタン（横付け修理中のみ表示） -->
+      <button id="emergency-undock-btn" class="hidden" style="width: 100%; margin-bottom: 6px; font-size: 12px; padding: 6px; background: rgba(239,68,68,0.25); border: 1px solid rgba(239,68,68,0.7); color: #fca5a5; cursor: pointer; font-family: Rajdhani, 'Noto Sans JP', sans-serif; font-weight: bold; letter-spacing: 1px; box-shadow: 0 0 10px rgba(239,68,68,0.4);">緊急離脱</button>
 
       <!-- 残弾表示（戦闘指揮モードのみ表示。applyModeToUnitModal で display を制御） -->
       <div id="ammo-container" style="margin-bottom: 6px; display: none;">
@@ -282,10 +293,10 @@
         </div>
       </div>
 
-      <!-- 戦闘アクションボタン（戦闘指揮モードのみ表示） -->
-      <div id="action-btn-container" class="hidden" style="margin-top: 6px;">
-        <button id="action-cycle-btn" style="width: 100%; font-size: 13px; padding: 7px; background: rgba(239,68,68,0.2); border: 1px solid rgba(239,68,68,0.5); color: #f87171; cursor: pointer; font-family: Rajdhani, sans-serif; font-weight: bold; letter-spacing: 1px;">攻撃</button>
-        <button id="recon-drone-btn" style="width: 100%; font-size: 13px; padding: 7px; margin-top: 8px; background: rgba(56,189,248,0.16); border: 1px solid rgba(56,189,248,0.45); color: #7dd3fc; cursor: pointer; font-family: Rajdhani, sans-serif; font-weight: bold; letter-spacing: 1px;">索敵ドローン</button>
+      <!-- 戦闘アクションボタン（戦闘指揮モードのみ表示・横並び） -->
+      <div id="action-btn-container" class="hidden" style="margin-top: 6px; display: flex; gap: 4px;">
+        <button id="action-cycle-btn" style="flex: 1; font-size: 13px; padding: 7px; background: rgba(239,68,68,0.2); border: 1px solid rgba(239,68,68,0.5); color: #f87171; cursor: pointer; font-family: Rajdhani, sans-serif; font-weight: bold; letter-spacing: 1px;">攻撃</button>
+        <button id="recon-drone-btn" style="flex: 1; font-size: 13px; padding: 7px; background: rgba(56,189,248,0.16); border: 1px solid rgba(56,189,248,0.45); color: #7dd3fc; cursor: pointer; font-family: Rajdhani, sans-serif; font-weight: bold; letter-spacing: 1px;">索敵ドローン</button>
       </div>
 
       <!-- 被害対処（戦闘指揮モードのみ表示） -->
