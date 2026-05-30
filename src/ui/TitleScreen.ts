@@ -165,6 +165,11 @@ export class TitleScreen {
       this.overlay.style.display = '';
       this.overlay.classList.add('open');
     }
+    // モバイルでアドレスバーを隠す（初期画面をゲーム開始後と同じ領域に揃える）
+    window.scrollTo(0, 1);
+    const el = document.documentElement;
+    const fsRequest = el.requestFullscreen ?? (el as any).webkitRequestFullscreen;
+    if (fsRequest) fsRequest.call(el).catch(() => {});
   }
 
   hide(): void {

@@ -774,8 +774,10 @@ export class MainScene extends Scene {
     const activeNodes = Array.from(this.spaceships.values()).filter(s => s.isNodeActive);
 
     // 2. Draw Units
-    // アイコン最小サイズ保証: ズームアウト時にアイコンが極小化しないよう k 倍率を掛ける
-    const k = Math.max(1, 1 / this.cameras.main.zoom);
+    // アイコン最小サイズ保証: ズームアウト時にアイコンが極小化しないよう k 倍率を掛ける。
+    // ICON_SCALE: 全体が大きすぎたため一律縮小（ズーム連動の最小サイズ保証は維持）
+    const ICON_SCALE = 0.55;
+    const k = Math.max(1, 1 / this.cameras.main.zoom) * ICON_SCALE;
     this.spaceships.forEach(ship => {
       const g = this.shipGraphics.get(ship.id);
       if (!g) return;
@@ -1232,12 +1234,29 @@ export class MainScene extends Scene {
     // 5. Draw Range Overlay (Combat/射程 mode: MISSILE_RANGE 300km + 100km laser range)
     if (this.vizMode === 'range') {
       this.spaceships.forEach(ship => {
+        // 近距離攻撃圏（赤）
         this.linkGraphics.lineStyle(1, 0xef4444, 0.6);
-        this.linkGraphics.strokeCircle(ship.x, ship.y, 100);
-        // ミサイル射程 300km を薄いオレンジで表示
-        this.linkGraphics.lineStyle(1, 0xfb923c, 0.25);
+        this.linkGraphics.strokeCircle(ship.x, ship.y, ship.ATTACK_RANGE);
+        // ミサイル射程（薄オレンジ）
+        this.linkGraphics.lineStyle(1, 0xfb923c, 0.35);
         this.linkGraphics.strokeCircle(ship.x, ship.y, ship.MISSILE_RANGE);
+        // 探知圏 = フォグ境界（シアン点線風で視認性向上）
+        this.linkGraphics.lineStyle(1, 0x38bdf8, 0.4);
+        this.linkGraphics.strokeCircle(ship.x, ship.y, ship.DETECTION_RANGE);
       });
+    }
+
+    // 全モード共通: 探知圏（フォグ境界）を薄く常時表示してフォグと一致させる
+    if (this._appPhase === 'playing') {
+      this.spaceships.forEach(ship => {
+        this.linkGraphics.lineStyle(1, 0x38bdf8, 0.18);
+        this.linkGraphics.strokeCircle(ship.x, ship.y, ship.DETECTION_RANGE);
+      });
+      // 偵察ドローンの探知圏も同様に表示（フォグ穴と一致）
+      for (const drone of this.reconDrones) {
+        this.linkGraphics.lineStyle(1, 0x38bdf8, 0.25);
+        this.linkGraphics.strokeCircle(drone.x, drone.y, this.RECON_DRONE_DETECTION_RANGE);
+      }
     }
 
     this.drawReconDrones(time);

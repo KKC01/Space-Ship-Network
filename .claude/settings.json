@@ -61,6 +61,16 @@
           }
         ]
       }
+    ],
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"/workspaces/Space-Ship-Network/.claude/hooks/session-start-context.cjs\""
+          }
+        ]
+      }
     ]
   },
   "enabledPlugins": {

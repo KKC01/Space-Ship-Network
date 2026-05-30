@@ -90,6 +90,14 @@ export class CustomizeShipScreen {
       this.titleScreen.show();
     });
     header.appendChild(backBtn);
+
+    // ミッション名を BACK の右に表示
+    const missionLabel = document.createElement('div');
+    missionLabel.className = 'customize-header__title';
+    missionLabel.setAttribute('data-testid', 'mission-label');
+    missionLabel.textContent = MISSION_CATALOG[this.missionId].title;
+    header.appendChild(missionLabel);
+
     el.appendChild(header);
 
     // ====== トップバー: BUDGET / FORMATION（旧右カラムから上部に移動） ======

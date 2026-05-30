@@ -155,15 +155,15 @@
 <body>
   <div id="ui-layer">
       <div id="mission-panel" class="glass-panel">
-        <button id="mission-toggle" class="mission-toggle-btn" type="button" aria-expanded="true">
-          OPERATOR AI
-          <span class="mission-chevron">▼</span>
-        </button>
+        <div class="mission-header-row">
+          <img id="operator-portrait-mini" src="" alt="Operator AI" class="operator-portrait-mini">
+          <button id="mission-toggle" class="mission-toggle-btn" type="button" aria-expanded="true">
+            OPERATOR AI
+            <span class="mission-chevron">▼</span>
+          </button>
+        </div>
         <div id="mission-body" class="mission-body">
-          <div style="display: flex; gap: 8px; align-items: center; padding: 6px 12px 4px;">
-            <img id="operator-portrait-mini" src="" alt="Operator AI" class="operator-portrait-mini">
-            <div id="mission-log" class="mission-log" style="padding: 0; flex: 1;">
-            </div>
+          <div id="mission-log" class="mission-log" style="padding: 4px 12px 4px;">
           </div>
         </div>
       </div>
@@ -185,7 +185,7 @@
     </div>
 
     <div id="unit-modal" class="glass-panel hidden"
-      style="position: absolute; top: 20px; right: 20px; width: 320px; padding: 10px 12px; pointer-events: auto; max-height: 90vh; overflow-y: auto;">
+      style="position: absolute; top: 20px; right: 20px; width: 320px; padding: 6px 12px; pointer-events: auto; max-height: 90vh; overflow-y: auto;">
       <!-- ヘッダー1行: 画像 名前 (Type) Lv. × -->
       <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 6px; border-bottom: 1px solid rgba(255,255,255,0.2); padding-bottom: 4px;">
         <img id="unit-ship-image" style="width: 64px; height: 64px; object-fit: contain; mix-blend-mode: screen; flex-shrink: 0;">
@@ -295,8 +295,8 @@
 
       <!-- 戦闘アクションボタン（戦闘指揮モードのみ表示・横並び） -->
       <div id="action-btn-container" class="hidden" style="margin-top: 6px; display: flex; gap: 4px;">
-        <button id="action-cycle-btn" style="flex: 1; font-size: 13px; padding: 7px; background: rgba(239,68,68,0.2); border: 1px solid rgba(239,68,68,0.5); color: #f87171; cursor: pointer; font-family: Rajdhani, sans-serif; font-weight: bold; letter-spacing: 1px;">攻撃</button>
-        <button id="recon-drone-btn" style="flex: 1; font-size: 13px; padding: 7px; background: rgba(56,189,248,0.16); border: 1px solid rgba(56,189,248,0.45); color: #7dd3fc; cursor: pointer; font-family: Rajdhani, sans-serif; font-weight: bold; letter-spacing: 1px;">索敵ドローン</button>
+        <button id="action-cycle-btn" style="flex: 1; box-sizing: border-box; min-height: 29px; display: flex; align-items: center; justify-content: center; font-size: 11px; padding: 5px 8px; background: rgba(239,68,68,0.2); border: 1px solid rgba(239,68,68,0.5); color: #f87171; cursor: pointer; font-family: Rajdhani, sans-serif; font-weight: bold; letter-spacing: 1px;">攻撃</button>
+        <button id="recon-drone-btn" style="flex: 1; box-sizing: border-box; min-height: 29px; display: flex; align-items: center; justify-content: center; font-size: 11px; padding: 5px 8px; background: rgba(56,189,248,0.16); border: 1px solid rgba(56,189,248,0.45); color: #7dd3fc; cursor: pointer; font-family: Rajdhani, sans-serif; font-weight: bold; letter-spacing: 1px;">索敵ドローン</button>
       </div>
 
       <!-- 被害対処（戦闘指揮モードのみ表示） -->
