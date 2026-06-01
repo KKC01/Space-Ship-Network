@@ -185,7 +185,7 @@
     </div>
 
     <div id="unit-modal" class="glass-panel hidden"
-      style="position: absolute; top: 20px; right: 20px; width: 320px; padding: 6px 12px; pointer-events: auto; max-height: 90vh; overflow-y: auto;">
+      style="position: absolute; top: 70px; right: 20px; width: 320px; padding: 0 12px 6px; pointer-events: auto; max-height: calc(90vh - 70px); overflow-y: auto;">
       <!-- ヘッダー1行: 画像 名前 (Type) Lv. × -->
       <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 6px; border-bottom: 1px solid rgba(255,255,255,0.2); padding-bottom: 4px;">
         <img id="unit-ship-image" style="width: 64px; height: 64px; object-fit: contain; mix-blend-mode: screen; flex-shrink: 0;">
@@ -288,8 +288,8 @@
             </select>
           </div>
 
-          <button id="toggle-role-btn" style="margin-top: 10px; width: 100%;" class="action-btn">ノード設定</button>
-          <button id="send-cmd-btn" style="margin-top: 10px; width: 100%;" class="action-btn hidden">全般宛 周波数変更</button>
+          <button id="toggle-role-btn" style="margin-top: 6px; width: 100%;" class="action-btn">ノード設定</button>
+          <button id="send-cmd-btn" style="margin-top: 6px; width: 100%;" class="action-btn hidden">全般宛 周波数変更</button>
         </div>
       </div>
 
@@ -367,7 +367,7 @@
       </div>
 
       <!-- 下部3ボタン横並び: 通信状況 / 転送設定 / 背景雑音（排他開閉） -->
-      <div style="display: flex; gap: 4px; margin-top: 8px;">
+      <div id="comm-btn-group" style="display: flex; gap: 4px; margin-top: 8px;">
         <button id="toggle-status-btn" style="flex: 1; font-size: 11px; padding: 5px; background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); color: #94a3b8; cursor: pointer;">通信状況 ▼</button>
         <button id="transfer-group-btn" style="flex: 1; font-size: 11px; padding: 5px; background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); color: #94a3b8; cursor: pointer;">転送設定 ▼</button>
         <button id="noise-monitor-btn" style="flex: 1; font-size: 11px; padding: 5px; background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); color: #94a3b8; cursor: pointer;">背景雑音 ▼</button>

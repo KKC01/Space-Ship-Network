@@ -432,7 +432,8 @@ body:has(#meteor-modal:not(.hidden)) #scale-bar-container {
     left: max(10px, env(safe-area-inset-left)) !important;
     width: auto !important;
     max-height: min(58vh, 500px) !important;
-    padding: 16px !important;
+    /* 上下の無駄な余白を詰める（上6px・下6px） */
+    padding: 6px 12px !important;
     border-radius: 10px;
   }
 
@@ -461,6 +462,15 @@ body:has(#meteor-modal:not(.hidden)) #scale-bar-container {
   #unit-modal .comm-toggle-btn {
     min-height: 0 !important;
     padding: 5px 8px !important;
+  }
+
+  /* モバイル: 多重通信/光通信 展開時のボタン・セレクトの縦幅を詰める（取りすぎ対策） */
+  #unit-modal .action-btn {
+    min-height: 32px !important;
+    padding: 6px 8px !important;
+  }
+  #unit-modal .custom-select {
+    min-height: 32px !important;
   }
 
   #scale-bar-text {
@@ -1121,6 +1131,18 @@ body:has(#meteor-modal:not(.hidden)) #scale-bar-container {
   box-shadow: none;
 }
 
+/* タイトル下部のフェード: スクロールするテキストが DEPLOY/CHAT に重なって見えるのを隠す。
+   DOM 順で title-main の後・DEPLOY の前に置くため、z-index 不要（テキストの上・ボタンの下に重なる）。 */
+.title-footer-fade {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 110px;
+  background: linear-gradient(to top, #020617 55%, rgba(2, 6, 23, 0));
+  pointer-events: none;
+}
+
 /* ---- Customize Overlay ---- */
 .customize-header {
   display: flex;
@@ -1398,7 +1420,8 @@ body:has(#meteor-modal:not(.hidden)) #scale-bar-container {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 6px 10px;
+  /* 縦幅を 4/5 に（30px→24px）。縦paddingを6px→3pxに縮小 */
+  padding: 3px 10px;
   background: rgba(15, 23, 42, 0.6);
   border: 1px solid rgba(56, 189, 248, 0.15);
   border-radius: 4px;
@@ -1475,7 +1498,7 @@ body:has(#meteor-modal:not(.hidden)) #scale-bar-container {
   }
 
   .title-main {
-    padding: 16px;
+    padding: 16px 16px 130px; /* 下部130px: DEPLOYボタン(55px)+余白分を確保 */
     gap: 16px;
     justify-content: flex-start;
   }

@@ -18,7 +18,7 @@ export class CameraController {
   private suppressTapAfterGesture: boolean = false;
 
   private clickHandler: ((worldX: number, worldY: number) => void) | null = null;
-  private readonly minZoom = 0.15;
+  private readonly minZoom = 0.08;
   private readonly maxZoom = 4.0;
 
   constructor(scene: MainScene) {

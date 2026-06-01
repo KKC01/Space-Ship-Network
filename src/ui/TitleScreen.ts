@@ -65,6 +65,25 @@ export class TitleScreen {
     this.mainRightEl.className = 'title-main';
     el.appendChild(this.mainRightEl);
 
+    // 下部グラデーション: スクロールするテキストが DEPLOY/CHAT に重なって見えるのを隠す。
+    // title-main の後・DEPLOY の前に置くことで、テキストの上・ボタンの下に重なる。
+    const footerFade = document.createElement('div');
+    footerFade.className = 'title-footer-fade';
+    el.appendChild(footerFade);
+
+    // Deploy ボタンは overlay 直下に置き、スクロール内容より前面に固定する
+    const deployBtn = document.createElement('button');
+    deployBtn.className = 'deploy-btn';
+    deployBtn.setAttribute('data-testid', 'deploy-btn');
+    deployBtn.textContent = 'DEPLOY';
+    deployBtn.addEventListener('click', () => {
+      import('./CustomizeShipScreen').then(({ CustomizeShipScreen }) => {
+        new CustomizeShipScreen(this.scene, this.selectedMissionId, this).show();
+        this.hide();
+      });
+    });
+    el.appendChild(deployBtn);
+
     this.renderMissionDetail();
   }
 
@@ -144,20 +163,6 @@ export class TitleScreen {
 
     body.appendChild(briefing);
     this.mainRightEl.appendChild(body);
-
-    // Deploy ボタン
-    const deployBtn = document.createElement('button');
-    deployBtn.className = 'deploy-btn';
-    deployBtn.setAttribute('data-testid', 'deploy-btn');
-    deployBtn.textContent = 'DEPLOY';
-    deployBtn.addEventListener('click', () => {
-      // 動的 import で循環参照を回避。show() 後に hide() してゲーム画面が一瞬見えるのを防ぐ
-      import('./CustomizeShipScreen').then(({ CustomizeShipScreen }) => {
-        new CustomizeShipScreen(this.scene, this.selectedMissionId, this).show();
-        this.hide();
-      });
-    });
-    this.mainRightEl.appendChild(deployBtn);
   }
 
   show(): void {

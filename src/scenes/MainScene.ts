@@ -1236,27 +1236,11 @@ export class MainScene extends Scene {
       this.spaceships.forEach(ship => {
         // 近距離攻撃圏（赤）
         this.linkGraphics.lineStyle(1, 0xef4444, 0.6);
-        this.linkGraphics.strokeCircle(ship.x, ship.y, ship.ATTACK_RANGE);
+        this.linkGraphics.strokeCircle(ship.x, ship.y, 100);
         // ミサイル射程（薄オレンジ）
-        this.linkGraphics.lineStyle(1, 0xfb923c, 0.35);
+        this.linkGraphics.lineStyle(1, 0xfb923c, 0.25);
         this.linkGraphics.strokeCircle(ship.x, ship.y, ship.MISSILE_RANGE);
-        // 探知圏 = フォグ境界（シアン点線風で視認性向上）
-        this.linkGraphics.lineStyle(1, 0x38bdf8, 0.4);
-        this.linkGraphics.strokeCircle(ship.x, ship.y, ship.DETECTION_RANGE);
       });
-    }
-
-    // 全モード共通: 探知圏（フォグ境界）を薄く常時表示してフォグと一致させる
-    if (this._appPhase === 'playing') {
-      this.spaceships.forEach(ship => {
-        this.linkGraphics.lineStyle(1, 0x38bdf8, 0.18);
-        this.linkGraphics.strokeCircle(ship.x, ship.y, ship.DETECTION_RANGE);
-      });
-      // 偵察ドローンの探知圏も同様に表示（フォグ穴と一致）
-      for (const drone of this.reconDrones) {
-        this.linkGraphics.lineStyle(1, 0x38bdf8, 0.25);
-        this.linkGraphics.strokeCircle(drone.x, drone.y, this.RECON_DRONE_DETECTION_RANGE);
-      }
     }
 
     this.drawReconDrones(time);
@@ -1315,11 +1299,22 @@ export class MainScene extends Scene {
       return;
     }
     this.fogRT.setVisible(true);
-    this.fogRT.clear();
-    // 画面全体を暗いグレーで塗りつぶす
-    this.fogRT.fill(0x000000, 0.55);
 
     const cam = this.cameras.main;
+    // RenderTexture は scrollFactor(0) でもカメラ zoom で縮小されてしまう。
+    // zoom を打ち消し、画面全体(0,0)-(width,height)を覆うよう scale と位置を補正する。
+    const z = cam.zoom;
+    if (this.fogRT.width !== cam.width || this.fogRT.height !== cam.height) {
+      this.fogRT.setSize(cam.width, cam.height);
+    }
+    this.fogRT.setScale(1 / z);
+    this.fogRT.setPosition((cam.width / 2) * (1 - 1 / z), (cam.height / 2) * (1 - 1 / z));
+
+    this.fogRT.clear();
+    // 画面全体を暗いグレーで塗りつぶす
+    // 0.82 opacity で探知圏外を明確に暗くする（0.55では暗い背景との差が見えなかった）
+    this.fogRT.fill(0x000000, 0.82);
+
     this.fogEraseGfx.clear();
     this.fogEraseGfx.fillStyle(0xffffff, 1);
 

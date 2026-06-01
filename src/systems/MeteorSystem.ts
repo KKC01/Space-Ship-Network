@@ -140,9 +140,10 @@ export class MeteorSystem {
       const dm = CommunicationSystem.getDistance(worldX, worldY, meteor.x, meteor.y);
       if (dm < METEOR_HIT_RADIUS) {
         const isCombatMode = this.scene.systemDisplayMode === SystemDisplayMode.COMBAT;
-        if (isCombatMode && this.scene.selectedUnitId && this.scene.selectedAction === 'attack') {
+        const selShip = this.scene.selectedUnitId ? this.scene.spaceships.get(this.scene.selectedUnitId) : null;
+        if (isCombatMode && selShip && selShip.combatAction === 'attack') {
           // 戦闘指揮モード + ユニット選択済み + 攻撃アクション → 攻撃指示
-          const ship = this.scene.spaceships.get(this.scene.selectedUnitId);
+          const ship = selShip;
           if (ship) {
             // 武器:UNABLE → 標的指定すら不可、ユーザーへフィードバック
             if (ship.combatEquipment.weapon === 'UNABLE') {
@@ -430,6 +431,26 @@ export class MeteorSystem {
    */
   private handleMeteorCombat(dt: number): void {
     const now = Date.now();
+
+    // 自動迎撃: combatAction==='autoIntercept' のユニットは、射程内の味方以外の目標（隕石）を
+    // 自動的に標的化する。現在の標的が無効になったら最も近い隕石を再取得する。
+    for (const ship of this.scene.spaceships.values()) {
+      if (ship.combatAction !== 'autoIntercept') continue;
+      if (ship.combatEquipment.weapon === 'UNABLE') continue;
+      const cur = ship.attackTargetMeteorId ? this.meteors.get(ship.attackTargetMeteorId) : null;
+      const curValid = !!cur && !cur.isDestroyed && cur.isDetected &&
+        CommunicationSystem.getDistance(ship.x, ship.y, cur.x, cur.y) <= ship.MISSILE_RANGE;
+      if (curValid) continue;
+      let nearestId: string | null = null;
+      let nearestDist = Infinity;
+      for (const [mId, m] of this.meteors.entries()) {
+        if (m.isDestroyed || !m.isDetected) continue;
+        const d = CommunicationSystem.getDistance(ship.x, ship.y, m.x, m.y);
+        if (d <= ship.MISSILE_RANGE && d < nearestDist) { nearestDist = d; nearestId = mId; }
+      }
+      ship.attackTargetMeteorId = nearestId;
+    }
+
     for (const ship of this.scene.spaceships.values()) {
       if (!ship.attackTargetMeteorId) continue;
 

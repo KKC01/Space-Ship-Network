@@ -137,7 +137,8 @@ export class UIManager {
      'transfer-group-btn', 'transfer-group-content',
      'toggle-status-btn',
      'noise-monitor-btn',
-     'unit-data-container'
+     'unit-data-container',
+     'comm-btn-group'  // 3ボタンのラッパー: 戦闘モード時は余白なくす
     ].forEach(id => {
       const el = document.getElementById(id);
       if (el) el.classList.toggle('hidden', isCombat);
@@ -159,6 +160,8 @@ export class UIManager {
     if (rgrEl && isCombat) rgrEl.classList.add('hidden');
     const actionContainer = document.getElementById('action-btn-container');
     if (actionContainer) actionContainer.classList.toggle('hidden', !isCombat);
+    // 攻撃ボタンのラベルを選択中ユニットの combatAction に同期
+    if (isCombat) this.syncActionButtonLabel();
 
     // 被害対処アコーディオン: 戦闘指揮モードのみ表示
     const dmgBtn = document.getElementById('damage-group-btn');
@@ -284,6 +287,31 @@ export class UIManager {
     this.domUnitModal.addEventListener('pointercancel', () => {
       this.unitModalSwipeStart = null;
     });
+
+    // タッチ実機では touch-action:pan-y により縦ドラッグがスクロール扱いになり
+    // pointercancel が発火して pointerup が来ないことがある。touchend は必ず発火するため
+    // touch でも下フリックで確実に閉じられるよう touch ハンドラを追加する。
+    let touchStart: { y: number; time: number; scrollTop: number } | null = null;
+    this.domUnitModal.addEventListener('touchstart', (e: TouchEvent) => {
+      if (e.touches.length !== 1) { touchStart = null; return; }
+      touchStart = {
+        y: e.touches[0].clientY,
+        time: Date.now(),
+        scrollTop: this.domUnitModal!.scrollTop,
+      };
+    }, { passive: true });
+
+    this.domUnitModal.addEventListener('touchend', (e: TouchEvent) => {
+      if (!touchStart) return;
+      const dy = e.changedTouches[0].clientY - touchStart.y;
+      const elapsed = Date.now() - touchStart.time;
+      const startScrollTop = touchStart.scrollTop;
+      touchStart = null;
+      // スクロール先頭で下方向へ十分フリックしたら閉じる
+      if (startScrollTop <= 5 && dy > 60 && elapsed < 800) {
+        this.closeUnitModal();
+      }
+    }, { passive: true });
   }
 
   private bindMultiplexDom(): void {
@@ -560,11 +588,15 @@ export class UIManager {
     const actionCycleBtn = document.getElementById('action-cycle-btn');
     if (actionCycleBtn) {
       actionCycleBtn.onclick = () => {
-        const cycle: Array<'attack' | 'warning'> = ['attack', 'warning'];
-        const labels: Record<string, string> = { attack: '攻撃', warning: '警告' };
-        const next = cycle[(cycle.indexOf(this.scene.selectedAction) + 1) % cycle.length];
-        this.scene.selectedAction = next;
-        actionCycleBtn.textContent = labels[next];
+        const unit = this.scene.selectedUnitId ? this.scene.spaceships.get(this.scene.selectedUnitId) : null;
+        if (!unit) return;
+        const cycle = this.getActionCycle(unit);
+        const next = cycle[(cycle.indexOf(unit.combatAction) + 1) % cycle.length];
+        unit.combatAction = next;
+        // 攻撃/警告へ切替時は自動取得した標的をクリア（攻撃は手動再指定、警告は射撃停止）
+        if (next !== 'autoIntercept') unit.attackTargetMeteorId = null;
+        this.scene.selectedAction = next === 'autoIntercept' ? 'attack' : next; // 後方互換
+        this.syncActionButtonLabel();
       };
     }
 
@@ -586,6 +618,23 @@ export class UIManager {
         }
       };
     }
+  }
+
+  // ユニット種別ごとの攻撃アクション循環。Destroyer/Cruiser のみ「自動迎撃」を含む。
+  private getActionCycle(unit: Spaceship): Array<'attack' | 'autoIntercept' | 'warning'> {
+    if (unit.unitType === 'Destroyer' || unit.unitType === 'Cruiser') {
+      return ['attack', 'autoIntercept', 'warning'];
+    }
+    return ['attack', 'warning'];
+  }
+
+  // 選択中ユニットの combatAction を攻撃ボタンのラベルへ反映する。
+  private syncActionButtonLabel(): void {
+    const btn = document.getElementById('action-cycle-btn');
+    if (!btn) return;
+    const unit = this.scene.selectedUnitId ? this.scene.spaceships.get(this.scene.selectedUnitId) : null;
+    const labels: Record<string, string> = { attack: '攻撃', autoIntercept: '自動迎撃', warning: '警告' };
+    btn.textContent = unit ? labels[unit.combatAction] : '攻撃';
   }
 
   public updateReconDroneButtonState(): void {

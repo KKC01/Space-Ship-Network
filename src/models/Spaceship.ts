@@ -116,6 +116,8 @@ export class Spaceship {
   // 攻撃関連（隕石戦闘用）
   public attackTargetMeteorId: string | null = null;
   public attackCooldown: number = 0;
+  // 戦闘アクション（ユニット単位）。'autoIntercept' は Destroyer/Cruiser のみ選択可。
+  public combatAction: 'attack' | 'autoIntercept' | 'warning' = 'attack';
   public readonly ATTACK_RANGE: number = 100;     // 射程: 戦闘指揮モードの内側サークルと一致
   public readonly DETECTION_RANGE: number = 400;  // 探知距離: 外側サークルと一致
   public readonly ATTACK_DAMAGE: number = 25;
