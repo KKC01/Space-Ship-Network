@@ -110,8 +110,23 @@ export class UIManager {
     // 他モーダルを閉じる
     this.scene.closeOtherModals('unit');
     this.domUnitModal.classList.remove('hidden');
+    // ユニット切替時は被害対処アコーディオンと武器/通信の詳細を閉じた初期状態に戻す
+    this.resetDamageAccordion();
     this.applyModeToUnitModal();
     this.updateModalData();
+  }
+
+  /** 被害対処アコーディオンと武器/通信の詳細行を閉じた状態に戻す */
+  private resetDamageAccordion(): void {
+    document.getElementById('damage-group-content')?.classList.remove('open');
+    document.getElementById('damage-group-btn')?.classList.remove('open');
+    const wd = document.getElementById('dmg-weapon-detail');
+    if (wd) wd.style.display = 'none';
+    const wt = document.getElementById('dmg-weapon-toggle');
+    if (wt) wt.textContent = '▼';
+    document.querySelectorAll('.dmg-comm-detail').forEach(el => { (el as HTMLElement).style.display = 'none'; });
+    const ct = document.getElementById('dmg-comm-toggle');
+    if (ct) ct.textContent = '▼';
   }
 
   /**
@@ -566,9 +581,11 @@ export class UIManager {
             this.controlVizIndex = 0;
             this.scene.vizMode = 'circles';
             vizBtn.textContent = 'サークル表示';
+            vizBtn.style.display = '';
           } else {
             this.scene.vizMode = 'range';
-            vizBtn.textContent = '射程';
+            // 戦闘指揮モードでは「射程」ボタンは不要なので非表示にする
+            vizBtn.style.display = 'none';
           }
         }
       };
@@ -682,11 +699,30 @@ export class UIManager {
     const weaponRow = document.getElementById('dmg-weapon-row');
     const weaponDetail = document.getElementById('dmg-weapon-detail');
     const weaponToggle = document.getElementById('dmg-weapon-toggle');
+    // 通信行クリックで通信内訳をトグル
+    const commRow = document.getElementById('dmg-comm-row');
+    const commToggle = document.getElementById('dmg-comm-toggle');
+    const commDetails = () => Array.from(document.querySelectorAll('.dmg-comm-detail')) as HTMLElement[];
+
+    // 通信内訳を閉じる
+    const closeComm = () => { commDetails().forEach(el => { el.style.display = 'none'; }); if (commToggle) commToggle.textContent = '▼'; };
+    // 武器内訳を閉じる
+    const closeWeapon = () => { if (weaponDetail) weaponDetail.style.display = 'none'; if (weaponToggle) weaponToggle.textContent = '▼'; };
+
     if (weaponRow && weaponDetail && weaponToggle) {
       weaponRow.onclick = () => {
         const isHidden = weaponDetail.style.display === 'none';
+        if (isHidden) closeComm(); // 武器⇔通信は排他
         weaponDetail.style.display = isHidden ? 'table-row' : 'none';
         weaponToggle.textContent = isHidden ? '▲' : '▼';
+      };
+    }
+    if (commRow && commToggle) {
+      commRow.onclick = () => {
+        const isHidden = commDetails()[0]?.style.display === 'none';
+        if (isHidden) closeWeapon(); // 武器⇔通信は排他
+        commDetails().forEach(el => { el.style.display = isHidden ? 'table-row' : 'none'; });
+        commToggle.textContent = isHidden ? '▲' : '▼';
       };
     }
   }

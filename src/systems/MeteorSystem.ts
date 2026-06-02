@@ -378,14 +378,35 @@ export class MeteorSystem {
           else dmgSize = 'large';
 
           const dmgKind: DamageKind = Math.random() < 0.5 ? 'fire' : 'breach';
-          hitShip.damageCounter++;
-          hitShip.damages.push({
-            id: `dmg-${hitShip.id}-${hitShip.damageCounter}`,
-            kind: dmgKind,
-            size: dmgSize,
-            phase: 'active',
-            treatStartedAt: null,
-          });
+          const dmgLabelKind = dmgKind === 'fire' ? '火災' : '破口';
+          const sizeOrder: DamageSize[] = ['small', 'medium', 'large'];
+          const sizeLabel = (s: DamageSize) => (s === 'large' ? '大' : s === 'medium' ? '中' : '小');
+          // 同種・同規模の active 被害が既にある場合は、重複表示せず1段階エスカレート（中→大）
+          const dupDamage = hitShip.damages.find(
+            d => d.phase === 'active' && d.kind === dmgKind && d.size === dmgSize
+          );
+          if (dupDamage) {
+            const idx = sizeOrder.indexOf(dupDamage.size);
+            if (idx < sizeOrder.length - 1) {
+              const newSize = sizeOrder[idx + 1];
+              window.__chatWidget?.pushSystemMessage(
+                `${hitShip.id} の${sizeLabel(dupDamage.size)}${dmgLabelKind}が${sizeLabel(newSize)}${dmgLabelKind}に拡大`
+              );
+              dupDamage.size = newSize;
+            } else {
+              window.__chatWidget?.pushSystemMessage(`${hitShip.id} の大${dmgLabelKind}が継続`);
+            }
+          } else {
+            hitShip.damageCounter++;
+            hitShip.damages.push({
+              id: `dmg-${hitShip.id}-${hitShip.damageCounter}`,
+              kind: dmgKind,
+              size: dmgSize,
+              phase: 'active',
+              treatStartedAt: null,
+            });
+            window.__chatWidget?.pushSystemMessage(`${hitShip.id} に${sizeLabel(dmgSize)}${dmgLabelKind}発生`);
+          }
 
           if (dmgKind === 'breach') hitShip.recalcArmorStatus();
 
@@ -405,10 +426,6 @@ export class MeteorSystem {
           hitShip.weaponStatus.missile = randomizeStatus(hitShip.weaponStatus.missile);
           hitShip.weaponStatus.laser = randomizeStatus(hitShip.weaponStatus.laser);
           hitShip.recalcWeaponStatus();
-
-          const labelKind = dmgKind === 'fire' ? '火災' : '破口';
-          const labelSize = dmgSize === 'large' ? '大' : dmgSize === 'medium' ? '中' : '小';
-          window.__chatWidget?.pushSystemMessage(`${hitShip.id} に${labelSize}${labelKind}発生`);
         }
 
         meteor.isDestroyed = true;

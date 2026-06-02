@@ -299,30 +299,29 @@
       <button id="damage-group-btn" class="accordion-btn" style="margin-top: 6px;">被害対処</button>
       <div id="damage-group-content" class="accordion-content">
         <div style="margin-bottom: 10px;">
-          <div class="hud-label" style="margin-bottom: 4px;">機器ステータス</div>
           <table style="width:100%; border-collapse: collapse; font-size: 11px;">
             <tbody>
               <tr>
                 <th style="text-align:left; color:#94a3b8; padding:3px 6px; font-weight:normal;">装甲</th>
                 <td id="dmg-status-armor" style="text-align:center; color:#4ade80; padding:3px 6px;">GOOD</td>
               </tr>
-              <tr>
-                <th style="text-align:left; color:#94a3b8; padding:3px 6px; font-weight:normal;">通信</th>
+              <tr id="dmg-comm-row" style="cursor:pointer;">
+                <th style="text-align:left; color:#94a3b8; padding:3px 6px; font-weight:normal;">通信 <span id="dmg-comm-toggle" style="font-size:9px; color:#64748b;">▼</span></th>
                 <td id="dmg-status-comm" style="text-align:center; color:#4ade80; padding:3px 6px;">GOOD</td>
               </tr>
-              <tr>
+              <tr class="dmg-comm-detail" style="display:none;">
                 <th style="text-align:left; color:#94a3b8; padding:3px 6px 3px 18px; font-weight:normal; font-size:10px;">└ 星間通信</th>
                 <td id="dmg-status-tcpip" style="text-align:center; color:#4ade80; padding:3px 6px; font-size:10px;">GOOD</td>
               </tr>
-              <tr>
+              <tr class="dmg-comm-detail" style="display:none;">
                 <th style="text-align:left; color:#94a3b8; padding:3px 6px 3px 18px; font-weight:normal; font-size:10px;">└ レガシー星間</th>
                 <td id="dmg-status-legacy" style="text-align:center; color:#4ade80; padding:3px 6px; font-size:10px;">GOOD</td>
               </tr>
-              <tr>
+              <tr class="dmg-comm-detail" style="display:none;">
                 <th style="text-align:left; color:#94a3b8; padding:3px 6px 3px 18px; font-weight:normal; font-size:10px;">└ 多重通信</th>
                 <td id="dmg-status-multiplex" style="text-align:center; color:#4ade80; padding:3px 6px; font-size:10px;">GOOD</td>
               </tr>
-              <tr>
+              <tr class="dmg-comm-detail" style="display:none;">
                 <th style="text-align:left; color:#94a3b8; padding:3px 6px 3px 18px; font-weight:normal; font-size:10px;">└ 光通信</th>
                 <td id="dmg-status-optical" style="text-align:center; color:#4ade80; padding:3px 6px; font-size:10px;">GOOD</td>
               </tr>
@@ -357,7 +356,7 @@
           <span id="dmg-situation" style="font-size: 12px; color: #fff;">被害なし</span>
         </div>
         <button id="dmg-treat-btn"
-          style="width:100%; font-size:13px; padding:7px; background:rgba(239,68,68,0.2); border:1px solid rgba(239,68,68,0.5); color:#f87171; cursor:pointer; font-family:Rajdhani, sans-serif; font-weight:bold; letter-spacing:1px;">
+          style="width:100%; font-size:12px; padding:3px; background:rgba(239,68,68,0.2); border:1px solid rgba(239,68,68,0.5); color:#f87171; cursor:pointer; font-family:Rajdhani, sans-serif; font-weight:bold; letter-spacing:1px;">
           被害対処 実行
         </button>
       </div>
