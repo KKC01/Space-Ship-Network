@@ -282,7 +282,8 @@ export class PlanetSystem {
     const sprite = this.scene.add.image(candidate.x, candidate.y, 'planet_comm');
     // 元画像 1024x1024 を通常惑星(150x150 * 0.5 = 75px相当)に近づける
     sprite.setScale(0.15);
-    sprite.setDepth(2);
+    // 通信衛星はフォグ(depth 9)より前面に出し、探知圏外でも常時可視にする
+    sprite.setDepth(10);
     sprite.setData('planetId', COMM_PLANET_SPEC.id);
     this.planetSprites.push(sprite);
   }
@@ -339,7 +340,8 @@ export class PlanetSystem {
 
     const sprite = this.scene.add.image(candidate.x, candidate.y, 'planet_comm_tcp');
     sprite.setScale(0.15);
-    sprite.setDepth(2);
+    // 通信衛星はフォグ(depth 9)より前面に出し、探知圏外でも常時可視にする
+    sprite.setDepth(10);
     sprite.setData('planetId', COMM_TCP_PLANET_SPEC.id);
     this.planetSprites.push(sprite);
   }

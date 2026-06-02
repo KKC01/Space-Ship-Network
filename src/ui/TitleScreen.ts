@@ -75,7 +75,7 @@ export class TitleScreen {
     const deployBtn = document.createElement('button');
     deployBtn.className = 'deploy-btn';
     deployBtn.setAttribute('data-testid', 'deploy-btn');
-    deployBtn.textContent = 'DEPLOY';
+    deployBtn.textContent = '艦隊編成';
     deployBtn.addEventListener('click', () => {
       import('./CustomizeShipScreen').then(({ CustomizeShipScreen }) => {
         new CustomizeShipScreen(this.scene, this.selectedMissionId, this).show();

@@ -169,7 +169,7 @@ export class CustomizeShipScreen {
     this.confirmBtn = document.createElement('button');
     this.confirmBtn.className = 'deploy-btn customize-deploy-btn';
     this.confirmBtn.setAttribute('data-testid', 'confirm-deploy-btn');
-    this.confirmBtn.textContent = 'DEPLOY';
+    this.confirmBtn.textContent = '任務開始';
     this.confirmBtn.addEventListener('click', () => {
       this.hide();
       this.titleScreen.hide();

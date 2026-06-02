@@ -67,8 +67,14 @@ window.addEventListener('load', () => {
 
   // MainScene の create 完了後に TitleScreen を起動する
   game.events.once('ready', () => {
+    // 初期起動時の最大化を確実にするため、即時リサイズを走らせる
+    game.scale.resize(window.innerWidth, getGameHeight());
+
     const mainScene = game.scene.getScene('MainScene') as MainScene;
     mainScene.events.once('create', () => {
+      // scene 初期化完了後に再度リサイズを走らせる
+      game.scale.resize(window.innerWidth, getGameHeight());
+
       // scene 初期化完了後に fullscreen 要求を複数回試行
       if (isMobile) {
         requestFS();

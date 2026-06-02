@@ -428,12 +428,13 @@ body:has(#meteor-modal:not(.hidden)) #scale-bar-container {
   #meteor-modal {
     top: auto !important;
     right: max(10px, env(safe-area-inset-right)) !important;
-    bottom: calc(62px + env(safe-area-inset-bottom)) !important;
+    /* モーダル表示中は CHAT を隠すため、下端の無駄な余白(旧62px)を詰める */
+    bottom: calc(10px + env(safe-area-inset-bottom)) !important;
     left: max(10px, env(safe-area-inset-left)) !important;
     width: auto !important;
-    max-height: min(58vh, 500px) !important;
-    /* 上下の無駄な余白を詰める（上6px・下6px） */
-    padding: 6px 12px !important;
+    max-height: min(70vh, 560px) !important;
+    /* 上下の無駄な余白を詰める（上3px・下3px） */
+    padding: 3px 12px !important;
     border-radius: 10px;
   }
 
@@ -468,6 +469,11 @@ body:has(#meteor-modal:not(.hidden)) #scale-bar-container {
   #unit-modal .action-btn {
     min-height: 32px !important;
     padding: 6px 8px !important;
+  }
+  /* 光通信「ノード設定」ボタンは縦幅を約2/3(32→21px)に */
+  #unit-modal #toggle-role-btn {
+    min-height: 21px !important;
+    padding: 3px 8px !important;
   }
   #unit-modal .custom-select {
     min-height: 32px !important;

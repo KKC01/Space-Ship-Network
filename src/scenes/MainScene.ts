@@ -112,7 +112,8 @@ export class MainScene extends Scene {
     this.cameras.main.setBackgroundColor('#020617');
     this.interferenceGraphics = this.add.graphics().setDepth(1);
     this.clutterGraphics = this.add.graphics().setDepth(2);
-    this.linkGraphics = this.add.graphics().setDepth(3);
+    // 通信ラインはフォグ(depth 9)より前面に置き、探知圏外でも通信網が見えるようにする
+    this.linkGraphics = this.add.graphics().setDepth(10);
 
     // 索敵範囲外の霧レイヤー（画面固定・depth 9 でゲームオブジェクト上に重ねる）
     const { width, height } = this.scale;
