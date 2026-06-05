@@ -266,10 +266,7 @@ export class MeteorSystem {
     else if (size === 'SMALL') scale = 0.1 / 5;
     else if (size === 'TINY') scale = 0.1 / 10;
     sprite.setScale(scale);
-    // 暗い宇宙背景の上で「透過」して見えるよう SCREEN ブレンド＋半透明にする
-    // （MULTIPLY だと暗背景で黒潰れ→不可視、NORMAL だと不透明になり透過しないため）
-    sprite.setAlpha(0.8);
-    sprite.setBlendMode(Phaser.BlendModes.SCREEN);
+    sprite.setAlpha(0.9);
     sprite.setDepth(4);
     sprite.setVisible(false);
     this.meteorSprites.set(meteorId, sprite);

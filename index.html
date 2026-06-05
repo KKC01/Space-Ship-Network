@@ -238,21 +238,20 @@
       <!-- 多重通信グループ コンテンツ -->
       <div id="multiplex-group-content" class="accordion-content">
         <div class="comm-group">
-          <label style="font-size: 11px;"><input type="checkbox" id="multiplex-enable"> 多重通信</label>
-          <!-- 連接マスター / 暗号 を1行に（ラベルは横付け） -->
-          <div style="display: flex; gap: 8px; align-items: center; margin-top: 4px;">
-            <span class="hud-label" style="font-size: 10px; white-space: nowrap;">連接マスター</span>
+          <!-- 行1: 多重通信チェック / 連接マスター / 暗号 -->
+          <div style="display: flex; gap: 6px; align-items: center;">
+            <label style="font-size: 11px; white-space: nowrap;"><input type="checkbox" id="multiplex-enable"> 多重通信</label>
             <select id="multiplex-master" class="custom-select" style="flex: 1; min-width: 0;">
               <option value="">--</option>
             </select>
             <span class="hud-label" style="font-size: 10px; white-space: nowrap;">暗号</span>
-            <select id="multiplex-cipher" class="custom-select" style="width: 58px;">
+            <select id="multiplex-cipher" class="custom-select" style="width: 52px;">
               <option value="AA">AA</option>
               <option value="BB">BB</option>
             </select>
           </div>
-          <!-- 速度 / 中継 を1行に -->
-          <div style="display: flex; gap: 8px; align-items: center; margin-top: 4px;">
+          <!-- 行2: 速度 / 中継 -->
+          <div style="display: flex; gap: 8px; align-items: center; margin-top: 2px;">
             <span class="hud-label" style="font-size: 10px; white-space: nowrap;">速度</span>
             <select id="multiplex-speed" class="custom-select" style="flex: 1; min-width: 0;">
               <option value="low">Low</option>
@@ -267,25 +266,26 @@
       <!-- 光通信グループ コンテンツ -->
       <div id="optical-group-content" class="accordion-content">
         <div class="comm-group">
-          <div style="display: flex; gap: 8px; align-items: center;">
-            <label style="font-size: 11px; white-space: nowrap; min-width: 56px;"><input type="checkbox" id="short-enable"> 短距離</label>
-            <select id="short-freq" class="custom-select" style="flex: 1; max-width: 150px;">
+          <!-- 1行: 短距離+長距離 -->
+          <div style="display: flex; gap: 6px; align-items: center;">
+            <label style="font-size: 11px; white-space: nowrap;"><input type="checkbox" id="short-enable"> 短距離</label>
+            <select id="short-freq" class="custom-select" style="flex: 1; min-width: 0;">
               <option value="A">周波数 A</option>
               <option value="B">周波数 B</option>
               <option value="C">周波数 C</option>
             </select>
-          </div>
-          <div style="display: flex; gap: 8px; align-items: center; margin-top: 4px;">
-            <label style="font-size: 11px; white-space: nowrap; min-width: 56px;"><input type="checkbox" id="long-enable"> 長距離</label>
-            <select id="long-freq" class="custom-select" style="flex: 1; max-width: 150px;">
+            <label style="font-size: 11px; white-space: nowrap;"><input type="checkbox" id="long-enable"> 長距離</label>
+            <select id="long-freq" class="custom-select" style="flex: 1; min-width: 0;">
               <option value="D">周波数 D</option>
               <option value="E">周波数 E</option>
               <option value="F">周波数 F</option>
             </select>
           </div>
-
-          <button id="toggle-role-btn" style="margin-top: 6px; width: 100%;" class="action-btn">ノード設定</button>
-          <button id="send-cmd-btn" style="margin-top: 6px; width: 100%;" class="action-btn hidden">全般宛 周波数変更</button>
+          <!-- ボタン横並び -->
+          <div style="display: flex; gap: 4px; margin-top: 4px;">
+            <button id="toggle-role-btn" class="action-btn" style="flex: 1;">ノード設定</button>
+            <button id="send-cmd-btn" class="action-btn hidden" style="flex: 1;">全般宛 周波数変更</button>
+          </div>
         </div>
       </div>
 

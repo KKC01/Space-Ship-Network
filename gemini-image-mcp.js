@@ -1,7 +1,10 @@
 #!/usr/bin/env node
 
 import readline from 'readline';
-import { GoogleGenerativeAI } from '@google/generative-ai';
+import fs from 'fs';
+import path from 'path';
+import { createCanvas, loadImage } from 'canvas';
+import { GoogleGenAI, Modality } from '@google/genai';
 
 const apiKey = process.env.GEMINI_API_KEY;
 if (!apiKey) {
@@ -9,7 +12,7 @@ if (!apiKey) {
   process.exit(1);
 }
 
-const genAI = new GoogleGenerativeAI(apiKey);
+const genAI = new GoogleGenAI({ apiKey });
 
 const rl = readline.createInterface({
   input: process.stdin,
@@ -17,32 +20,24 @@ const rl = readline.createInterface({
   terminal: false
 });
 
-let requestId = 0;
-
 rl.on('line', async (line) => {
+  let request;
   try {
-    const request = JSON.parse(line);
+    request = JSON.parse(line);
 
-    // Initialize リクエスト
     if (request.method === 'initialize') {
       process.stdout.write(JSON.stringify({
         jsonrpc: '2.0',
         id: request.id,
         result: {
           protocolVersion: '2024-11-05',
-          capabilities: {
-            tools: {}
-          },
-          serverInfo: {
-            name: 'gemini-image-mcp',
-            version: '1.0.0'
-          }
+          capabilities: { tools: {} },
+          serverInfo: { name: 'gemini-image-mcp', version: '2.0.0' }
         }
       }) + '\n');
       return;
     }
 
-    // Tools リスト
     if (request.method === 'tools/list') {
       process.stdout.write(JSON.stringify({
         jsonrpc: '2.0',
@@ -51,13 +46,25 @@ rl.on('line', async (line) => {
           tools: [
             {
               name: 'generate_image',
-              description: 'Generate an image using Google Gemini API',
+              description: 'Generate an image using Google Gemini API (gemini-2.5-flash-image) and save it as a PNG file',
               inputSchema: {
                 type: 'object',
                 properties: {
                   prompt: {
                     type: 'string',
                     description: 'The prompt for image generation'
+                  },
+                  outputPath: {
+                    type: 'string',
+                    description: 'Absolute path to save the generated PNG. Defaults to Temp folder.'
+                  },
+                  width: {
+                    type: 'number',
+                    description: 'Output width in pixels (resized). Default 100.'
+                  },
+                  height: {
+                    type: 'number',
+                    description: 'Output height in pixels (resized). Default 100.'
                   }
                 },
                 required: ['prompt']
@@ -69,36 +76,51 @@ rl.on('line', async (line) => {
       return;
     }
 
-    // Tool call
     if (request.method === 'tools/call') {
       const { name, arguments: args } = request.params;
 
       if (name === 'generate_image') {
         try {
-          const model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash' });
-          const result = await model.generateContent(args.prompt);
-          const text = result.response.text();
+          const response = await genAI.models.generateContent({
+            model: 'gemini-2.5-flash-image',
+            contents: args.prompt,
+            config: {
+              responseModalities: [Modality.TEXT, Modality.IMAGE]
+            }
+          });
+
+          const parts = response.candidates?.[0]?.content?.parts ?? [];
+          const imagePart = parts.find((p) => p.inlineData?.data);
+          if (!imagePart) {
+            const textOut = parts.map((p) => p.text).filter(Boolean).join(' ');
+            throw new Error('No image returned by model. Text: ' + (textOut || '(none)'));
+          }
+
+          const w = args.width ?? 100;
+          const h = args.height ?? 100;
+          const img = await loadImage(Buffer.from(imagePart.inlineData.data, 'base64'));
+          const canvas = createCanvas(w, h);
+          const ctx = canvas.getContext('2d');
+          ctx.drawImage(img, 0, 0, w, h);
+          const pngBuffer = canvas.toBuffer('image/png');
+
+          const outPath = args.outputPath
+            || path.join(process.cwd(), 'Temp', `gemini-image-${Date.now()}.png`);
+          fs.mkdirSync(path.dirname(outPath), { recursive: true });
+          fs.writeFileSync(outPath, pngBuffer);
 
           process.stdout.write(JSON.stringify({
             jsonrpc: '2.0',
             id: request.id,
             result: {
-              content: [
-                {
-                  type: 'text',
-                  text: text
-                }
-              ]
+              content: [{ type: 'text', text: `Image saved to ${outPath} (${w}x${h})` }]
             }
           }) + '\n');
         } catch (error) {
           process.stdout.write(JSON.stringify({
             jsonrpc: '2.0',
             id: request.id,
-            error: {
-              code: -32603,
-              message: error.message
-            }
+            error: { code: -32603, message: error.message }
           }) + '\n');
         }
         return;
@@ -107,27 +129,17 @@ rl.on('line', async (line) => {
       process.stdout.write(JSON.stringify({
         jsonrpc: '2.0',
         id: request.id,
-        error: {
-          code: -32601,
-          message: `Unknown tool: ${name}`
-        }
+        error: { code: -32601, message: `Unknown tool: ${name}` }
       }) + '\n');
     }
   } catch (error) {
     const response = {
       jsonrpc: '2.0',
-      error: {
-        code: -32700,
-        message: 'Parse error'
-      }
+      error: { code: -32700, message: 'Parse error' }
     };
-    if (request && request.id !== undefined) {
-      response.id = request.id;
-    }
+    if (request && request.id !== undefined) response.id = request.id;
     process.stdout.write(JSON.stringify(response) + '\n');
   }
 });
 
-rl.on('close', () => {
-  process.exit(0);
-});
+rl.on('close', () => process.exit(0));

@@ -273,7 +273,7 @@ body {
 
 .comm-group {
   background: rgba(0,0,0,0.3);
-  padding: 6px;
+  padding: 3px 4px;
   border-radius: 6px;
   font-size: 12px;
 }
@@ -292,7 +292,7 @@ body {
   color: white;
   border: 1px solid rgba(255,255,255,0.2);
   border-radius: 4px;
-  padding: 5px;
+  padding: 2px 4px;
   font-family: inherit;
 }
 
@@ -867,8 +867,6 @@ body:has(#meteor-modal:not(.hidden)) #scale-bar-container {
 .customize-overlay {
   position: fixed;
   inset: 0;
-  /* dvh 対応ブラウザでアドレスバーが表示されても全領域を使う */
-  height: 100dvh;
   z-index: 1000;
   display: none;
   pointer-events: auto;

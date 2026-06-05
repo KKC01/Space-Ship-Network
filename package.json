@@ -19,6 +19,7 @@
     "phaser": "^3.80.1"
   },
   "devDependencies": {
+    "@google/genai": "^2.8.0",
     "typescript": "^5.2.2",
     "vite": "^5.2.0"
   }

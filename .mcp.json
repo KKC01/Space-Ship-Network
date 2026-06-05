@@ -20,11 +20,10 @@
     "gemini": {
       "command": "node",
       "args": [
+        "--env-file=.env",
         "gemini-image-mcp.js"
       ],
-      "env": {
-        "GEMINI_API_KEY": "${GEMINI_API_KEY}"
-      }
+      "env": {}
     },
     "aidesigner": {
       "type": "http",
@@ -32,7 +31,11 @@
     },
     "obsidian": {
       "command": "npx",
-      "args": ["-y", "mcp-obsidian", "/mnt/obsidian"]
+      "args": [
+        "-y",
+        "mcp-obsidian",
+        "/mnt/obsidian"
+      ]
     }
   }
 }
