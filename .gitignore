@@ -2,6 +2,8 @@ node_modules/
 dist/
 .vite/
 .claude/settings.local.json
+.claude/settings.local.json.*
+.claude/*.bak.*
 
 # 環境変数（APIキー等のシークレット）
 .env

@@ -260,11 +260,11 @@ export class MeteorSystem {
 
     const meteorKey = Math.random() < 0.5 ? 'meteor' : 'meteor2';
     const sprite = this.scene.add.image(mx, my, meteorKey);
-    let scale = 0.1;
-    if (size === 'LARGE') scale = 0.1;
-    else if (size === 'MEDIUM') scale = 0.1 / 3;
-    else if (size === 'SMALL') scale = 0.1 / 5;
-    else if (size === 'TINY') scale = 0.1 / 10;
+    let scale = 0.6;
+    if (size === 'LARGE') scale = 0.6;
+    else if (size === 'MEDIUM') scale = 0.6 / 3;
+    else if (size === 'SMALL') scale = 0.6 / 5;
+    else if (size === 'TINY') scale = 0.6 / 10;
     sprite.setScale(scale);
     sprite.setAlpha(0.9);
     sprite.setDepth(4);

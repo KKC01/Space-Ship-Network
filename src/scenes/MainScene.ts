@@ -127,30 +127,6 @@ export class MainScene extends Scene {
       this.fogRT.setSize(gameSize.width, gameSize.height);
     });
 
-    // meteor_01.png は白背景ソリッドPNG のため、Canvas API で白ピクセルを透過に変換する
-    const meteorTex = this.textures.get('meteor');
-    if (meteorTex) {
-      const src = meteorTex.getSourceImage() as HTMLImageElement;
-      const cvs = document.createElement('canvas');
-      cvs.width = src.naturalWidth || src.width;
-      cvs.height = src.naturalHeight || src.height;
-      const ctx2d = cvs.getContext('2d')!;
-      ctx2d.drawImage(src, 0, 0);
-      const imgData = ctx2d.getImageData(0, 0, cvs.width, cvs.height);
-      const px = imgData.data;
-      for (let i = 0; i < px.length; i += 4) {
-        const brightness = (px[i] + px[i + 1] + px[i + 2]) / 3;
-        if (brightness > 200) {
-          px[i + 3] = 0;
-        } else if (brightness > 100) {
-          px[i + 3] = Math.min(px[i + 3], Math.floor((255 - brightness) * (255 / 155)));
-        }
-      }
-      ctx2d.putImageData(imgData, 0, 0);
-      this.textures.remove('meteor');
-      this.textures.addCanvas('meteor', cvs);
-    }
-
     // サブシステム初期化（DOM・Graphics は各システム内で生成）
     this.meteorSystem = new MeteorSystem(this);
     this.meteorSystem.init();
