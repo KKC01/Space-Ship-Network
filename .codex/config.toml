@@ -21,6 +21,14 @@ args = [
 ]
 command = "npx"
 
+[mcp_servers.obsidian]
+command = "npx"
+args = [
+    "-y",
+    "mcp-obsidian",
+    "/mnt/obsidian",
+]
+
 [shell_environment_policy]
 inherit = "core"
 

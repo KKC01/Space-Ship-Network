@@ -267,8 +267,9 @@ export class MainScene extends Scene {
     if (this.planetSystem.handleClick(worldX, worldY)) return;
     if (this.meteorSystem.handleClick(worldX, worldY)) return;
 
+    const zoom = this.cameras.main.zoom;
     let clickedId: string | null = null;
-    let minDist = 30;
+    let minDist = 30 / zoom;
     for (const [id, ship] of this.spaceships.entries()) {
       const d = CommunicationSystem.getDistance(worldX, worldY, ship.x, ship.y);
       if (d < minDist) { minDist = d; clickedId = id; }

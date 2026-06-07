@@ -1,37 +1,27 @@
-# Space-Ship-Network プロジェクト指示
+# Space-Ship-Network
 
-## サブエージェント運用ルール
+Codex からこのリポジトリを扱うときの入口。
 
-このプロジェクトには `.Codex/agents/` に専用エージェントが定義されている。
-タスクの性質に応じて以下のエージェントを積極的に活用すること。
+## まず読むもの
 
-### タスク別の推奨エージェント
+1. [AI_SYNC.md](./AI_SYNC.md)
+2. `CLAUDE.md`
+3. `/mnt/obsidian/_handoff/current-session.md`
+4. `/mnt/obsidian/Knowledge/mistakes.md`
 
-| タスク | 推奨エージェント |
-|---|---|
-| ゲームロジック・UI 実装 | `coder` |
-| UI / 機能変更後の動作確認 | `tester`（必須） |
-| バグ修正・原因特定 | `debugger` |
-| 新規アセット登録（src/assets/ 配下） | `asset-loader` |
-| コミット前のコードレビュー | `reviewer` |
-| API キー・認証情報を扱う変更後 | `security-reviewer`（必須） |
+## このリポジトリの指示
 
-### 必須呼び出しタイミング
+- 変更は最小限にする。
+- 役割ごとの設定を混ぜない。
+- 変更後は Obsidian に引き継ぎを書く。
+- セキュリティに関わる変更は既存の hook と確認ルールに従う。
 
-以下の場合は**必ず**該当エージェントを呼び出す：
+## 主要な対応関係
 
-1. **UI / Phaser シーン変更後** → `tester` でブラウザ確認
-2. **コミット直前** → `security-reviewer` で認証情報チェック
-3. **Dify / Google AI / 外部 API 連携変更後** → `security-reviewer`
-4. **新規アセットファイル追加後** → `asset-loader` で preload 登録
-
-### 並列実行の活用
-
-独立したシステム（例: MeteorSystem と ChatWidget）への変更は、
-複数のエージェントを並列で呼び出して効率化する。
-
-### 注意
-
-- `coder` で実装 → `tester` で検証 → `reviewer` でレビュー、の流れを基本とする
-- バグ発覚時は `tester` → `debugger` に引き継ぐ
-- メインの Codex がエージェント呼び出しを忘れた場合、ユーザーが指摘してよい
+| 役割 | Claude Code 側 | Codex 側 |
+|---|---|---|
+| 常時指示 | `CLAUDE.md` | `AGENTS.md` |
+| MCP 設定 | `.mcp.json` | `.codex/config.toml` |
+| Hooks | `.claude/hooks/` | `.codex/hooks/` |
+| Agents | `.claude/agents/` | `.codex/agents/` |
+| Skills | `.claude/skills/` | `.codex/skills/` |

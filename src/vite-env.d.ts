@@ -11,7 +11,6 @@ declare module '*.mp4' {
 }
 
 interface ImportMetaEnv {
-  readonly VITE_DIFY_API_KEY?: string;
 }
 
 interface ImportMeta {
