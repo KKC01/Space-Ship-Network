@@ -1,8 +1,8 @@
 import { Meteor, MeteorSize } from '../models/Meteor';
 import { CommunicationSystem } from '../models/CommunicationSystem';
-import { SystemDisplayMode } from '../models/DataPacket';
+import { SystemDisplayMode, PacketType } from '../models/DataPacket';
 import type { MainScene } from '../scenes/MainScene';
-import type { DamageKind, DamageSize, EquipmentLevel } from '../models/Spaceship';
+import type { Spaceship, DamageKind, DamageSize, EquipmentLevel } from '../models/Spaceship';
 
 /**
  * 隕石（メテオ）システム。
@@ -99,6 +99,7 @@ export class MeteorSystem {
     this.updateMeteors(dt);
     this.handleMeteorCombat(dt);
     this.updateMissiles(dt);
+    this.updateSensorDataGeneration(dt);
   }
 
   /**
@@ -152,7 +153,9 @@ export class MeteorSystem {
               return true;
             }
             ship.attackTargetMeteorId = mId;
-            // 標的指定直後の即着弾を防ぐため、クールダウンを満タンにセット
+            // 標的指定直後の遅延をセット（L1-2=2000ms, L3-5=0ms）
+            ship.explicitAttackDelayMs = ship.getExplicitAttackDelay();
+            // 遅延なし（L3-5）でも即着弾しないようクールダウンを満タンにセット
             ship.attackCooldown = ship.ATTACK_COOLDOWN_MS;
             window.__chatWidget?.pushSystemMessage(`${ship.id} → ${meteor.id} に攻撃指示`);
             this.scene.showFloatingText(ship.x, ship.y, '攻撃指示', '#f87171');
@@ -443,93 +446,213 @@ export class MeteorSystem {
   }
 
   /**
-   * ユニットから隕石への攻撃処理（レーザー: 100km以内 / ミサイル: 100〜300km）。
+   * ユニットから隕石への攻撃処理。
+   * セクション1: 常時自動攻撃（受動）
+   * セクション2: 明示的攻撃（combatAction==='attack'）
+   * セクション3: 自動迎撃（combatAction==='autoIntercept'）
    */
   private handleMeteorCombat(dt: number): void {
-    const now = Date.now();
+    // attackCooldown は全ユニット共通でフレームごとにデクリメント
+    for (const ship of this.scene.spaceships.values()) {
+      ship.attackCooldown = Math.max(0, ship.attackCooldown - dt);
+    }
 
-    // 自動迎撃: combatAction==='autoIntercept' のユニットは、射程内の味方以外の目標（隕石）を
-    // 自動的に標的化する。現在の標的が無効になったら最も近い隕石を再取得する。
+    // ===== セクション1: 常時自動攻撃（全ユニット、Repair Ship 除く）=====
+    for (const ship of this.scene.spaceships.values()) {
+      if (ship.isRepairShip()) continue;
+      if (ship.combatEquipment.weapon === 'UNABLE') continue;
+
+      ship.passiveReAttackCooldown = Math.max(0, ship.passiveReAttackCooldown - dt);
+
+      // 現在の受動ターゲットを検証
+      const target = ship.passiveAttackTargetId ? this.meteors.get(ship.passiveAttackTargetId) : null;
+      const dist = target ? CommunicationSystem.getDistance(ship.x, ship.y, target.x, target.y) : Infinity;
+      if (!target || target.isDestroyed || !target.isDetected || dist > ship.MISSILE_RANGE) {
+        ship.passiveAttackTargetId = null;
+        // 射程外・撃破済み・未探知のタイマーを削除
+        for (const [mId] of ship.passiveAttackTimers) {
+          const m = this.meteors.get(mId);
+          if (!m || m.isDestroyed || !m.isDetected) { ship.passiveAttackTimers.delete(mId); continue; }
+          if (CommunicationSystem.getDistance(ship.x, ship.y, m.x, m.y) > ship.MISSILE_RANGE) {
+            ship.passiveAttackTimers.delete(mId);
+          }
+        }
+        // 最近傍の探知済み射程内隕石を新ターゲットに選定
+        let bestId: string | null = null;
+        let bestDist = Infinity;
+        for (const [mId, m] of this.meteors) {
+          if (m.isDestroyed || !m.isDetected) continue;
+          const d = CommunicationSystem.getDistance(ship.x, ship.y, m.x, m.y);
+          if (d > ship.MISSILE_RANGE) continue;
+          // 探知タイムスタンプを未登録なら今すぐ記録
+          if (!ship.passiveAttackTimers.has(mId)) ship.passiveAttackTimers.set(mId, Date.now());
+          if (d < bestDist) { bestDist = d; bestId = mId; }
+        }
+        ship.passiveAttackTargetId = bestId;
+      }
+
+      // 攻撃実行（探知待機経過 + 再攻撃クールダウンなし）
+      if (ship.passiveAttackTargetId && ship.passiveReAttackCooldown <= 0) {
+        const detectionTime = ship.passiveAttackTimers.get(ship.passiveAttackTargetId) ?? Date.now();
+        const elapsed = Date.now() - detectionTime;
+        if (elapsed >= ship.getPassiveAttackDelay()) {
+          this.executeAttack(ship, ship.passiveAttackTargetId, 'passive');
+        }
+      }
+    }
+
+    // ===== セクション2: 明示的攻撃（combatAction==='attack'）=====
+    for (const ship of this.scene.spaceships.values()) {
+      if (ship.combatAction !== 'attack') continue;
+      if (!ship.attackTargetMeteorId) continue;
+      if (ship.combatEquipment.weapon === 'UNABLE') continue;
+
+      ship.explicitAttackDelayMs = Math.max(0, ship.explicitAttackDelayMs - dt);
+      if (ship.explicitAttackDelayMs > 0) continue;
+
+      this.executeAttack(ship, ship.attackTargetMeteorId, 'explicit');
+    }
+
+    // ===== セクション3: 自動迎撃（Destroyer/Cruiser、最大3目標）=====
     for (const ship of this.scene.spaceships.values()) {
       if (ship.combatAction !== 'autoIntercept') continue;
       if (ship.combatEquipment.weapon === 'UNABLE') continue;
-      const cur = ship.attackTargetMeteorId ? this.meteors.get(ship.attackTargetMeteorId) : null;
-      const curValid = !!cur && !cur.isDestroyed && cur.isDetected &&
-        CommunicationSystem.getDistance(ship.x, ship.y, cur.x, cur.y) <= ship.MISSILE_RANGE;
-      if (curValid) continue;
-      let nearestId: string | null = null;
-      let nearestDist = Infinity;
-      for (const [mId, m] of this.meteors.entries()) {
-        if (m.isDestroyed || !m.isDetected) continue;
-        const d = CommunicationSystem.getDistance(ship.x, ship.y, m.x, m.y);
-        if (d <= ship.MISSILE_RANGE && d < nearestDist) { nearestDist = d; nearestId = mId; }
+
+      // クールダウンをデクリメント
+      for (const [mId, cd] of ship.autoInterceptCooldowns) {
+        ship.autoInterceptCooldowns.set(mId, Math.max(0, cd - dt));
       }
-      ship.attackTargetMeteorId = nearestId;
+
+      // 無効なターゲット（撃破・未探知・射程外）を除去
+      ship.autoInterceptTargetIds = ship.autoInterceptTargetIds.filter(mId => {
+        const m = this.meteors.get(mId);
+        return m && !m.isDestroyed && m.isDetected &&
+          CommunicationSystem.getDistance(ship.x, ship.y, m.x, m.y) <= ship.MISSILE_RANGE;
+      });
+
+      // 最大3体まで最近傍から補充
+      if (ship.autoInterceptTargetIds.length < 3) {
+        const candidates = [...this.meteors.values()]
+          .filter(m => !m.isDestroyed && m.isDetected &&
+            CommunicationSystem.getDistance(ship.x, ship.y, m.x, m.y) <= ship.MISSILE_RANGE &&
+            !ship.autoInterceptTargetIds.includes(m.id))
+          .sort((a, b) =>
+            CommunicationSystem.getDistance(ship.x, ship.y, a.x, a.y) -
+            CommunicationSystem.getDistance(ship.x, ship.y, b.x, b.y));
+        for (const c of candidates) {
+          if (ship.autoInterceptTargetIds.length >= 3) break;
+          ship.autoInterceptTargetIds.push(c.id);
+        }
+      }
+
+      // 各目標を攻撃
+      for (const mId of ship.autoInterceptTargetIds) {
+        const cd = ship.autoInterceptCooldowns.get(mId) ?? 0;
+        if (cd > 0) continue;
+        this.executeAttack(ship, mId, 'autoIntercept');
+      }
     }
+  }
 
-    for (const ship of this.scene.spaceships.values()) {
-      if (!ship.attackTargetMeteorId) continue;
+  /**
+   * 艦から指定隕石への単発攻撃を実行する（レーザー / ミサイル）。
+   * attackType によってヒット後の再攻撃タイマーセット先を切り替える。
+   */
+  private executeAttack(
+    ship: Spaceship,
+    meteorId: string,
+    attackType: 'passive' | 'explicit' | 'autoIntercept'
+  ): void {
+    const now = Date.now();
+    const meteor = this.meteors.get(meteorId);
+    if (!meteor || meteor.isDestroyed) return;
 
-      // 両方 UNABLE → 射撃不可（標的指定は維持）
-      if (ship.combatEquipment.weapon === 'UNABLE') continue;
+    const dist = CommunicationSystem.getDistance(ship.x, ship.y, meteor.x, meteor.y);
 
-      const meteor = this.meteors.get(ship.attackTargetMeteorId);
-      if (!meteor || meteor.isDestroyed) {
-        ship.attackTargetMeteorId = null;
-        continue;
-      }
+    if (dist <= ship.ATTACK_RANGE) {
+      // レーザー射程内
+      if (ship.attackCooldown <= 0 && ship.canFireLaser()) {
+        meteor.takeDamage(ship.ATTACK_DAMAGE);
+        ship.laserAmmo--;
+        const cooldownMul = ship.weaponStatus.laser === 'POOR' ? 2 : 1;
+        ship.attackCooldown = ship.ATTACK_COOLDOWN_MS * cooldownMul;
+        this.scene.showFloatingText(meteor.x, meteor.y, `LASER -${ship.ATTACK_DAMAGE}`, '#fbbf24');
 
-      ship.attackCooldown = Math.max(0, ship.attackCooldown - dt);
+        // ヒット後再攻撃タイマーをセット
+        this.setReAttackTimer(ship, meteorId, attackType);
 
-      const dist = CommunicationSystem.getDistance(ship.x, ship.y, meteor.x, meteor.y);
-
-      if (dist <= ship.ATTACK_RANGE) {
-        // レーザー射程内
-        if (ship.attackCooldown <= 0 && ship.canFireLaser()) {
-          meteor.takeDamage(ship.ATTACK_DAMAGE);
-          ship.laserAmmo--;
-          // レーザー POOR ならクールダウン 2 倍
-          const cooldownMul = ship.weaponStatus.laser === 'POOR' ? 2 : 1;
-          ship.attackCooldown = ship.ATTACK_COOLDOWN_MS * cooldownMul;
-          this.scene.showFloatingText(meteor.x, meteor.y, `LASER -${ship.ATTACK_DAMAGE}`, '#fbbf24');
-
-          if (meteor.isDestroyed) {
-            this.createExplosion(meteor.x, meteor.y);
-            window.__chatWidget?.pushSystemMessage(`${meteor.id} を撃破しました`);
-            this.removeMeteor(ship.attackTargetMeteorId);
-            ship.attackTargetMeteorId = null;
-          }
-        }
-      } else if (dist <= ship.MISSILE_RANGE) {
-        // ミサイル射程内（100km < dist ≤ 300km）
-        const targetId = ship.attackTargetMeteorId;
-        const inFlightToTarget = ship.missilesInFlight.filter(m => m.targetMeteorId === targetId).length;
-
-        if (
-          ship.canFireMissile() &&
-          ship.missilesInFlight.length < ship.MISSILE_MAX_TOTAL &&
-          inFlightToTarget < ship.MISSILE_MAX_PER_TARGET &&
-          now - ship.lastMissileLaunchAt >= ship.MISSILE_LAUNCH_INTERVAL_MS
-        ) {
-          const missileId = `${ship.id}-missile-${now}`;
-          ship.missilesInFlight.push({
-            id: missileId,
-            x: ship.x,
-            y: ship.y,
-            targetMeteorId: targetId,
-            speed: ship.MISSILE_SPEED,
-          });
-          ship.lastMissileLaunchAt = now;
-          ship.missileAmmo--;
-          this.scene.showFloatingText(ship.x, ship.y, 'MISSILE LAUNCH', '#60a5fa');
+        if (meteor.isDestroyed) {
+          this.createExplosion(meteor.x, meteor.y);
+          window.__chatWidget?.pushSystemMessage(`${meteor.id} を撃破しました`);
+          this.removeMeteor(meteorId);
+          this.clearAttackTarget(ship, meteorId, attackType);
         }
       }
-      // dist > MISSILE_RANGE: 何もしない（飛翔中ミサイルは updateMissiles で継続）
+    } else if (dist <= ship.MISSILE_RANGE) {
+      // ミサイル射程内（100km < dist ≤ 300km）
+      const inFlightToTarget = ship.missilesInFlight.filter(m => m.targetMeteorId === meteorId).length;
+
+      if (
+        ship.canFireMissile() &&
+        ship.missilesInFlight.length < ship.MISSILE_MAX_TOTAL &&
+        inFlightToTarget < ship.MISSILE_MAX_PER_TARGET &&
+        now - ship.lastMissileLaunchAt >= ship.MISSILE_LAUNCH_INTERVAL_MS
+      ) {
+        const missileId = `${ship.id}-missile-${now}`;
+        ship.missilesInFlight.push({
+          id: missileId,
+          x: ship.x,
+          y: ship.y,
+          targetMeteorId: meteorId,
+          speed: ship.MISSILE_SPEED,
+        });
+        ship.lastMissileLaunchAt = now;
+        ship.missileAmmo--;
+        this.scene.showFloatingText(ship.x, ship.y, 'MISSILE LAUNCH', '#60a5fa');
+      }
+    }
+    // dist > MISSILE_RANGE: 何もしない（飛翔中ミサイルは updateMissiles で継続）
+  }
+
+  /**
+   * ヒット後の再攻撃タイマーを attackType に応じてセットする。
+   */
+  private setReAttackTimer(
+    ship: Spaceship,
+    meteorId: string,
+    attackType: 'passive' | 'explicit' | 'autoIntercept'
+  ): void {
+    if (attackType === 'passive') {
+      ship.passiveReAttackCooldown = ship.getPassiveReAttackDelay();
+    } else if (attackType === 'explicit') {
+      ship.explicitAttackDelayMs = ship.getExplicitAttackDelay();
+    } else {
+      ship.autoInterceptCooldowns.set(meteorId, ship.ATTACK_COOLDOWN_MS);
+    }
+  }
+
+  /**
+   * 撃破後に attackType に応じた攻撃ターゲットをクリアする。
+   */
+  private clearAttackTarget(
+    ship: Spaceship,
+    meteorId: string,
+    attackType: 'passive' | 'explicit' | 'autoIntercept'
+  ): void {
+    if (attackType === 'passive') {
+      ship.passiveAttackTargetId = null;
+      ship.passiveAttackTimers.delete(meteorId);
+    } else if (attackType === 'explicit') {
+      ship.attackTargetMeteorId = null;
+    } else {
+      ship.autoInterceptTargetIds = ship.autoInterceptTargetIds.filter(id => id !== meteorId);
+      ship.autoInterceptCooldowns.delete(meteorId);
     }
   }
 
   /**
    * 飛翔中ミサイルの位置更新・命中判定。
+   * 命中時に attackType に応じた再攻撃タイマーをセットする。
    */
   private updateMissiles(dt: number): void {
     for (const ship of this.scene.spaceships.values()) {
@@ -538,7 +661,6 @@ export class MeteorSystem {
       for (const missile of ship.missilesInFlight) {
         const meteor = this.meteors.get(missile.targetMeteorId);
         if (!meteor || meteor.isDestroyed) {
-          // ターゲット消滅 → 静かに削除
           toRemove.push(missile.id);
           continue;
         }
@@ -555,10 +677,20 @@ export class MeteorSystem {
           this.scene.showFloatingText(missile.x, missile.y, `MISSILE HIT -${ship.MISSILE_DAMAGE}`, '#60a5fa');
           toRemove.push(missile.id);
 
+          // ミサイルがどのモードで発射されたかを判定し、再攻撃タイマーをセット
+          const targetId = missile.targetMeteorId;
+          if (ship.passiveAttackTargetId === targetId) {
+            this.setReAttackTimer(ship, targetId, 'passive');
+          } else if (ship.autoInterceptTargetIds.includes(targetId)) {
+            this.setReAttackTimer(ship, targetId, 'autoIntercept');
+          } else if (ship.attackTargetMeteorId === targetId) {
+            this.setReAttackTimer(ship, targetId, 'explicit');
+          }
+
           if (meteor.isDestroyed) {
             window.__chatWidget?.pushSystemMessage(`${meteor.id} を撃破しました`);
-            this.removeMeteor(missile.targetMeteorId);
-            if (ship.attackTargetMeteorId === missile.targetMeteorId) {
+            this.removeMeteor(targetId);
+            if (ship.attackTargetMeteorId === targetId) {
               ship.attackTargetMeteorId = null;
             }
           }
@@ -792,6 +924,39 @@ export class MeteorSystem {
       }
       // 撃破された隕石に向かうミサイルを除去（他艦のものも含む）
       ship.missilesInFlight = ship.missilesInFlight.filter(m => m.targetMeteorId !== meteorId);
+    }
+  }
+
+  /**
+   * 各ユニットが2秒ごとにセンサーデータを sensorQueue に追加する。
+   * 基本: 1パケット、探知中隕石1体につき +floor(1.5)=+1、通信妨害時 +5。
+   */
+  private updateSensorDataGeneration(dt: number): void {
+    for (const ship of this.scene.spaceships.values()) {
+      ship.sensorDataTimer -= dt;
+      if (ship.sensorDataTimer > 0) continue;
+      ship.sensorDataTimer = 2000;
+
+      // 探知中の隕石数（この艦の探知圏内）
+      let detectedCount = 0;
+      for (const meteor of this.meteors.values()) {
+        if (!meteor.isDetected || meteor.isDestroyed) continue;
+        const d = CommunicationSystem.getDistance(ship.x, ship.y, meteor.x, meteor.y);
+        if (d <= ship.DETECTION_RANGE) detectedCount++;
+      }
+
+      const commStatus = ship.combatEquipment.comm;
+      const jamBonus = (commStatus === 'POOR' || commStatus === 'UNABLE') ? 5 : 0;
+      const total = 1 + Math.floor(detectedCount * 1.5) + jamBonus;
+
+      for (let i = 0; i < total; i++) {
+        ship.sensorQueue.push({
+          id: `sensor-${Date.now()}-${ship.id}-${i}`,
+          type: PacketType.SENSOR_DATA,
+          createdAt: Date.now(),
+          originShipId: ship.id
+        });
+      }
     }
   }
 

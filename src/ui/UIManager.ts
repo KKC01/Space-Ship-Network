@@ -487,17 +487,7 @@ export class UIManager {
       };
     }
 
-    // 矢印ボタンのトグル: right → left → both → right
-    const directionCycle: Record<string, string> = { right: 'left', left: 'both', both: 'right' };
-    const directionLabel: Record<string, string> = { right: '▶', left: '◀', both: '◀▶' };
-    document.querySelectorAll<HTMLButtonElement>('.transfer-arrow-btn').forEach(btn => {
-      btn.onclick = () => {
-        const current = btn.dataset.direction ?? 'right';
-        const next = directionCycle[current] ?? 'right';
-        btn.dataset.direction = next;
-        btn.textContent = directionLabel[next];
-      };
-    });
+    // 転送ボタンは updateTransferSettingsUI で動的生成するためここでは登録不要
   }
 
   private setupMissionPanelToggle(): void {
@@ -748,6 +738,51 @@ export class UIManager {
     }
   }
 
+  /**
+   * 転送設定UI を選択中ユニットの接続相手ごとに動的生成する。
+   * pollingList に含まれる各 targetId に対して ー→▶→◀→◀▶→ー のトグルボタンを表示。
+   */
+  private updateTransferSettingsUI(unit: Spaceship): void {
+    const container = document.getElementById('transfer-group-content');
+    if (!container) return;
+    container.innerHTML = '';
+
+    const cycle: Array<'none' | 'right' | 'left' | 'both'> = ['none', 'right', 'left', 'both'];
+    const label: Record<string, string> = { none: 'ー', right: '▶', left: '◀', both: '◀▶' };
+
+    for (const targetId of unit.pollingList) {
+      const dir = unit.transferDirections.get(targetId) ?? 'none';
+      const row = document.createElement('div');
+      row.style.cssText = 'display:flex;align-items:center;gap:6px;padding:4px 0;';
+
+      const nameSpan = document.createElement('span');
+      nameSpan.textContent = targetId;
+      nameSpan.style.cssText = 'flex:1;font-size:11px;color:#94a3b8;';
+
+      const btn = document.createElement('button');
+      btn.className = 'transfer-arrow-btn';
+      btn.dataset.targetId = targetId;
+      btn.textContent = label[dir];
+      btn.onclick = () => {
+        const cur = unit.transferDirections.get(targetId) ?? 'none';
+        const next = cycle[(cycle.indexOf(cur) + 1) % cycle.length];
+        unit.transferDirections.set(targetId, next);
+        btn.textContent = label[next];
+      };
+
+      row.appendChild(nameSpan);
+      row.appendChild(btn);
+      container.appendChild(row);
+    }
+
+    if (unit.pollingList.length === 0) {
+      const empty = document.createElement('p');
+      empty.textContent = '接続相手なし';
+      empty.style.cssText = 'font-size:11px;color:#64748b;padding:4px 0;';
+      container.appendChild(empty);
+    }
+  }
+
   private statusColor(level: 'GOOD' | 'POOR' | 'UNABLE'): string {
     if (level === 'GOOD') return '#4ade80';
     if (level === 'POOR') return '#facc15';
@@ -857,15 +892,15 @@ export class UIManager {
       hpBar.style.background = pct < 0.3 ? '#ef4444' : '#4ade80';
     }
 
-    // 未送信データバー（queue.length / 10 を割合とし段階配色）
+    // センサーデータバー（sensorQueue.length / 50 を割合とし段階配色）
     const dataBar = document.getElementById('unit-data-bar');
     if (dataBar) {
-      const dataPct = Math.min(1, unit.queue.length / 10);
+      const dataPct = Math.min(1, unit.sensorQueue.length / 50);
       dataBar.style.width = `${dataPct * 100}%`;
-      let color = '#38bdf8';            // <10%: 青
-      if (dataPct >= 0.8) color = '#a855f7';      // 80%以上: 紫
-      else if (dataPct >= 0.5) color = '#ef4444'; // 50〜80%: 赤
-      else if (dataPct >= 0.1) color = '#facc15'; // 10〜50%: 黄
+      let color = '#38bdf8';
+      if (dataPct >= 0.8) color = '#a855f7';
+      else if (dataPct >= 0.5) color = '#ef4444';
+      else if (dataPct >= 0.1) color = '#facc15';
       dataBar.style.background = color;
     }
 
@@ -874,6 +909,9 @@ export class UIManager {
     if (undockBtn) {
       undockBtn.classList.toggle('hidden', !unit.dockingPartnerId);
     }
+
+    // 転送設定UI: 接続相手ごとに動的生成
+    this.updateTransferSettingsUI(unit);
 
     // === 被害対処タブの描画 ===
     if (this.domDmgStatusArmor) {

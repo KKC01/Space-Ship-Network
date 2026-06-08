@@ -1,5 +1,5 @@
 import { CommunicationSystem } from '../models/CommunicationSystem';
-import { PacketType, SystemDisplayMode } from '../models/DataPacket';
+import { SystemDisplayMode } from '../models/DataPacket';
 import type { MainScene } from '../scenes/MainScene';
 
 /**
@@ -11,10 +11,13 @@ export class MissionManager {
   // 調査対象ポイント
   public readonly surveyPoint = { x: 3000, y: 3000, radius: 200 };
 
+  // 勝利条件: 調査ポイント内に10秒連続滞在
+  private readonly WIN_STAY_MS = 10000;
+  // shipId → そのユニットがポイントに入った時刻(ms)。ポイント外に出たら null 削除。
+  private surveyEntryTimes: Map<string, number> = new Map();
+
   // ミッション達成状況キャッシュ（ChatWidget 用）
   private missionReach: boolean = false;
-  private missionAllLinked: boolean = false;
-  private missionData: boolean = false;
 
   // window.__gameState 書き出しの 60 フレームごとカウンタ
   private gameStateTickCounter: number = 0;
@@ -72,7 +75,7 @@ export class MissionManager {
 
   private win(): void {
     this.gameOver = true;
-    this.scene.uiManager.showGameOver('MISSION SUCCESS', '調査データをHQに回収し、全部隊の安全を確保しました。');
+    this.scene.uiManager.showGameOver('MISSION SUCCESS', '調査対象ポイントへの10秒滞在を達成しました。');
   }
 
   isGameOver(): boolean {
@@ -80,64 +83,42 @@ export class MissionManager {
   }
 
   /**
-   * 3つのミッション達成条件をチェックし、UI 表示を更新する。
-   * 全達成で win() を呼ぶ。
+   * ミッション達成条件をチェックし、UI 表示を更新する。
+   * 条件: 任意のユニットが調査ポイントに10秒連続滞在
    */
   private checkWinLoss(): void {
     if (this.gameOver) return;
 
-    let reachSuccess = false;
-    let allLinkedSuccess = true;
-    let dataSuccess = false;
-
+    const now = this.scene.getTimeElapsedMs();
     const activeUnits = Array.from(this.scene.spaceships.values());
-    const hqNode = activeUnits.find(s => s.id === 'L-Dest1');
-    const nodes = activeUnits.filter(s => s.isNodeActive);
-    const planets = this.scene.planetSystem.getPlanets();
+    let reachSuccess = false;
+    let staySeconds = 0;
 
     for (const ship of activeUnits) {
-      // 1. Survey Point Reach
       const dist = CommunicationSystem.getDistance(ship.x, ship.y, this.surveyPoint.x, this.surveyPoint.y);
       if (dist < this.surveyPoint.radius) {
         reachSuccess = true;
-        if (this.scene.getTimeElapsedMs() % 1000 < 20 && !ship.queue.some(p => p.type === PacketType.SURVEY_DATA)) {
-          ship.receivePacket({
-            id: `survey-${Date.now()}-${ship.id}`,
-            type: PacketType.SURVEY_DATA,
-            createdAt: Date.now(),
-            originShipId: ship.id
-          });
-          this.scene.showFloatingText(ship.x, ship.y, 'データ収集', '#eab308');
+        if (!this.surveyEntryTimes.has(ship.id)) {
+          this.surveyEntryTimes.set(ship.id, now);
         }
-      }
-
-      // 2. All Linked Success (HQ への接続を全船が確保)
-      if (hqNode) {
-        const { canConnect } = CommunicationSystem.getLinkQuality(ship, hqNode, nodes, planets);
-        if (!canConnect && ship.id !== hqNode.id) {
-          allLinkedSuccess = false;
+        const elapsed = now - this.surveyEntryTimes.get(ship.id)!;
+        staySeconds = Math.max(staySeconds, Math.floor(elapsed / 1000));
+        if (elapsed >= this.WIN_STAY_MS) {
+          this.win();
+          return;
         }
+      } else {
+        // ポイント外に出たらリセット
+        this.surveyEntryTimes.delete(ship.id);
       }
     }
-
-    // 3. Survey Data recovered at HQ
-    if (hqNode && hqNode.queue.some(p => p.type === PacketType.SURVEY_DATA)) {
-      dataSuccess = true;
-    }
-
-    const mReach = document.getElementById('m-reach');
-    const mAllLink = document.getElementById('m-all-link');
-    const mData = document.getElementById('m-data');
-    if (mReach) mReach.innerHTML = `<span class="check">${reachSuccess ? '[x]' : '[ ]'}</span> 調査対象ポイントへの到達`;
-    if (mAllLink) mAllLink.innerHTML = `<span class="check">${allLinkedSuccess ? '[x]' : '[ ]'}</span> 全ユニットの通信確保`;
-    if (mData) mData.innerHTML = `<span class="check">${dataSuccess ? '[x]' : '[ ]'}</span> 調査データの転送・回収`;
 
     this.missionReach = reachSuccess;
-    this.missionAllLinked = allLinkedSuccess;
-    this.missionData = dataSuccess;
 
-    if (reachSuccess && allLinkedSuccess && dataSuccess) {
-      this.win();
+    const mLog = document.getElementById('mission-log');
+    if (mLog) {
+      const stayDisplay = reachSuccess ? ` (${staySeconds}/${this.WIN_STAY_MS / 1000}秒)` : '';
+      mLog.innerHTML = `<span style="color:${reachSuccess ? '#4ade80' : '#94a3b8'}">${reachSuccess ? '[x]' : '[ ]'} 調査ポイント到達${stayDisplay}</span>`;
     }
   }
 
@@ -154,8 +135,6 @@ export class MissionManager {
       selectedUnitId: this.scene.selectedUnitId,
       selectedUnitHp: selectedHp,
       missionReach: this.missionReach,
-      missionAllLinked: this.missionAllLinked,
-      missionData: this.missionData,
       elapsedSeconds: Math.floor(this.scene.getTimeElapsedMs() / 1000),
       gameMode: this.scene.systemDisplayMode === SystemDisplayMode.CONTROL ? 'control' : 'combat',
       gameStatus: this.scene.isBriefingActive ? 'briefing' : this.gameOver ? 'won' : 'active',

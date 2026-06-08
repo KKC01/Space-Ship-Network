@@ -36,6 +36,12 @@
         "mcp-obsidian",
         "/mnt/obsidian"
       ]
+    },
+    "agy": {
+      "command": "python3",
+      "args": [
+        "/home/node/.local/share/agy-mcp/server.py"
+      ]
     }
   }
 }

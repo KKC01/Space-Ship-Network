@@ -57,6 +57,12 @@ export class Spaceship {
   public readonly MAX_SPEED = 50;
   
   public queue: DataPacket[] = [];
+  // センサーデータ専用キュー（CMD/RGR との混在を回避）
+  public sensorQueue: DataPacket[] = [];
+  // センサーデータ生成タイマー（2000ms ごとに生成）
+  public sensorDataTimer: number = 2000;
+  // 接続相手ごとの転送方向設定
+  public transferDirections: Map<string, 'none' | 'right' | 'left' | 'both'> = new Map();
   public level: number;
   
   public isShortEnabled: boolean = true;
@@ -122,6 +128,22 @@ export class Spaceship {
   public readonly DETECTION_RANGE: number = 400;  // 探知距離: 外側サークルと一致
   public readonly ATTACK_DAMAGE: number = 25;
   public readonly ATTACK_COOLDOWN_MS: number = 1000;
+
+  // 常時自動攻撃（受動）
+  // meteorId → 探知タイムスタンプ(ms)
+  public passiveAttackTimers: Map<string, number> = new Map();
+  // ヒット後再攻撃待機残り(ms)
+  public passiveReAttackCooldown: number = 0;
+  // 現在の受動攻撃対象
+  public passiveAttackTargetId: string | null = null;
+
+  // 明示的攻撃の遅延
+  public explicitAttackDelayMs: number = 0;
+
+  // autoIntercept 3目標管理
+  public autoInterceptTargetIds: string[] = [];
+  // meteorId → クールダウン残り(ms)
+  public autoInterceptCooldowns: Map<string, number> = new Map();
 
   // ミサイル定数
   public readonly MISSILE_RANGE: number = 300;
@@ -299,7 +321,8 @@ export class Spaceship {
     }
     
     const now = Date.now();
-    this.queue = this.queue.filter(p => (now - p.createdAt) < 90000);
+    this.queue = this.queue.filter(p => (now - p.createdAt) < 60000);
+    this.sensorQueue = this.sensorQueue.filter(p => (now - p.createdAt) < 60000);
   }
 
   public receivePacket(packet: DataPacket) {
@@ -434,5 +457,20 @@ export class Spaceship {
 
   public canFireLaser(): boolean {
     return this.laserAmmo > 0 && this.weaponStatus.laser !== 'UNABLE';
+  }
+
+  /** 探知から攻撃開始までの遅延(ms)。L1=10000ms, L5=5000ms */
+  public getPassiveAttackDelay(): number {
+    return (10 - (this.level - 1) * 1.25) * 1000;
+  }
+
+  /** ヒット後の再攻撃待機時間(ms)。L1=5000ms, L5=2500ms */
+  public getPassiveReAttackDelay(): number {
+    return (5 - (this.level - 1) * 0.625) * 1000;
+  }
+
+  /** 明示的攻撃指示後の遅延(ms)。L1-2=2000ms, L3-5=0ms */
+  public getExplicitAttackDelay(): number {
+    return this.level <= 2 ? 2000 : 0;
   }
 }

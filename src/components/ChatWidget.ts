@@ -267,8 +267,6 @@ export class ChatWidget {
       selected_unit: s.selectedUnitId ?? '',
       selected_unit_hp: s.selectedUnitHp !== null ? String(s.selectedUnitHp) : '',
       mission_reach: String(s.missionReach),
-      mission_all_linked: String(s.missionAllLinked),
-      mission_data: String(s.missionData),
       elapsed_seconds: String(s.elapsedSeconds),
       game_mode: s.gameMode,
       game_status: s.gameStatus,

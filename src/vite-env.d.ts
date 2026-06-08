@@ -22,8 +22,6 @@ interface GameStateSnapshot {
   selectedUnitId: string | null;
   selectedUnitHp: number | null;
   missionReach: boolean;
-  missionAllLinked: boolean;
-  missionData: boolean;
   elapsedSeconds: number;
   gameMode: 'control' | 'combat';
   gameStatus: 'briefing' | 'active' | 'won';

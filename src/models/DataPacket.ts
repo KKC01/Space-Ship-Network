@@ -4,7 +4,7 @@ export enum PacketType {
   FREQ_CHANGE = 'FREQ_CHANGE',
   CMD = 'CMD',
   RGR = 'RGR',
-  SURVEY_DATA = 'SURVEY_DATA'
+  SENSOR_DATA = 'SENSOR_DATA'
 }
 
 export type FreqShort = 'A' | 'B' | 'C';

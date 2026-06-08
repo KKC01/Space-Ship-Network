@@ -368,6 +368,13 @@ export class CommunicationManager {
           successfulNodePackets.forEach(p => target.receivePacket(p));
           this.recordLinkSuccess(node.id, target.id);
         }
+
+        // SENSOR_DATA の転送（消費あり・ループ防止・転送設定に従う）
+        const via = 'radio';
+        const freq = poll.rangeMode === 'long'
+          ? (node.isLongEnabled ? node.longFreq : target.longFreq)
+          : (node.isShortEnabled ? node.shortFreq : target.shortFreq);
+        this.applySensorTransfer(node, target, via, freq);
       }
 
       // 2. 復路ブロードキャスト（金色の波が拡大して周辺船にデータ伝搬）
@@ -398,6 +405,52 @@ export class CommunicationManager {
           }
           this.activePolls.splice(i, 1);
         }
+      }
+    }
+  }
+
+  /**
+   * SENSOR_DATA をセンサーキューから消費転送する。
+   * - ▶(right): このユニット → 相手。◀(left): 相手 → このユニット。◀▶(both): 双方向。
+   * - ループ防止: sensorVia + sensorFreq が一致するパケットは転送しない。
+   */
+  private applySensorTransfer(
+    node: Spaceship,
+    target: Spaceship,
+    via: string,
+    freq: string
+  ): void {
+    const nd = node.transferDirections.get(target.id) ?? 'none';
+    const td = target.transferDirections.get(node.id) ?? 'none';
+
+    // node → target: node が ▶/◀▶、または target が ◀/◀▶
+    const nodeToTarget = nd === 'right' || nd === 'both' || td === 'left' || td === 'both';
+    // target → node: target が ▶/◀▶、または node が ◀/◀▶
+    const targetToNode = td === 'right' || td === 'both' || nd === 'left' || nd === 'both';
+
+    if (nodeToTarget) {
+      const toSend = node.sensorQueue.filter(p =>
+        p.type === PacketType.SENSOR_DATA &&
+        !(p.payload?.sensorVia === via && p.payload?.sensorFreq === freq)
+      );
+      if (toSend.length > 0) {
+        toSend.forEach(p =>
+          target.sensorQueue.push({ ...p, payload: { ...(p.payload ?? {}), sensorVia: via, sensorFreq: freq } })
+        );
+        node.sensorQueue = node.sensorQueue.filter(p => !toSend.includes(p));
+      }
+    }
+
+    if (targetToNode) {
+      const toSend = target.sensorQueue.filter(p =>
+        p.type === PacketType.SENSOR_DATA &&
+        !(p.payload?.sensorVia === via && p.payload?.sensorFreq === freq)
+      );
+      if (toSend.length > 0) {
+        toSend.forEach(p =>
+          node.sensorQueue.push({ ...p, payload: { ...(p.payload ?? {}), sensorVia: via, sensorFreq: freq } })
+        );
+        target.sensorQueue = target.sensorQueue.filter(p => !toSend.includes(p));
       }
     }
   }

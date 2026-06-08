@@ -373,39 +373,8 @@
         <div id="rgr-list" style="font-size: 11px; max-height: 150px; overflow-y: auto;"></div>
       </div>
 
-      <!-- 転送設定コンテンツ -->
-      <div id="transfer-group-content" class="accordion-content">
-        <div class="transfer-row" data-pair="tcp-legacy">
-          <span class="transfer-label">星間通信</span>
-          <button class="transfer-arrow-btn" data-pair="tcp-legacy" data-direction="right">▶</button>
-          <span class="transfer-label">レガシー星間通信</span>
-        </div>
-        <div class="transfer-row" data-pair="tcp-mux">
-          <span class="transfer-label">星間通信</span>
-          <button class="transfer-arrow-btn" data-pair="tcp-mux" data-direction="right">▶</button>
-          <span class="transfer-label">多重通信</span>
-        </div>
-        <div class="transfer-row" data-pair="tcp-optical">
-          <span class="transfer-label">星間通信</span>
-          <button class="transfer-arrow-btn" data-pair="tcp-optical" data-direction="both">◀▶</button>
-          <span class="transfer-label">光通信</span>
-        </div>
-        <div class="transfer-row" data-pair="optical-legacy">
-          <span class="transfer-label">光通信</span>
-          <button class="transfer-arrow-btn" data-pair="optical-legacy" data-direction="left">◀</button>
-          <span class="transfer-label">レガシー星間通信</span>
-        </div>
-        <div class="transfer-row" data-pair="mux-legacy">
-          <span class="transfer-label">多重通信</span>
-          <button class="transfer-arrow-btn" data-pair="mux-legacy" data-direction="right">▶</button>
-          <span class="transfer-label">レガシー星間通信</span>
-        </div>
-        <div class="transfer-row" data-pair="mux-optical">
-          <span class="transfer-label">多重通信</span>
-          <button class="transfer-arrow-btn" data-pair="mux-optical" data-direction="right">▶</button>
-          <span class="transfer-label">光通信</span>
-        </div>
-      </div>
+      <!-- 転送設定コンテンツ（接続相手ごとに動的生成） -->
+      <div id="transfer-group-content" class="accordion-content"></div>
 
       <!-- 背景雑音コンテンツ -->
       <div id="noise-monitor-video-container" style="margin-top: 8px; display: none;">
