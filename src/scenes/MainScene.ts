@@ -268,8 +268,15 @@ export class MainScene extends Scene {
     if (this.meteorSystem.handleClick(worldX, worldY)) return;
 
     const zoom = this.cameras.main.zoom;
+    // 画面上 30px 相当をワールド座標に変換した最低タップ半径
+    // ズームアウト時（zoom < 1）でも選択しやすいよう、アイコンスケール k に連動した半径も考慮する
+    const ICON_SCALE = 0.55;
+    const k = Math.max(1, 1 / zoom) * ICON_SCALE;
+    const screenMinPx = 30;                    // 最低タップ半径（画面ピクセル）
+    const iconRadius = 45 * k;                  // HQ アイコン外接円（最大アイコン）
+    const hitRadius = Math.max(screenMinPx / zoom, iconRadius * 0.8);
     let clickedId: string | null = null;
-    let minDist = 30 / zoom;
+    let minDist = hitRadius;
     for (const [id, ship] of this.spaceships.entries()) {
       const d = CommunicationSystem.getDistance(worldX, worldY, ship.x, ship.y);
       if (d < minDist) { minDist = d; clickedId = id; }
@@ -1265,12 +1272,16 @@ export class MainScene extends Scene {
   private applyLabelScaleAndDeclutter(): void {
     const cam = this.cameras.main;
     const k = Math.max(1, 1 / cam.zoom);
+    // ズームに応じてフォントサイズを変更することでぼやけを防ぐ（setScale より高品質）
+    const baseFontSize = 12;
+    const fontSize = Math.round(baseFontSize * k);
 
     // 表示中ラベルにスケールを適用しつつ、画面座標と優先度を収集
     const visible: { label: Phaser.GameObjects.Text; sx: number; sy: number; priority: number }[] = [];
     for (const [id, label] of this.textLabels) {
       if (!label.visible) continue;
-      label.setScale(k);
+      label.setFontSize(fontSize);
+      label.setScale(1);
       const sx = (label.x - cam.worldView.x) * cam.zoom;
       const sy = (label.y - cam.worldView.y) * cam.zoom;
       // 優先度: 選択中 > HQ(L-Dest1) > その他
