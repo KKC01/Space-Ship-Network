@@ -1,0 +1,26 @@
+# =====================================================================
+# agy（Antigravity CLI）の認証を全プロジェクトで共有するための追記スニペット。
+# 各プロジェクトの .devcontainer/docker-compose.yml に、以下の【2か所】を足す。
+# =====================================================================
+
+# 【1】 対象サービス（devcontainerが使うサービス）の volumes: に1行追加
+#       例:
+#   services:
+#     app:
+#       volumes:
+#         - ..:/workspace:cached
+#         - agy-config:/root/.gemini   # ← これを追加（agyの実際の設定先は /root/.gemini）
+
+# 【2】 トップレベルの volumes: に共有ボリューム定義を追加
+#       name を固定することで compose のプロジェクト名プレフィックスが付かず、
+#       全プロジェクトで同一ボリュームを共有できる（＝ログインを使い回せる）。
+#   volumes:
+#     agy-config:
+#       name: agy-config
+
+# --- devcontainer.json で直接 mounts を書く構成の場合は代わりにこちら ---
+#   "mounts": [
+#     "source=agy-config,target=/root/.gemini,type=volume"
+#   ]
+#   ※ この方式だとボリュームは自動作成されるが name 固定の概念がないため、
+#     複数プロジェクトで確実に共有したいなら docker-compose 方式（上）を推奨。

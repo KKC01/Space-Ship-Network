@@ -1,0 +1,33 @@
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    volumes:
+      - ..:/workspace:cached
+      # Claude Code の状態（settings/CLAUDE.md/認証/会話履歴/memory）は
+      # devcontainer.json の mounts でホストの実際の ~/.claude をバインドマウントする
+      # （ユーザーレベルのグローバル設定・rtkフック等を全プロジェクトで共有するため）。
+      # Antigravity CLI（agy）の認証・設定は /root/.gemini に保存される
+      # （oauth-token・projects設定など）。name を固定した全プロジェクト共有ボリュームで
+      # 再構築をまたいでログイン状態を維持する。
+      - agy-config:/root/.gemini
+      # Obsidian等のホスト側ナレッジベースを使う場合はこの行を有効化し、
+      # ホスト側の .env（このファイルと同じ階層）に
+      # OBSIDIAN_VAULT_PATH=/path/to/vault を設定する。
+      # - ${OBSIDIAN_VAULT_PATH}:/mnt/obsidian:cached
+      # 兄弟コンテナ（例: このプロジェクトが依存する別サービス）を操作する必要が
+      # なければ、この行と下記の docker.io インストールは削除してよい。
+      - /var/run/docker.sock:/var/run/docker.sock
+    restart: unless-stopped
+    command: sleep infinity
+    # プロジェクト固有の依存サービス（DB、外部エンジンなど）があれば
+    # ここに追記し、depends_on で app サービスに紐付ける。
+    # depends_on:
+    #   - some-service
+
+volumes:
+  # name を固定して compose のプロジェクト名プレフィックスを付けず、
+  # 全プロジェクトで同一ボリュームを共有する（同じ name を書けば認証を使い回せる）。
+  agy-config:
+    name: agy-config

@@ -1,0 +1,9 @@
+{
+  "name": "devcontainer-template-mcp",
+  "private": true,
+  "type": "module",
+  "dependencies": {
+    "@google/genai": "^0.3.0",
+    "canvas": "^2.11.2"
+  }
+}

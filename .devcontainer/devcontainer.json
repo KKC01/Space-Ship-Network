@@ -14,11 +14,15 @@
 
   "mounts": [
     "source=${localEnv:USERPROFILE}\\.claude,target=/home/node/.claude,type=bind,consistency=cached",
-    "source=${localEnv:USERPROFILE}\\Documents\\Obsidian\\自分用PC,target=/mnt/obsidian,type=bind,consistency=cached",
+    "source=${localEnv:USERPROFILE}\\Documents\\Obsidian\\APP\\SpaceShip,target=/mnt/obsidian,type=bind,consistency=cached",
     "source=${localEnv:USERPROFILE}\\Documents\\Obsidian\\IT勉強,target=/mnt/obsidian_it,type=bind,consistency=cached"
   ],
 
   "postCreateCommand": "npm install",
+
+  "remoteEnv": {
+    "PATH": "${containerEnv:PATH}:/home/node/.local/bin"
+  },
 
   "remoteUser": "node",
 

@@ -1,0 +1,25 @@
+[mcp_servers.gemini]
+args = [".devcontainer/mcp/gemini-image-mcp.js"]
+command = "node"
+env_vars = ["GEMINI_API_KEY"]
+
+[mcp_servers.playwright]
+args = [
+    "-y",
+    "@playwright/mcp@latest",
+]
+command = "npx"
+
+[mcp_servers.obsidian]
+command = "npx"
+args = [
+    "-y",
+    "mcp-obsidian",
+    "/mnt/obsidian",
+]
+
+[shell_environment_policy]
+inherit = "core"
+
+[shell_environment_policy.set]
+GEMINI_API_KEY = ""

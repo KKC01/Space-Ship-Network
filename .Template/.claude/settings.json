@@ -1,0 +1,45 @@
+{
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Read|Edit|Write|Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash .claude/hooks/block-sensitive-files.sh",
+            "statusMessage": "機密ファイルチェック中..."
+          }
+        ]
+      }
+    ],
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node .claude/hooks/obsidian-session-context.cjs"
+          }
+        ]
+      },
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node .claude/hooks/first-run-setup.cjs"
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "test -d /mnt/obsidian && echo '[handoff] セッション終了前に /mnt/obsidian/_handoff/current-session.md を更新しましたか？' || true",
+            "statusMessage": "handoff チェック"
+          }
+        ]
+      }
+    ]
+  }
+}

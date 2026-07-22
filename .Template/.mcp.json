@@ -1,0 +1,17 @@
+{
+  "mcpServers": {
+    "playwright": {
+      "command": "npx",
+      "args": ["-y", "@playwright/mcp@latest"]
+    },
+    "obsidian": {
+      "command": "npx",
+      "args": ["-y", "mcp-obsidian", "/mnt/obsidian"]
+    },
+    "gemini": {
+      "command": "node",
+      "args": ["--env-file=.env", ".devcontainer/mcp/gemini-image-mcp.js"],
+      "env": {}
+    }
+  }
+}
