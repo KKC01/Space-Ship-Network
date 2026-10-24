@@ -24,17 +24,18 @@ def f(size, mono=False):
     return _fc[key]
 
 
-BG = (11, 17, 32)
-PANEL = (24, 33, 52)
-LINE = (51, 65, 85)
-TXT = (241, 245, 249)
-DIM = (148, 163, 184)
-C_SYN = (56, 189, 248)
-C_SYNACK = (167, 139, 250)
-C_ACK = (74, 222, 128)
-C_ATK = (248, 113, 113)
-C_WARN = (250, 204, 21)
-C_COOKIE = (251, 146, 60)
+BG = (234, 241, 250)
+PANEL = (255, 255, 255)
+LINE = (176, 188, 206)
+TXT = (20, 22, 30)
+DIM = (100, 112, 132)
+C_SYN = (2, 132, 199)
+C_SYNACK = (124, 58, 237)
+C_ACK = (22, 163, 74)
+C_ATK = (220, 38, 38)
+C_WARN = (202, 138, 4)
+C_COOKIE = (234, 88, 12)
+ON_COLOR = (255, 255, 255)
 
 CREAM = (247, 242, 230)
 INK = (20, 22, 30)
@@ -74,10 +75,10 @@ def tc(d, xy, s, font, fill, **kw):
 # ======================================================================
 SW, SH = 1350, 1062
 NP = {
-    "client": (260, 200),
-    "attacker": (260, 820),
-    "server": (1040, 480),
-    "cloud": (660, 950),
+    "client": (215, 190),
+    "attacker": (215, 790),
+    "server": (1100, 450),
+    "cloud": (660, 960),
 }
 N_SLOTS = 8
 
@@ -87,8 +88,8 @@ def edge_points(src, dst):
     dx, dy = x1 - x0, y1 - y0
     dd = math.hypot(dx, dy)
     ux, uy = dx / dd, dy / dd
-    o0 = 80 if src == "cloud" else 135
-    o1 = 80 if dst == "cloud" else 135
+    o0 = 95 if src == "cloud" else 185
+    o1 = 95 if dst == "cloud" else 185
     return (x0 + ux * o0, y0 + uy * o0), (x1 - ux * o1, y1 - uy * o1)
 
 
@@ -96,24 +97,24 @@ def node(d, key, name, sub, state, color, alpha=1.0):
     if alpha <= 0:
         return
     x, y = NP[key]
-    d.rounded_rectangle((x - 135, y - 62, x + 135, y + 62), 18,
+    d.rounded_rectangle((x - 185, y - 85, x + 185, y + 85), 22,
                         fill=mix(BG, PANEL, alpha), outline=mix(BG, color, alpha), width=5)
-    tc(d, (x, y - 20), name, f(42), mix(BG, TXT, alpha))
-    tc(d, (x, y + 26), sub, f(26, True), mix(BG, DIM, alpha))
+    tc(d, (x, y - 25), name, f(60), mix(BG, TXT, alpha))
+    tc(d, (x, y + 38), sub, f(36, True), mix(BG, DIM, alpha))
     if state:
         s, sc = state
-        tc(d, (x, y + 96), s, f(34), mix(BG, sc, alpha))
+        tc(d, (x, y + 128), s, f(50), mix(BG, sc, alpha), stroke_width=1, stroke_fill=mix(BG, sc, alpha))
 
 
 def cloud(d, alpha=1.0):
     if alpha <= 0:
         return
     x, y = NP["cloud"]
-    c = mix(BG, (71, 85, 105), alpha)
-    for dx, dy, r in [(-90, 6, 44), (-34, -20, 54), (38, -14, 50), (94, 8, 42), (0, 20, 50)]:
+    c = mix(BG, (203, 213, 225), alpha)
+    for dx, dy, r in [(-120, 6, 56), (-45, -26, 70), (50, -18, 64), (125, 10, 54), (0, 26, 64)]:
         d.ellipse((x + dx - r, y + dy - r, x + dx + r, y + dy + r), fill=c)
-    tc(d, (x, y - 6), "偽装された送信元IP", f(30), mix(BG, TXT, alpha))
-    tc(d, (x, y + 32), "(存在しない/応答しない)", f(22), mix(BG, DIM, alpha))
+    tc(d, (x, y - 10), "偽装された送信元IP", f(42), mix(BG, TXT, alpha))
+    tc(d, (x, y + 40), "(存在しない/応答しない)", f(30), mix(BG, DIM, alpha))
 
 
 def packet(d, pk, t):
@@ -123,40 +124,40 @@ def packet(d, pk, t):
     a, b = edge_points(pk["src"], pk["dst"])
     col = pk["color"]
     if t <= t1:
-        d.line((a, b), fill=mix(BG, col, 0.35), width=3)
+        d.line((a, b), fill=mix(BG, col, 0.4), width=4)
         p = ease((t - t0) / (t1 - t0))
         x, y = lerp(a[0], b[0], p), lerp(a[1], b[1], p)
         fade = clamp((1 - p) / 0.25) if pk.get("lost") else 1.0
         label = pk["label"]
-        tw = d.textlength(label, font=f(32)) + 30
-        d.rounded_rectangle((x - tw / 2, y - 27, x + tw / 2, y + 27), 13,
-                            fill=mix(BG, col, 0.92 * fade), outline=mix(BG, (255, 255, 255), 0.7 * fade), width=2)
-        tc(d, (x, y), label, f(32), mix(BG, (10, 15, 25), fade))
+        tw = d.textlength(label, font=f(46)) + 40
+        d.rounded_rectangle((x - tw / 2, y - 36, x + tw / 2, y + 36), 16,
+                            fill=mix(BG, col, fade), outline=mix(BG, TXT, 0.8 * fade), width=3)
+        tc(d, (x, y), label, f(46), mix(BG, ON_COLOR, fade), stroke_width=1, stroke_fill=mix(BG, ON_COLOR, fade))
     elif pk.get("drop") and t < t1 + 1.0:
         x, y = b
         c = mix(BG, C_ATK, 1 - (t - t1))
-        d.line((x - 26, y - 26, x + 26, y + 26), fill=c, width=9)
-        d.line((x - 26, y + 26, x + 26, y - 26), fill=c, width=9)
-        tc(d, (x, y - 48), "破棄", f(32), c)
+        d.line((x - 34, y - 34, x + 34, y + 34), fill=c, width=12)
+        d.line((x - 34, y + 34, x + 34, y - 34), fill=c, width=12)
+        tc(d, (x, y - 64), "破棄", f(46), c)
     elif pk.get("lost") and t < t1 + 0.8:
         x, y = b
-        tc(d, (x + 28, y - 28), "?", f(50), mix(BG, DIM, 1 - (t - t1) / 0.8))
+        tc(d, (x + 34, y - 40), "?", f(64), mix(BG, DIM, 1 - (t - t1) / 0.8))
 
 
 def mini_backlog(d, used, color):
     """サーバの下に 8 マスのバックログ表示"""
     x, y = NP["server"]
-    y += 136
-    cw, gap = 30, 7
+    y += 190
+    cw, gap = 38, 8
     x0 = x - (N_SLOTS * (cw + gap) - gap) / 2
     for i in range(N_SLOTS):
         cx = x0 + i * (cw + gap)
-        box = (cx, y, cx + cw, y + 38)
+        box = (cx, y, cx + cw, y + 48)
         if i < used:
             d.rounded_rectangle(box, 5, fill=color)
         else:
             d.rounded_rectangle(box, 5, outline=LINE, width=2)
-    tc(d, (x, y + 66), f"バックログ {used}/{N_SLOTS}", f(28), color if used else DIM)
+    tc(d, (x, y + 86), f"バックログ {used}/{N_SLOTS}", f(40), color if used else DIM)
 
 
 def mk(t0, dt, src, dst, label, color, **kw):
@@ -273,17 +274,17 @@ def draw_cookie(d, tk):
 # ---- 時系列グラフ ----
 def draw_graph(d, p):
     x0, y0, x1, y1 = 40, 30, SW - 40, SH - 20
-    tc(d, ((x0 + x1) / 2, y0 + 20), "半開接続数(SYN_RCVD)の推移", f(40), TXT)
-    gx0, gy0, gx1, gy1 = x0 + 80, y0 + 100, x1 - 30, y1 - 60
+    tc(d, ((x0 + x1) / 2, y0 + 20), "半開接続数(SYN_RCVD)の推移", f(54), TXT)
+    gx0, gy0, gx1, gy1 = x0 + 80, y0 + 120, x1 - 30, y1 - 70
     d.line((gx0, gy1, gx1, gy1), fill=LINE, width=3)
     d.line((gx0, gy0, gx0, gy1), fill=LINE, width=3)
     d.line((gx0, gy0, gx1, gy0), fill=mix(BG, C_ATK, 0.6), width=2)
-    d.text((gx0 - 14, gy0), str(N_SLOTS), font=f(30), fill=C_ATK, anchor="rm")
-    d.text((gx0 - 14, gy1), "0", font=f(30), fill=DIM, anchor="rm")
-    d.text((gx1, gy0 - 26), "上限(バックログ)", font=f(26), fill=C_ATK, anchor="rm")
+    d.text((gx0 - 14, gy0), str(N_SLOTS), font=f(40), fill=C_ATK, anchor="rm")
+    d.text((gx0 - 14, gy1), "0", font=f(40), fill=DIM, anchor="rm")
+    d.text((gx1, gy0 - 26), "上限(バックログ)", font=f(36), fill=C_ATK, anchor="rm")
     for s in range(0, int(FLOOD_DUR) + 1, 4):
         sx = gx0 + (gx1 - gx0) * s / FLOOD_DUR
-        tc(d, (sx, gy1 + 32), f"{s}s", f(26), DIM)
+        tc(d, (sx, gy1 + 38), f"{s}s", f(36), DIM)
     tmax = FLOOD_DUR * p
     pts = []
     for k in range(321):
@@ -292,7 +293,7 @@ def draw_graph(d, p):
             break
         pts.append((gx0 + (gx1 - gx0) * tt / FLOOD_DUR, gy1 - (gy1 - gy0) * flood_count(tt) / N_SLOTS))
     if len(pts) > 1:
-        d.line(pts, fill=C_WARN, width=7)
+        d.line(pts, fill=C_WARN, width=9)
     marks = [(0.3, "攻撃開始", C_ATK, 0.25), (FLOOD_ARR[-1], "満杯", C_ATK, 0.45), (11.4, "正規SYN破棄", C_SYN, 0.7)]
     for tt, label, c, ly in marks:
         if tt > tmax:
@@ -300,22 +301,22 @@ def draw_graph(d, p):
         mx = gx0 + (gx1 - gx0) * tt / FLOOD_DUR
         d.line((mx, gy0, mx, gy1), fill=mix(BG, c, 0.7), width=2)
         my = gy0 + (gy1 - gy0) * ly
-        tw = d.textlength(label, font=f(30)) + 18
-        d.rounded_rectangle((mx + 6, my - 22, mx + 6 + tw, my + 22), 8, fill=mix(BG, c, 0.85))
-        d.text((mx + 15, my), label, font=f(30), fill=(10, 15, 25), anchor="lm")
+        tw = d.textlength(label, font=f(42)) + 22
+        d.rounded_rectangle((mx + 6, my - 30, mx + 6 + tw, my + 30), 10, fill=c)
+        d.text((mx + 17, my), label, font=f(42), fill=ON_COLOR, anchor="lm")
 
 
 # ---- 比較表 ----
 def draw_compare(d, t):
-    tc(d, (SW / 2, 100), "対策なし vs SYN Cookie", f(50), TXT)
+    tc(d, (SW / 2, 100), "対策なし vs SYN Cookie", f(62), TXT)
     rows = [
         ("", "対策なし", "SYN Cookie"),
         ("偽装SYNが来ると", "1件ごとに枠を消費", "枠を消費しない"),
         ("バックログ", "すぐ満杯", "空のまま"),
         ("正規ユーザー", "× 接続できない", "○ 接続できる"),
     ]
-    xs = [110, 470, 860]
-    ws = [360, 390, 390]
+    xs = [30, 440, 890]
+    ws = [410, 450, 430]
     for r, row in enumerate(rows):
         a = clamp((t - 0.3 - r * 0.5) / 0.4)
         y = 190 + r * 200
@@ -324,14 +325,15 @@ def draw_compare(d, t):
                 continue
             col, fg = PANEL, TXT
             if r == 0:
-                col = mix(BG, C_ATK if c == 1 else C_ACK, 0.6)
+                col = C_ATK if c == 1 else C_ACK
+                fg = ON_COLOR
             elif c == 1:
                 fg = C_ATK
             elif c == 2:
                 fg = C_ACK
             d.rounded_rectangle((xs[c], y, xs[c] + ws[c] - 12, y + 135), 16,
                                 fill=mix(BG, col, a), outline=mix(BG, LINE, a), width=2)
-            tc(d, (xs[c] + (ws[c] - 12) / 2, y + 67), cell, f(36 if r else 40), mix(BG, fg, a))
+            tc(d, (xs[c] + (ws[c] - 12) / 2, y + 67), cell, f(44 if r else 52), mix(BG, fg, a))
 
 
 def draw_shield(d, t):
@@ -340,7 +342,7 @@ def draw_shield(d, t):
     r = 300 * (0.8 + 0.2 * a)
     pts = [(x, y - r), (x + r * 0.85, y - r * 0.6), (x + r * 0.75, y + r * 0.35), (x, y + r),
            (x - r * 0.75, y + r * 0.35), (x - r * 0.85, y - r * 0.6)]
-    d.polygon(pts, fill=mix(BG, (22, 101, 52), a))
+    d.polygon(pts, fill=mix(BG, (220, 252, 231), a))
     d.line(pts + [pts[0]], fill=mix(BG, C_ACK, a), width=10)
     tc(d, (x, y - 50), "SYN Flood", f(70), mix(BG, TXT, a))
     tc(d, (x, y + 45), "仕組みを知って防ぐ", f(48), mix(BG, C_ACK, a))
@@ -351,13 +353,13 @@ def draw_top(img, main, t, progress):
     sd = ImageDraw.Draw(s)
     # うっすらグリッド
     for gx in range(0, SW, 60):
-        sd.line((gx, 0, gx, SH), fill=(17, 24, 42), width=1)
+        sd.line((gx, 0, gx, SH), fill=(220, 229, 241), width=1)
     for gy in range(0, SH, 60):
-        sd.line((0, gy, SW, gy), fill=(17, 24, 42), width=1)
+        sd.line((0, gy, SW, gy), fill=(220, 229, 241), width=1)
     main(sd, t)
     img.paste(s.resize((W, TOP_H), Image.LANCZOS), (0, 0))
     d = ImageDraw.Draw(img)
-    d.rectangle((0, 0, W, 9), fill=(40, 46, 66))
+    d.rectangle((0, 0, W, 9), fill=(203, 213, 225))
     d.rectangle((0, 0, int(W * progress), 9), fill=(244, 63, 94))
 
 
@@ -559,7 +561,7 @@ def char_slot(d, expr, t):
     label = f"表情: {expr}"
     tw = d.textlength(label, font=f(30)) + 34
     d.rounded_rectangle((cx - tw / 2, y1 - 80, cx + tw / 2, y1 - 30), 24, fill=(30, 41, 59), outline=col, width=2)
-    tc(d, (cx, y1 - 55), label, f(30), TXT)
+    tc(d, (cx, y1 - 55), label, f(30), (241, 245, 249))
 
 
 def caption(img, text, t):
