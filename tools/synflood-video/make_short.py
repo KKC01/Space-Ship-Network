@@ -9,7 +9,7 @@ import math
 import subprocess
 import sys
 
-from PIL import Image, ImageDraw, ImageFont
+from PIL import Image, ImageDraw, ImageFilter, ImageFont
 
 from fonts import FONT, MONO
 
@@ -24,17 +24,18 @@ def f(size, mono=False):
     return _fc[key]
 
 
-BG = (234, 241, 250)
+BG = (238, 242, 255)
 PANEL = (255, 255, 255)
 LINE = (176, 188, 206)
-TXT = (20, 22, 30)
-DIM = (100, 112, 132)
-C_SYN = (2, 132, 199)
-C_SYNACK = (124, 58, 237)
-C_ACK = (22, 163, 74)
-C_ATK = (220, 38, 38)
-C_WARN = (202, 138, 4)
-C_COOKIE = (234, 88, 12)
+TXT = (15, 23, 42)
+DIM = (100, 116, 139)
+C_SYN = (14, 165, 233)
+C_SYNACK = (139, 92, 246)
+C_ACK = (16, 185, 129)
+C_ATK = (244, 63, 94)
+C_WARN = (245, 158, 11)
+C_COOKIE = (249, 115, 22)
+C_INDIGO = (99, 102, 241)
 ON_COLOR = (255, 255, 255)
 
 CREAM = (247, 242, 230)
@@ -72,15 +73,124 @@ def tc(d, xy, s, font, fill, **kw):
 # ======================================================================
 # 上段: ネットワークのアニメーション
 # 1350x1062 で描いて 0.8 倍に縮小し、1080x850 に収める
+# 柔らかいグラデーション背景 + 影付きの白カード + 光るパケット
 # ======================================================================
 SW, SH = 1350, 1062
 NP = {
-    "client": (215, 190),
-    "attacker": (215, 790),
-    "server": (1100, 450),
-    "cloud": (660, 960),
+    "client": (240, 300),
+    "attacker": (240, 800),
+    "server": (1100, 470),
+    "cloud": (690, 120),
 }
+CARD_HW, CARD_HH = 165, 128
 N_SLOTS = 8
+CUR = {"img": None}  # 描画中の上段キャンバス (影やグローの合成に使う)
+_cache = {}
+
+
+def shadow_card(w, h, r=34, blur=22, alpha=60):
+    key = ("card", w, h, r)
+    if key not in _cache:
+        pad = blur * 3
+        im = Image.new("RGBA", (w + pad * 2, h + pad * 2), (0, 0, 0, 0))
+        d = ImageDraw.Draw(im)
+        d.rounded_rectangle((pad, pad + 14, pad + w, pad + h + 14), r, fill=(40, 50, 110, alpha))
+        im = im.filter(ImageFilter.GaussianBlur(blur))
+        d = ImageDraw.Draw(im)
+        d.rounded_rectangle((pad, pad, pad + w, pad + h), r, fill=(255, 255, 255, 240),
+                            outline=(255, 255, 255, 255), width=3)
+        _cache[key] = (im, pad)
+    return _cache[key]
+
+
+def top_background():
+    if "bg" not in _cache:
+        g = Image.new("RGB", (2, 2))
+        g.putdata([(238, 242, 255), (224, 242, 254), (243, 232, 255), (236, 253, 245)])
+        bg = g.resize((SW, SH), Image.BICUBIC)
+        blobs = Image.new("RGBA", (SW, SH), (0, 0, 0, 0))
+        bd = ImageDraw.Draw(blobs)
+        for (x, y, r, c) in [(150, 120, 260, (167, 139, 250, 90)), (1250, 260, 300, (56, 189, 248, 80)),
+                             (1150, 980, 320, (244, 114, 182, 70)), (120, 1000, 260, (52, 211, 153, 70))]:
+            bd.ellipse((x - r, y - r, x + r, y + r), fill=c)
+        blobs = blobs.filter(ImageFilter.GaussianBlur(120))
+        bg.paste(blobs, (0, 0), blobs)
+        dots = ImageDraw.Draw(bg)
+        for y in range(20, SH, 40):
+            for x in range(20, SW, 40):
+                dots.ellipse((x - 1.5, y - 1.5, x + 1.5, y + 1.5), fill=(203, 213, 235))
+        _cache["bg"] = bg
+    return _cache["bg"].copy()
+
+
+# ---- アイコン ----
+def icon_laptop(d, x, y, c):
+    d.rounded_rectangle((x - 58, y - 44, x + 58, y + 28), 10, fill=c)
+    d.rounded_rectangle((x - 48, y - 35, x + 48, y + 20), 6, fill=(224, 242, 254))
+    d.polygon([(x - 74, y + 34), (x + 74, y + 34), (x + 64, y + 46), (x - 64, y + 46)], fill=c)
+
+
+def icon_server(d, x, y, c):
+    for i in range(3):
+        yy = y - 48 + i * 33
+        d.rounded_rectangle((x - 54, yy, x + 54, yy + 27), 7, fill=c)
+        d.ellipse((x + 30, yy + 9, x + 40, yy + 19), fill=(134, 239, 172))
+        d.line((x - 40, yy + 13, x + 10, yy + 13), fill=(226, 232, 240), width=4)
+
+
+def icon_hacker(d, x, y, c):
+    d.ellipse((x - 52, y - 54, x + 52, y + 50), fill=c)
+    d.pieslice((x - 80, y + 10, x + 80, y + 120), 180, 360, fill=c)
+    d.ellipse((x - 34, y - 30, x + 34, y + 36), fill=(30, 27, 46))
+    d.ellipse((x - 22, y - 6, x - 8, y + 6), fill=(251, 113, 133))
+    d.ellipse((x + 8, y - 6, x + 22, y + 6), fill=(251, 113, 133))
+
+
+ICONS = {"laptop": icon_laptop, "server": icon_server, "hacker": icon_hacker}
+
+
+def pill(d, cx, cy, text, bg, size=40, fg=ON_COLOR):
+    tw = d.textlength(text, font=f(size)) + 44
+    h = size + 26
+    d.rounded_rectangle((cx - tw / 2, cy - h / 2, cx + tw / 2, cy + h / 2), h / 2, fill=bg)
+    tc(d, (cx, cy), text, f(size), fg, stroke_width=1, stroke_fill=fg)
+
+
+def node(d, key, name, sub, state, color, alpha=1.0, icon="laptop"):
+    if alpha <= 0:
+        return
+    x, y = NP[key]
+    im, pad = shadow_card(CARD_HW * 2, CARD_HH * 2)
+    if alpha < 1:
+        im = im.copy()
+        im.putalpha(im.getchannel("A").point(lambda v: int(v * alpha)))
+    CUR["img"].paste(im, (int(x - CARD_HW - pad), int(y - CARD_HH - pad)), im)
+    d.rounded_rectangle((x - CARD_HW, y - CARD_HH, x + CARD_HW, y - CARD_HH + 10), 5,
+                        fill=mix((255, 255, 255), color, alpha))
+    ICONS[icon](d, x, y - 40, mix((255, 255, 255), color, alpha))
+    tc(d, (x, y + 52), name, f(48), mix((255, 255, 255), TXT, alpha), stroke_width=1,
+       stroke_fill=mix((255, 255, 255), TXT, alpha))
+    tc(d, (x, y + 98), sub, f(28, True), mix((255, 255, 255), DIM, alpha))
+    if state:
+        s, sc = state
+        pill(d, x, y + CARD_HH + 50, s, mix(BG, sc, alpha), 38)
+
+
+def cloud(d, alpha=1.0):
+    x, y = NP["cloud"]
+    if "cloud" not in _cache:
+        lay = Image.new("RGBA", (SW, SH), (0, 0, 0, 0))
+        ld = ImageDraw.Draw(lay)
+        for dx, dy, r in [(-130, 14, 58), (-50, -22, 76), (52, -14, 68), (135, 14, 56), (0, 34, 68)]:
+            ld.ellipse((x + dx - r, y + dy - r, x + dx + r, y + dy + r), fill=(255, 255, 255, 255))
+        sh = Image.new("RGBA", (SW, SH), (0, 0, 0, 0))
+        sh.paste((60, 70, 130, 70), (0, 14), lay)
+        sh = sh.filter(ImageFilter.GaussianBlur(20))
+        sh.alpha_composite(lay)
+        _cache["cloud"] = sh
+    CUR["img"].paste(_cache["cloud"], (0, 0), _cache["cloud"])
+    tc(d, (x, y - 14), "偽装された送信元IP", f(40), TXT, stroke_width=1, stroke_fill=TXT)
+    tc(d, (x, y + 30), "存在しない / 応答しない", f(28), DIM)
 
 
 def edge_points(src, dst):
@@ -88,33 +198,23 @@ def edge_points(src, dst):
     dx, dy = x1 - x0, y1 - y0
     dd = math.hypot(dx, dy)
     ux, uy = dx / dd, dy / dd
-    o0 = 95 if src == "cloud" else 185
-    o1 = 95 if dst == "cloud" else 185
+
+    def off(k):
+        if k == "cloud":
+            return 120
+        return min(CARD_HW / max(abs(ux), 1e-6), CARD_HH / max(abs(uy), 1e-6)) + 20
+
+    o0, o1 = off(src), off(dst)
     return (x0 + ux * o0, y0 + uy * o0), (x1 - ux * o1, y1 - uy * o1)
 
 
-def node(d, key, name, sub, state, color, alpha=1.0):
-    if alpha <= 0:
-        return
-    x, y = NP[key]
-    d.rounded_rectangle((x - 185, y - 85, x + 185, y + 85), 22,
-                        fill=mix(BG, PANEL, alpha), outline=mix(BG, color, alpha), width=5)
-    tc(d, (x, y - 25), name, f(60), mix(BG, TXT, alpha))
-    tc(d, (x, y + 38), sub, f(36, True), mix(BG, DIM, alpha))
-    if state:
-        s, sc = state
-        tc(d, (x, y + 128), s, f(50), mix(BG, sc, alpha), stroke_width=1, stroke_fill=mix(BG, sc, alpha))
-
-
-def cloud(d, alpha=1.0):
-    if alpha <= 0:
-        return
-    x, y = NP["cloud"]
-    c = mix(BG, (203, 213, 225), alpha)
-    for dx, dy, r in [(-120, 6, 56), (-45, -26, 70), (50, -18, 64), (125, 10, 54), (0, 26, 64)]:
-        d.ellipse((x + dx - r, y + dy - r, x + dx + r, y + dy + r), fill=c)
-    tc(d, (x, y - 10), "偽装された送信元IP", f(42), mix(BG, TXT, alpha))
-    tc(d, (x, y + 40), "(存在しない/応答しない)", f(30), mix(BG, DIM, alpha))
+def bez(a, b, p, bend=0.12):
+    """2点間をゆるくカーブさせた経路"""
+    mx, my = (a[0] + b[0]) / 2, (a[1] + b[1]) / 2
+    nx, ny = -(b[1] - a[1]) * bend, (b[0] - a[0]) * bend
+    cx, cy = mx + nx, my + ny
+    q = 1 - p
+    return (q * q * a[0] + 2 * q * p * cx + p * p * b[0], q * q * a[1] + 2 * q * p * cy + p * p * b[1])
 
 
 def packet(d, pk, t):
@@ -124,40 +224,54 @@ def packet(d, pk, t):
     a, b = edge_points(pk["src"], pk["dst"])
     col = pk["color"]
     if t <= t1:
-        d.line((a, b), fill=mix(BG, col, 0.4), width=4)
+        # 点線の経路
+        for k in range(0, 40):
+            if k % 2 == 0:
+                d.line((bez(a, b, k / 40), bez(a, b, (k + 1) / 40)), fill=mix(BG, col, 0.45), width=4)
         p = ease((t - t0) / (t1 - t0))
-        x, y = lerp(a[0], b[0], p), lerp(a[1], b[1], p)
         fade = clamp((1 - p) / 0.25) if pk.get("lost") else 1.0
+        x, y = bez(a, b, p)
+        for j in range(1, 6):
+            tx, ty = bez(a, b, max(0.0, p - j * 0.035))
+            r = 12 - j * 1.8
+            d.ellipse((tx - r, ty - r, tx + r, ty + r), fill=mix(BG, col, (0.7 - j * 0.12) * fade))
         label = pk["label"]
-        tw = d.textlength(label, font=f(46)) + 40
-        d.rounded_rectangle((x - tw / 2, y - 36, x + tw / 2, y + 36), 16,
-                            fill=mix(BG, col, fade), outline=mix(BG, TXT, 0.8 * fade), width=3)
-        tc(d, (x, y), label, f(46), mix(BG, ON_COLOR, fade), stroke_width=1, stroke_fill=mix(BG, ON_COLOR, fade))
+        tw = d.textlength(label, font=f(44)) + 46
+        glow = Image.new("RGBA", (int(tw) + 120, 190), (0, 0, 0, 0))
+        gd = ImageDraw.Draw(glow)
+        gd.rounded_rectangle((60, 60, 60 + tw, 130), 35, fill=col + (int(170 * fade),))
+        glow = glow.filter(ImageFilter.GaussianBlur(18))
+        CUR["img"].paste(glow, (int(x - tw / 2 - 60), int(y - 95)), glow)
+        d.rounded_rectangle((x - tw / 2, y - 35, x + tw / 2, y + 35), 35, fill=mix(BG, col, fade))
+        tc(d, (x, y), label, f(44), mix(BG, ON_COLOR, fade), stroke_width=1, stroke_fill=mix(BG, ON_COLOR, fade))
     elif pk.get("drop") and t < t1 + 1.0:
         x, y = b
-        c = mix(BG, C_ATK, 1 - (t - t1))
-        d.line((x - 34, y - 34, x + 34, y + 34), fill=c, width=12)
-        d.line((x - 34, y + 34, x + 34, y - 34), fill=c, width=12)
-        tc(d, (x, y - 64), "破棄", f(46), c)
+        k = 1 - (t - t1)
+        c = mix(BG, C_ATK, k)
+        d.ellipse((x - 40, y - 40, x + 40, y + 40), fill=mix(BG, (255, 228, 230), k), outline=c, width=5)
+        d.line((x - 18, y - 18, x + 18, y + 18), fill=c, width=9)
+        d.line((x - 18, y + 18, x + 18, y - 18), fill=c, width=9)
+        pill(d, x, y - 76, "破棄", c, 32)
     elif pk.get("lost") and t < t1 + 0.8:
         x, y = b
-        tc(d, (x + 34, y - 40), "?", f(64), mix(BG, DIM, 1 - (t - t1) / 0.8))
+        tc(d, (x + 40, y - 46), "?", f(70), mix(BG, DIM, 1 - (t - t1) / 0.8))
 
 
 def mini_backlog(d, used, color):
-    """サーバの下に 8 マスのバックログ表示"""
+    """サーバの下にバックログのマス"""
     x, y = NP["server"]
-    y += 190
-    cw, gap = 38, 8
+    y += CARD_HH + 110
+    cw, gap = 40, 9
     x0 = x - (N_SLOTS * (cw + gap) - gap) / 2
     for i in range(N_SLOTS):
         cx = x0 + i * (cw + gap)
-        box = (cx, y, cx + cw, y + 48)
+        box = (cx, y, cx + cw, y + 50)
         if i < used:
-            d.rounded_rectangle(box, 5, fill=color)
+            d.rounded_rectangle(box, 10, fill=color)
         else:
-            d.rounded_rectangle(box, 5, outline=LINE, width=2)
-    tc(d, (x, y + 86), f"バックログ {used}/{N_SLOTS}", f(40), color if used else DIM)
+            d.rounded_rectangle(box, 10, fill=(255, 255, 255), outline=(203, 213, 225), width=3)
+    tc(d, (x, y + 86), f"バックログ {used}/{N_SLOTS}", f(38), color if used else DIM,
+       stroke_width=1, stroke_fill=color if used else DIM)
 
 
 def mk(t0, dt, src, dst, label, color, **kw):
@@ -185,7 +299,7 @@ def draw_normal(d, tn):
     node(d, "client", "あなたのPC", "192.0.2.10",
          st([(0, "CLOSED", DIM), (0.5, "SYN_SENT", C_SYN), (4.3, "ESTABLISHED", C_ACK)]), C_SYN)
     node(d, "server", "Webサーバ", "198.51.100.1",
-         st([(0, "LISTEN", DIM), (1.7, "SYN_RCVD", C_WARN), (5.5, "ESTABLISHED", C_ACK)]), DIM)
+         st([(0, "LISTEN", DIM), (1.7, "SYN_RCVD", C_WARN), (5.5, "ESTABLISHED", C_ACK)]), C_INDIGO, icon="server")
     for pk in NORMAL_PK:
         packet(d, pk, tn)
     used = 1 if 1.7 <= tn < 7.0 else 0
@@ -220,8 +334,8 @@ def flood_count(tf):
 def draw_flood(d, tf):
     n = flood_count(tf)
     full = n >= N_SLOTS
-    node(d, "attacker", "攻撃者", "送信元IPを偽装", ("SYN を連射", C_ATK), C_ATK)
     cloud(d)
+    node(d, "attacker", "攻撃者", "送信元IPを偽装", ("SYN を連射", C_ATK), C_ATK, icon="hacker")
     a = clamp((tf - 10.0) / 0.6)
     state = None
     for ts, s, c in [(10.0, "接続したい…", C_SYN), (12.3, "応答なし", C_ATK), (14.5, "接続できない!", C_ATK)]:
@@ -233,7 +347,7 @@ def draw_flood(d, tf):
         srv = (f"SYN_RCVD ×{n}", C_WARN)
     if full:
         srv = ("満杯!", C_ATK)
-    node(d, "server", "Webサーバ", "198.51.100.1", srv, C_ATK if full else DIM)
+    node(d, "server", "Webサーバ", "198.51.100.1", srv, C_ATK if full else C_INDIGO, icon="server")
     for pk in FLOOD_PK:
         packet(d, pk, tf)
     mini_backlog(d, n, C_ATK)
@@ -245,10 +359,10 @@ def build_cookie():
     for i in range(6):
         t0 = 0.2 + i * 0.6
         pk.append(mk(t0, 0.7, "attacker", "server", "SYN", C_ATK))
-        pk.append(mk(t0 + 0.8, 0.8, "server", "cloud", "SYN-ACK(Cookie)", C_COOKIE, lost=True))
+        pk.append(mk(t0 + 0.8, 0.8, "server", "cloud", "SYN-ACK", C_COOKIE, lost=True))
     pk.append(mk(1.6, 0.9, "client", "server", "SYN", C_SYN))
-    pk.append(mk(2.7, 0.9, "server", "client", "SYN-ACK(Cookie)", C_COOKIE))
-    pk.append(mk(3.8, 0.9, "client", "server", "ACK(Cookie+1)", C_ACK))
+    pk.append(mk(2.7, 0.9, "server", "client", "SYN-ACK+Cookie", C_COOKIE))
+    pk.append(mk(3.8, 0.9, "client", "server", "ACK+Cookie", C_ACK))
     return pk
 
 
@@ -256,35 +370,42 @@ COOKIE_PK = build_cookie()
 
 
 def draw_cookie(d, tk):
-    node(d, "attacker", "攻撃者", "送信元IPを偽装", ("SYN を連射", C_ATK), C_ATK)
     cloud(d)
+    node(d, "attacker", "攻撃者", "送信元IPを偽装", ("SYN を連射", C_ATK), C_ATK, icon="hacker")
     cs = ("SYN_SENT", C_SYN) if tk >= 1.6 else ("CLOSED", DIM)
     if tk >= 4.7:
         cs = ("接続OK!", C_ACK)
     node(d, "client", "正規ユーザー", "192.0.2.10", cs, C_SYN)
     srv = ("SYN Cookie 有効", C_COOKIE)
     if tk >= 4.7:
-        srv = ("Cookie検証OK ✓", C_ACK)
-    node(d, "server", "Webサーバ", "198.51.100.1", srv, C_COOKIE)
+        srv = ("Cookie検証OK", C_ACK)
+    node(d, "server", "Webサーバ", "198.51.100.1", srv, C_COOKIE, icon="server")
     for pk in COOKIE_PK:
         packet(d, pk, tk)
     mini_backlog(d, 1 if tk >= 4.7 else 0, C_ACK)
 
 
+def glass_panel(x0, y0, x1, y1):
+    im, pad = shadow_card(int(x1 - x0), int(y1 - y0), r=40)
+    CUR["img"].paste(im, (int(x0 - pad), int(y0 - pad)), im)
+
+
 # ---- 時系列グラフ ----
 def draw_graph(d, p):
-    x0, y0, x1, y1 = 40, 30, SW - 40, SH - 20
-    tc(d, ((x0 + x1) / 2, y0 + 20), "半開接続数(SYN_RCVD)の推移", f(54), TXT)
-    gx0, gy0, gx1, gy1 = x0 + 80, y0 + 120, x1 - 30, y1 - 70
-    d.line((gx0, gy1, gx1, gy1), fill=LINE, width=3)
-    d.line((gx0, gy0, gx0, gy1), fill=LINE, width=3)
-    d.line((gx0, gy0, gx1, gy0), fill=mix(BG, C_ATK, 0.6), width=2)
-    d.text((gx0 - 14, gy0), str(N_SLOTS), font=f(40), fill=C_ATK, anchor="rm")
-    d.text((gx0 - 14, gy1), "0", font=f(40), fill=DIM, anchor="rm")
-    d.text((gx1, gy0 - 26), "上限(バックログ)", font=f(36), fill=C_ATK, anchor="rm")
+    x0, y0, x1, y1 = 40, 40, SW - 40, SH - 40
+    glass_panel(x0, y0, x1, y1)
+    tc(d, ((x0 + x1) / 2, y0 + 60), "半開接続数の推移", f(56), TXT, stroke_width=1, stroke_fill=TXT)
+    gx0, gy0, gx1, gy1 = x0 + 100, y0 + 160, x1 - 50, y1 - 90
+    for k in range(N_SLOTS + 1):
+        gy = gy1 - (gy1 - gy0) * k / N_SLOTS
+        d.line((gx0, gy, gx1, gy), fill=(226, 232, 240), width=2)
+    d.line((gx0, gy0, gx1, gy0), fill=C_ATK, width=3)
+    d.text((gx0 - 18, gy0), str(N_SLOTS), font=f(40), fill=C_ATK, anchor="rm")
+    d.text((gx0 - 18, gy1), "0", font=f(40), fill=DIM, anchor="rm")
+    d.text((gx1, gy0 - 30), "上限(バックログ)", font=f(36), fill=C_ATK, anchor="rm")
     for s in range(0, int(FLOOD_DUR) + 1, 4):
         sx = gx0 + (gx1 - gx0) * s / FLOOD_DUR
-        tc(d, (sx, gy1 + 38), f"{s}s", f(36), DIM)
+        tc(d, (sx, gy1 + 42), f"{s}秒", f(36), DIM)
     tmax = FLOOD_DUR * p
     pts = []
     for k in range(321):
@@ -293,69 +414,72 @@ def draw_graph(d, p):
             break
         pts.append((gx0 + (gx1 - gx0) * tt / FLOOD_DUR, gy1 - (gy1 - gy0) * flood_count(tt) / N_SLOTS))
     if len(pts) > 1:
-        d.line(pts, fill=C_WARN, width=9)
+        d.polygon(pts + [(pts[-1][0], gy1), (gx0, gy1)], fill=(254, 243, 199))
+        d.line(pts, fill=C_WARN, width=10, joint="curve")
+        ex, ey = pts[-1]
+        d.ellipse((ex - 14, ey - 14, ex + 14, ey + 14), fill=C_WARN, outline=(255, 255, 255), width=4)
     marks = [(0.3, "攻撃開始", C_ATK, 0.25), (FLOOD_ARR[-1], "満杯", C_ATK, 0.45), (11.4, "正規SYN破棄", C_SYN, 0.7)]
     for tt, label, c, ly in marks:
         if tt > tmax:
             continue
         mx = gx0 + (gx1 - gx0) * tt / FLOOD_DUR
-        d.line((mx, gy0, mx, gy1), fill=mix(BG, c, 0.7), width=2)
-        my = gy0 + (gy1 - gy0) * ly
-        tw = d.textlength(label, font=f(42)) + 22
-        d.rounded_rectangle((mx + 6, my - 30, mx + 6 + tw, my + 30), 10, fill=c)
-        d.text((mx + 17, my), label, font=f(42), fill=ON_COLOR, anchor="lm")
+        d.line((mx, gy0, mx, gy1), fill=mix((255, 255, 255), c, 0.6), width=3)
+        tw = d.textlength(label, font=f(40)) + 44
+        pill(d, mx + 10 + tw / 2, gy0 + (gy1 - gy0) * ly, label, c, 40)
 
 
 # ---- 比較表 ----
 def draw_compare(d, t):
-    tc(d, (SW / 2, 100), "対策なし vs SYN Cookie", f(62), TXT)
+    glass_panel(30, 40, SW - 30, SH - 40)
+    tc(d, (SW / 2, 120), "対策なし vs SYN Cookie", f(62), TXT, stroke_width=1, stroke_fill=TXT)
     rows = [
         ("", "対策なし", "SYN Cookie"),
         ("偽装SYNが来ると", "1件ごとに枠を消費", "枠を消費しない"),
         ("バックログ", "すぐ満杯", "空のまま"),
         ("正規ユーザー", "× 接続できない", "○ 接続できる"),
     ]
-    xs = [30, 440, 890]
-    ws = [410, 450, 430]
+    xs = [60, 460, 900]
+    ws = [400, 440, 400]
     for r, row in enumerate(rows):
         a = clamp((t - 0.3 - r * 0.5) / 0.4)
-        y = 190 + r * 200
+        y = 210 + r * 200
         for c, cell in enumerate(row):
             if r == 0 and c == 0:
                 continue
-            col, fg = PANEL, TXT
+            fg = TXT
+            fill = (241, 245, 249)
             if r == 0:
-                col = C_ATK if c == 1 else C_ACK
-                fg = ON_COLOR
+                fill, fg = (C_ATK if c == 1 else C_ACK), ON_COLOR
             elif c == 1:
-                fg = C_ATK
+                fill, fg = (255, 241, 242), C_ATK
             elif c == 2:
-                fg = C_ACK
-            d.rounded_rectangle((xs[c], y, xs[c] + ws[c] - 12, y + 135), 16,
-                                fill=mix(BG, col, a), outline=mix(BG, LINE, a), width=2)
-            tc(d, (xs[c] + (ws[c] - 12) / 2, y + 67), cell, f(44 if r else 52), mix(BG, fg, a))
+                fill, fg = (236, 253, 245), C_ACK
+            d.rounded_rectangle((xs[c], y, xs[c] + ws[c] - 14, y + 170), 28, fill=mix((255, 255, 255), fill, a))
+            tc(d, (xs[c] + (ws[c] - 14) / 2, y + 85), cell, f(44 if r else 52), mix((255, 255, 255), fg, a),
+               stroke_width=1, stroke_fill=mix((255, 255, 255), fg, a))
 
 
 def draw_shield(d, t):
     x, y = SW / 2, SH / 2
     a = ease(t / 0.8)
-    r = 300 * (0.8 + 0.2 * a)
+    r = 340 * (0.8 + 0.2 * a)
     pts = [(x, y - r), (x + r * 0.85, y - r * 0.6), (x + r * 0.75, y + r * 0.35), (x, y + r),
            (x - r * 0.75, y + r * 0.35), (x - r * 0.85, y - r * 0.6)]
-    d.polygon(pts, fill=mix(BG, (220, 252, 231), a))
-    d.line(pts + [pts[0]], fill=mix(BG, C_ACK, a), width=10)
-    tc(d, (x, y - 50), "SYN Flood", f(70), mix(BG, TXT, a))
-    tc(d, (x, y + 45), "仕組みを知って防ぐ", f(48), mix(BG, C_ACK, a))
+    glow = Image.new("RGBA", (SW, SH), (0, 0, 0, 0))
+    ImageDraw.Draw(glow).polygon(pts, fill=(16, 185, 129, int(150 * a)))
+    glow = glow.filter(ImageFilter.GaussianBlur(40))
+    CUR["img"].paste(glow, (0, 0), glow)
+    d.polygon(pts, fill=mix(BG, (16, 185, 129), a))
+    inner = [(x + (px - x) * 0.86, y + (py - y) * 0.86) for px, py in pts]
+    d.line(inner + [inner[0]], fill=mix(BG, (209, 250, 229), a), width=6)
+    tc(d, (x, y - 50), "SYN Flood", f(80), mix(BG, ON_COLOR, a), stroke_width=2, stroke_fill=mix(BG, ON_COLOR, a))
+    tc(d, (x, y + 50), "仕組みを知って防ぐ", f(52), mix(BG, ON_COLOR, a), stroke_width=1, stroke_fill=mix(BG, ON_COLOR, a))
 
 
 def draw_top(img, main, t, progress):
-    s = Image.new("RGB", (SW, SH), BG)
+    s = top_background()
+    CUR["img"] = s
     sd = ImageDraw.Draw(s)
-    # うっすらグリッド
-    for gx in range(0, SW, 60):
-        sd.line((gx, 0, gx, SH), fill=(220, 229, 241), width=1)
-    for gy in range(0, SH, 60):
-        sd.line((0, gy, SW, gy), fill=(220, 229, 241), width=1)
     main(sd, t)
     img.paste(s.resize((W, TOP_H), Image.LANCZOS), (0, 0))
     d = ImageDraw.Draw(img)
