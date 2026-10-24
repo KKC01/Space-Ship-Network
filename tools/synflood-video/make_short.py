@@ -43,8 +43,8 @@ RED = (229, 57, 53)
 MINT = (190, 242, 214)
 NAVY = (16, 20, 38)
 
-TOP_H = 600
-MID_Y0, MID_Y1 = 600, 1260
+TOP_H = 850
+MID_Y0, MID_Y1 = 850, 1260
 
 
 def lerp(a, b, t):
@@ -70,14 +70,14 @@ def tc(d, xy, s, font, fill, **kw):
 
 # ======================================================================
 # 上段: ネットワークのアニメーション
-# 1350x750 で描いて 0.8 倍に縮小し、1080x600 に収める
+# 1350x1062 で描いて 0.8 倍に縮小し、1080x850 に収める
 # ======================================================================
-SW, SH = 1350, 750
+SW, SH = 1350, 1062
 NP = {
-    "client": (260, 170),
-    "attacker": (260, 560),
-    "server": (1040, 360),
-    "cloud": (660, 640),
+    "client": (260, 200),
+    "attacker": (260, 820),
+    "server": (1040, 480),
+    "cloud": (660, 950),
 }
 N_SLOTS = 8
 
@@ -307,7 +307,7 @@ def draw_graph(d, p):
 
 # ---- 比較表 ----
 def draw_compare(d, t):
-    tc(d, (SW / 2, 55), "対策なし vs SYN Cookie", f(50), TXT)
+    tc(d, (SW / 2, 100), "対策なし vs SYN Cookie", f(50), TXT)
     rows = [
         ("", "対策なし", "SYN Cookie"),
         ("偽装SYNが来ると", "1件ごとに枠を消費", "枠を消費しない"),
@@ -318,7 +318,7 @@ def draw_compare(d, t):
     ws = [360, 390, 390]
     for r, row in enumerate(rows):
         a = clamp((t - 0.3 - r * 0.5) / 0.4)
-        y = 110 + r * 150
+        y = 190 + r * 200
         for c, cell in enumerate(row):
             if r == 0 and c == 0:
                 continue
@@ -421,7 +421,7 @@ def flow(img, t, cards, y, heading=None):
     """横一列のカードを矢印でつなぐ"""
     d = ImageDraw.Draw(img)
     if heading:
-        bold_text(d, (W / 2, y - 170), heading, f(46), INK)
+        bold_text(d, (W / 2, y - 125), heading, f(46), INK)
     gap = 56
     total = sum(c["w"] for c in cards) + gap * (len(cards) - 1)
     x = (W - total) / 2
@@ -441,7 +441,7 @@ def flow(img, t, cards, y, heading=None):
 def grid(img, t, rows, y0, heading=None):
     d = ImageDraw.Draw(img)
     if heading:
-        bold_text(d, (W / 2, y0 - 110), heading, f(46), INK)
+        bold_text(d, (W / 2, y0 - 100), heading, f(46), INK)
     k = 0
     for r, row in enumerate(rows):
         gap = 22
@@ -450,7 +450,7 @@ def grid(img, t, rows, y0, heading=None):
         for i, c in enumerate(row):
             c.setdefault("at", 0.3 + k * 0.3)
             c.setdefault("tilt", (-1.2, 1.0, -0.6, 1.4, -1.0)[k % 5])
-            paste_card(img, x + c["w"] / 2, y0 + r * 170, c, t)
+            paste_card(img, x + c["w"] / 2, y0 + r * 150, c, t)
             x += c["w"] + gap
             k += 1
 
@@ -466,60 +466,60 @@ HLR = dict(fill=YELLOW, fg=RED)
 
 
 def mid_hook(img, t):
-    flow(img, t, [C("Webサーバ"), C(["SYNが", "大量に届く"], fg=RED), C(["ダウン!?"], size=52, **HLR)], 930)
+    flow(img, t, [C("Webサーバ"), C(["SYNが", "大量に届く"], fg=RED), C(["ダウン!?"], size=52, **HLR)], 1055)
 
 
 def mid_handshake(img, t):
     flow(img, t, [C("SYN", w=230, fill=(186, 230, 253)), C("SYN-ACK", w=270, fill=(221, 214, 254)),
-                  C("ACK", w=230, fill=MINT)], 960, heading="3ウェイハンドシェイク")
+                  C("ACK", w=230, fill=MINT)], 1085, heading="3ウェイハンドシェイク")
 
 
 def mid_slot(img, t):
-    flow(img, t, [C(["SYNを", "受け取る"]), C(["枠を", "1つ確保"], **HL), C(["ACKで", "枠を解放"])], 960,
+    flow(img, t, [C(["SYNを", "受け取る"]), C(["枠を", "1つ確保"], **HL), C(["ACKで", "枠を解放"])], 1085,
          heading="サーバーの動き")
 
 
 def mid_attack(img, t):
-    flow(img, t, [C("攻撃者"), C(["偽装SYN", "×大量"], fg=RED, **HL), C("Webサーバ")], 930)
+    flow(img, t, [C("攻撃者"), C(["偽装SYN", "×大量"], fg=RED, **HL), C("Webサーバ")], 1055)
 
 
 def mid_noack(img, t):
-    flow(img, t, [C("SYN-ACK"), C(["偽装IP", "(存在しない)"]), C(["ACKが", "来ない"], **HLR)], 930)
+    flow(img, t, [C("SYN-ACK"), C(["偽装IP", "(存在しない)"]), C(["ACKが", "来ない"], **HLR)], 1055)
 
 
 def mid_dos(img, t):
-    flow(img, t, [C(["枠", "8/8 満杯"], fg=RED), C(["正規SYNも", "破棄"]), C(["DoS"], size=60, **HLR)], 930)
+    flow(img, t, [C(["枠", "8/8 満杯"], fg=RED), C(["正規SYNも", "破棄"]), C(["DoS"], size=60, **HLR)], 1055)
 
 
 def mid_numbers(img, t):
     d = ImageDraw.Draw(img)
     for i, (title, num, unit, at) in enumerate([("満杯まで(この例)", "約7", "秒", 0.3), ("解放されるまで", "約60", "秒", 1.0)]):
         cx = 290 + i * 500
-        spec = C([" "], w=440, h=300, at=at, tilt=(-1.5, 1.5)[i])
-        paste_card(img, cx, 930, spec, t)
+        spec = C([" "], w=440, h=250, at=at, tilt=(-1.5, 1.5)[i])
+        paste_card(img, cx, 1055, spec, t)
         a = clamp((t - at - 0.25) / 0.2)
         if a > 0:
-            bold_text(d, (cx - 5, 860), title, f(36), mix((255, 255, 255), INK, a))
+            bold_text(d, (cx - 5, 995), title, f(36), mix((255, 255, 255), INK, a))
             nf = f(120, True)
             nw = d.textlength(num, font=nf)
-            d.text((cx - 5 - 25, 960), num, font=nf, fill=mix((255, 255, 255), RED, a), anchor="mm",
+            d.text((cx - 5 - 25, 1080), num, font=nf, fill=mix((255, 255, 255), RED, a), anchor="mm",
                    stroke_width=2, stroke_fill=mix((255, 255, 255), RED, a))
-            bold_text(d, (cx - 5 - 25 + nw / 2 + 32, 985), unit, f(48), mix((255, 255, 255), RED, a))
+            bold_text(d, (cx - 5 - 25 + nw / 2 + 32, 1105), unit, f(48), mix((255, 255, 255), RED, a))
 
 
 def mid_cookie(img, t):
     flow(img, t, [C(["SYN-ACKに", "Cookie"], w=270), C(["ACKで", "検証"], w=250, **HL), C(["接続", "OK!"], w=250, fill=MINT)],
-         960, heading="SYN Cookie")
+         1085, heading="SYN Cookie")
 
 
 def mid_measures(img, t):
     grid(img, t, [[C("SYN Cookie", w=330, h=130, **HL), C("バックログ拡大", w=330, h=130)],
                   [C("再送回数を削減", w=330, h=130), C("レート制限", w=260, h=130), C("DDoS防御", w=250, h=130)]],
-         860, heading="主な対策")
+         995, heading="主な対策")
 
 
 def mid_final(img, t):
-    flow(img, t, [C(["ACK待ちの", "枠を狙う"]), C(["枠を", "埋め尽くす"], fg=RED), C(["SYN Cookie", "で防ぐ"], **HL)], 930)
+    flow(img, t, [C(["ACK待ちの", "枠を狙う"]), C(["枠を", "埋め尽くす"], fg=RED), C(["SYN Cookie", "で防ぐ"], **HL)], 1055)
 
 
 # ======================================================================
